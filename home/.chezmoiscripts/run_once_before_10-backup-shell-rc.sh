@@ -1,21 +1,23 @@
 #!/bin/sh
-# Preserve any pre-existing shell rc files before this repo's chezmoi-managed
-# versions replace them.
-#
-# Idempotent twice over: chezmoi runs `run_once_` scripts exactly once per
-# machine (so re-running `chezmoi apply` never re-triggers this), and each file
-# is copied only when no backup already exists. So you get a single, original
-# backup — never a fresh one on every run.
+# Back up pre-existing config to <path>.pre-dotfiles.bak before the first
+# `chezmoi apply --force`, so the force is recoverable.
+# Idempotent: run_once (per machine) + skip any item already backed up.
+# NOTE: this list must track the chezmoi source tree — add new managed paths here.
 set -eu
 
 any=0
-for f in "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.zshrc" "$HOME/.zshenv" "$HOME/.zprofile"; do
-	[ -f "$f" ] || continue
-	bak="$f.pre-dotfiles.bak"
+for t in \
+	"$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.zshrc" "$HOME/.zshenv" "$HOME/.zprofile" \
+	"$HOME/.config/bat" "$HOME/.config/ghostty" "$HOME/.config/git" \
+	"$HOME/.config/lazygit" "$HOME/.config/navi" "$HOME/.config/nvim" \
+	"$HOME/.config/ripgrep" "$HOME/.config/sheldon" "$HOME/.config/starship.toml" \
+	"$HOME/.config/yazi" "$HOME/.config/zellij" "$HOME/.config/zsh"; do
+	[ -e "$t" ] || continue
+	bak="$t.pre-dotfiles.bak"
 	[ -e "$bak" ] && continue
-	cp -p "$f" "$bak"
+	cp -Rp "$t" "$bak"
 	if [ "$any" -eq 0 ]; then
-		echo "Preserved your previous shell rc file(s) before applying dotfiles:"
+		echo "Preserved pre-existing config as *.pre-dotfiles.bak before applying dotfiles:"
 		any=1
 	fi
 	echo "  $bak"

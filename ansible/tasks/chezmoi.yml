@@ -16,7 +16,7 @@
     state: directory
     mode: "0755"
 
-- name: Template chezmoi.toml from per-machine vars (single source of truth)
+- name: Template chezmoi.toml from per-machine vars
   ansible.builtin.copy:
     dest: "{{ ansible_facts['env']['HOME'] }}/.config/chezmoi/chezmoi.toml"
     mode: "0600"
@@ -32,7 +32,9 @@
   register: _cz_status
   changed_when: false
 
+# --force: skip prompts (need a TTY) when a managed file changed outside chezmoi.
+# Pre-existing files are backed up first by the run_once backup script.
 - name: Apply chezmoi (only when there are pending changes)
-  ansible.builtin.command: "{{ _chezmoi.stdout }} apply"
+  ansible.builtin.command: "{{ _chezmoi.stdout }} apply --force"
   when: _cz_status.stdout | length > 0
   changed_when: true
