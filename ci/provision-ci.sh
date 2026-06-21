@@ -1,0 +1,67 @@
+#!/usr/bin/env sh
+# Provision the dotfiles env inside a distro container and assert the tools.
+# MODE=sudo   -> run as root with allow_sudo=true  (native + shims + ubi fallback)
+# MODE=nosudo -> run as an unprivileged user with allow_sudo=false (pure ubi)
+set -eu
+
+MODE="${MODE:?set MODE=sudo|nosudo}"
+
+# --- Bootstrap deps via whichever package manager exists (we are root here) ---
+if command -v apt-get >/dev/null 2>&1; then
+	export DEBIAN_FRONTEND=noninteractive
+	apt-get update -qq
+	apt-get install -y -qq python3 python3-pip git curl ca-certificates sudo >/dev/null
+	pip install --quiet --break-system-packages ansible-core
+elif command -v pacman >/dev/null 2>&1; then
+	pacman -Sy --noconfirm --quiet python python-pip git curl sudo >/dev/null
+	pip install --quiet --break-system-packages ansible-core
+elif command -v dnf >/dev/null 2>&1; then
+	# Fedora's python3 is new enough for ansible-core; EL (Rocky/Alma/RHEL) ships
+	# too old, so pin python3.12. --allowerasing resolves the curl vs curl-minimal
+	# conflict on EL9+.
+	# shellcheck source=/dev/null
+	. /etc/os-release
+	if [ "${ID:-}" = "fedora" ]; then
+		dnf install -y -q --allowerasing python3 python3-pip git curl sudo >/dev/null
+		python3 -m pip install --quiet ansible-core
+	else
+		dnf install -y -q --allowerasing python3.12 python3.12-pip git curl sudo >/dev/null
+		python3.12 -m pip install --quiet ansible-core
+	fi
+else
+	echo "no supported package manager"
+	exit 1
+fi
+
+# /usr/local/bin holds the EL python3.12 ansible-playbook; ~/.local/bin holds ubi tools.
+export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
+# Install collections to a shared path so the unprivileged tester user can read them.
+COLLECTIONS_PATH=/usr/share/ansible/collections
+export ANSIBLE_COLLECTIONS_PATH="$COLLECTIONS_PATH"
+ansible-galaxy collection install -r ansible/requirements.yml -p "$COLLECTIONS_PATH" >/dev/null
+git config --global --add safe.directory "$PWD"
+
+# ubi reads GITHUB_TOKEN from the env to raise its GitHub API rate limit; empty is fine.
+export GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+
+write_local() { # $1 = allow_sudo value
+	printf '%s\n' '---' 'git_name: ci' 'git_email: ci@example.com' "allow_sudo: $1" >ansible/local.yml
+}
+
+# Run from ansible/ so its ansible.cfg loads (become=false, interpreter discovery,
+# inventory) — both modes must run under the same config. Only the packages tag:
+# fonts/chezmoi/sheldon/shell need a real home + TTY, out of scope for this matrix.
+if [ "$MODE" = "sudo" ]; then
+	write_local true
+	(cd ansible && ansible-playbook site.yml --tags packages)
+	./ci/assert-tools.sh ansible/group_vars/all.yml
+else
+	# Genuine unprivileged user with NO sudo rights. Pass the token + collections
+	# path inline — simple and portable across su versions; fine for a no-scope
+	# token in an ephemeral single-tenant container.
+	useradd -m tester
+	write_local false
+	chown -R tester "$PWD"
+	su tester -c "cd '$PWD/ansible' && GITHUB_TOKEN='${GITHUB_TOKEN:-}' ANSIBLE_COLLECTIONS_PATH='$COLLECTIONS_PATH' ansible-playbook site.yml --tags packages"
+	su tester -c "cd '$PWD' && ./ci/assert-tools.sh ansible/group_vars/all.yml"
+fi

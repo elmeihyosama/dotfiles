@@ -17,7 +17,7 @@
     use_ubi_fallback: >-
       {{ not (
            (ansible_facts.os_family == 'Darwin' and (_brew.rc | default(1)) == 0)
-           or (ansible_facts.pkg_mgr in ['apt', 'pacman'] and allow_sudo)
+           or (ansible_facts.pkg_mgr in ['apt', 'pacman', 'dnf', 'dnf5'] and allow_sudo)
          ) }}
 
 # ---- No-sudo / fallback path: ubi → ~/.local/bin -------------------------
@@ -26,7 +26,7 @@
     path: "{{ local_bin }}"
     state: directory
     mode: "0755"
-  when: use_ubi_fallback
+  when: use_ubi_fallback or (ansible_facts.system == 'Linux' and allow_sudo)
 
 - name: Check for ubi
   ansible.builtin.stat:
@@ -50,6 +50,7 @@
     cmd: >
       {{ local_bin }}/ubi --project {{ ubi_tool_repos[item] }} --in {{ local_bin }}
       {% if item in ubi_exe_overrides %}--exe {{ ubi_exe_overrides[item] }}{% endif %}
+      {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
     creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
   loop: "{{ tools }}"
   when: use_ubi_fallback
@@ -62,21 +63,152 @@
   loop: "{{ tools }}"
   when: ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
 
-# ---- Native path: Debian/Ubuntu apt -------------------------------------
-- name: Install tools via apt (Debian/Ubuntu, sudo)
+# ---- Native path: decision engine (Linux, sudo) -------------------------
+# Query each tool's candidate version via the host package manager, then
+# split `tools` into natives (present AND at/above any floor) and ubi tools.
+- name: Set native-path flags
+  ansible.builtin.set_fact:
+    _native_path: "{{ ansible_facts.pkg_mgr in ['apt', 'pacman', 'dnf', 'dnf5'] and allow_sudo and not use_ubi_fallback }}"
+    _pkgmgr: "{{ 'dnf' if ansible_facts.pkg_mgr == 'dnf5' else ansible_facts.pkg_mgr }}"
+
+- name: Build canonical->package-name map for this manager
+  ansible.builtin.set_fact:
+    _pkg_map: >-
+      {{ dict(tools | zip(tools)) | combine(native_pkg_overrides[_pkgmgr] | default({})) }}
+  when: _native_path
+
+- name: Refresh apt metadata before querying  # noqa command-instead-of-module
   become: true
   ansible.builtin.apt:
-    name: "{{ item }}"
-    state: present
     update_cache: true
+  when: _native_path and _pkgmgr == 'apt'
+
+- name: Refresh pacman metadata before querying
+  become: true
+  ansible.builtin.command: pacman -Sy --noconfirm
+  changed_when: false
+  when: _native_path and _pkgmgr == 'pacman'
+
+- name: Enable EPEL on the RHEL family (not Fedora)
+  become: true
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+  when: _native_path and _pkgmgr == 'dnf' and ansible_facts.distribution != 'Fedora'
+
+- name: Refresh dnf metadata before querying
+  become: true
+  ansible.builtin.command: dnf -q makecache
+  changed_when: false
+  when: _native_path and _pkgmgr == 'dnf'
+
+- name: Query apt candidate versions  # noqa command-instead-of-shell risky-shell-pipe
+  ansible.builtin.shell: "apt-cache policy {{ _pkg_map[item] }} | awk '/Candidate:/ {print $2}'"
   loop: "{{ tools }}"
-  when: ansible_facts.pkg_mgr == 'apt' and allow_sudo and not use_ubi_fallback
+  register: _apt_q
+  changed_when: false
+  when: _native_path and _pkgmgr == 'apt'
+
+- name: Query pacman candidate versions  # noqa command-instead-of-shell risky-shell-pipe
+  ansible.builtin.shell: "pacman -Si {{ _pkg_map[item] }} 2>/dev/null | awk -F': +' '/^Version/ {print $2; exit}'"
+  loop: "{{ tools }}"
+  register: _pacman_q
+  changed_when: false
+  failed_when: false
+  when: _native_path and _pkgmgr == 'pacman'
+
+- name: Query dnf candidate versions  # noqa command-instead-of-shell risky-shell-pipe
+  ansible.builtin.shell: "dnf -q info {{ _pkg_map[item] }} 2>/dev/null | awk -F': +' '/^Version/ {print $2; exit}'"
+  loop: "{{ tools }}"
+  register: _dnf_q
+  changed_when: false
+  failed_when: false
+  when: _native_path and _pkgmgr == 'dnf'
+
+- name: Collect candidate versions keyed by tool
+  ansible.builtin.set_fact:
+    _candidate_versions: >-
+      {{ dict(_q.results | map(attribute='item')
+              | zip(_q.results | map(attribute='stdout') | map('trim'))) }}
+  vars:
+    _q: "{{ _apt_q if _pkgmgr == 'apt' else (_pacman_q if _pkgmgr == 'pacman' else _dnf_q) }}"
+  when: _native_path
+
+- name: Partition tools into native vs ubi
+  ansible.builtin.set_fact:
+    native_tools: "{{ (native_tools | default([])) + ([item] if _ok else []) }}"
+    ubi_tools: "{{ (ubi_tools | default([])) + ([] if _ok else [item]) }}"
+  vars:
+    _cand: "{{ _candidate_versions[item] | default('') }}"
+    # Strip epoch (1:) and distro revision (-1, ~rc, +deb) before the compare.
+    _clean: "{{ _cand | regex_replace('^[0-9]+:', '') | regex_replace('[-+~].*$', '') }}"
+    _available: "{{ _cand | length > 0 and _cand != '(none)' }}"
+    _floor: "{{ min_versions[item] | default('') }}"
+    _ok: "{{ _available and (_floor == '' or _clean is version(_floor, '>=')) }}"
+  loop: "{{ tools }}"
+  when: _native_path
+
+- name: Map native tools to package names
+  # native_tools ⊆ tools ⊆ keys(_pkg_map), so extract always resolves.
+  ansible.builtin.set_fact:
+    _native_pkgs: "{{ native_tools | default([]) | map('extract', _pkg_map) | list }}"
+  when: _native_path
+
+- name: Show native/ubi partition
+  ansible.builtin.debug:
+    msg: "native={{ native_tools | default([]) }} ubi={{ ubi_tools | default([]) }}"
+  when: _native_path
+
+# ---- Native path: Debian/Ubuntu apt -------------------------------------
+- name: Install native tools via apt (Debian/Ubuntu, sudo)
+  become: true
+  ansible.builtin.apt:
+    name: "{{ _native_pkgs }}"
+    state: present
+  when: _native_path and _pkgmgr == 'apt' and (_native_pkgs | default([])) | length > 0
+
+- name: Shim renamed native binaries to canonical names in ~/.local/bin  # noqa command-instead-of-shell
+  ansible.builtin.shell: 'ln -sf "$(command -v {{ item.value }})" "{{ local_bin }}/{{ item.key }}"'
+  args:
+    creates: "{{ local_bin }}/{{ item.key }}"
+  loop: "{{ (native_bin_renames[_pkgmgr] | default({})) | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: _native_path and item.key in (native_tools | default([]))
+
+# ---- Native path: ubi fallback for tools absent/below-floor in the repo ----
+# Tools that failed the native check (absent or below floor) still need ubi.
+- name: Bootstrap ubi for native-path ubi_tools  # noqa command-instead-of-module risky-shell-pipe
+  ansible.builtin.shell: >
+    curl --silent --location
+    https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh
+    | TARGET={{ local_bin }} sh
+  args:
+    creates: "{{ local_bin }}/ubi"
+  when: _native_path and (ubi_tools | default([]) | length > 0)
+
+- name: Install ubi_tools via ubi on the native path
+  ansible.builtin.command:
+    cmd: >
+      {{ local_bin }}/ubi --project {{ ubi_tool_repos[item] }} --in {{ local_bin }}
+      {% if item in ubi_exe_overrides %}--exe {{ ubi_exe_overrides[item] }}{% endif %}
+      {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
+    creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
+  loop: "{{ ubi_tools | default([]) }}"
+  when: _native_path and (ubi_tools | default([]) | length > 0)
 
 # ---- Native path: Arch pacman -------------------------------------------
-- name: Install tools via pacman (Arch, sudo)
+- name: Install native tools via pacman (Arch, sudo)
   become: true
   community.general.pacman:
-    name: "{{ item }}"
+    name: "{{ _native_pkgs }}"
     state: present
-  loop: "{{ tools }}"
-  when: ansible_facts.pkg_mgr == 'pacman' and allow_sudo and not use_ubi_fallback
+  when: _native_path and _pkgmgr == 'pacman' and (_native_pkgs | default([])) | length > 0
+
+# ---- Native path: Fedora / RHEL family dnf ------------------------------
+- name: Install native tools via dnf (Fedora/RHEL family, sudo)
+  become: true
+  ansible.builtin.package:
+    name: "{{ _native_pkgs }}"
+    state: present
+  when: _native_path and _pkgmgr == 'dnf' and (_native_pkgs | default([])) | length > 0

@@ -1,4 +1,4 @@
-stages: [lint]
+stages: [lint, provision]
 
 # Common setup: a small Debian image + ubi to fetch static linter binaries
 # (mirrors the repo's own no-sudo install approach), plus apt for zsh/python.
@@ -50,3 +50,17 @@ ansible-lint:
     - ansible-galaxy collection install -r ansible/requirements.yml
   script:
     - ./ci/lint.sh ansible
+
+provision:
+  stage: provision
+  image: $DISTRO
+  interruptible: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+  parallel:
+    matrix:
+      - DISTRO: ["debian:bookworm-slim", "ubuntu:24.04", "archlinux:latest", "fedora:latest", "rockylinux:9", "quay.io/rockylinux/rockylinux:10"]
+        MODE: [sudo, nosudo]
+  script:
+    - sh ci/provision-ci.sh
