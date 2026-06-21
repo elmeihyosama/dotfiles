@@ -72,13 +72,17 @@ cd ~/dotfiles
   install user-local (`~/.local/bin`) and, since the login shell can't be
   changed, a `.bashrc` shim hands off to zsh. All driven by the auto-detected
   `allow_sudo`; no manual flag needed.
+- **Safe to adopt** — on first run, any pre-existing config it would overwrite
+  is backed up to `<path>.pre-dotfiles.bak`, so adopting on a machine you
+  already use is recoverable.
 
 ## Usage
 
 - Apply changes: `chezmoi apply` — preview with `chezmoi diff`.
 - Add an editor language: `:LazyExtras` in Neovim.
 - Switch theme: edit `theme` in `home/.chezmoidata/theme.toml`, then apply.
-- Lint locally: `ci/lint.sh all` (or `pre-commit install` for git hooks).
+- Lint locally: `ci/lint.sh all`. `install.sh` also sets up a pre-commit hook
+  that runs these checks on each commit.
 
 ## License
 
