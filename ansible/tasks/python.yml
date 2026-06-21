@@ -21,3 +21,11 @@
     creates: "{{ local_bin }}/python3"
   environment:
     PATH: "{{ local_bin }}:{{ ansible_facts['env']['PATH'] }}"
+
+# pre-commit is a Python tool (no static binary for ubi) — install it via uv.
+- name: Install pre-commit as a uv tool
+  ansible.builtin.command: "uv tool install pre-commit"
+  args:
+    creates: "{{ local_bin }}/pre-commit"
+  environment:
+    PATH: "{{ local_bin }}:{{ ansible_facts['env']['PATH'] }}"
