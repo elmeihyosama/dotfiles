@@ -43,16 +43,13 @@ It's safe to re-run: an existing clone is fast-forwarded, your saved answers
 are reused, and the playbook only changes what's drifted. Re-run the prompts
 with `./install.sh --reconfigure`.
 
-<details>
-<summary>Manual clone</summary>
+### Manual clone
 
 ```bash
 git clone https://gitlab.com/oelmeihy/dotfiles ~/dotfiles
 cd ~/dotfiles
 ./install.sh
 ```
-
-</details>
 
 ## The stack
 
