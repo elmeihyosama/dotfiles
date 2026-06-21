@@ -62,6 +62,38 @@ ubi_exe_overrides:
   gh: gh        # repo is cli/cli, but the binary inside the archive is `gh`
   neovim: nvim  # GitHub release extracts a binary named nvim
 
+# Force a specific ubi release asset when a tool ships multiple (e.g. glibc vs
+# musl). yazi's gnu binary needs a very new glibc; the musl static build runs
+# on any Linux, so we always pick it.
+ubi_match_overrides:
+  yazi: musl
+
 # Homebrew formula names that differ from canonical
 brew_formula_overrides:
   dust: dust            # the crate is du-dust on some taps; default tap = dust
+
+# --- Native package install (sudo path) ---------------------------------
+# Per-manager package name, only when it differs from the canonical tool name.
+# Tools absent here use the canonical name. dnf covers Fedora + RHEL/EPEL.
+native_pkg_overrides:
+  apt:
+    fd: fd-find
+  dnf:
+    fd: fd-find
+  pacman: {}
+
+# Native package that installs the binary under a non-canonical name; we
+# symlink the canonical name to it in ~/.local/bin. Keyed by manager, then tool.
+native_bin_renames:
+  apt:
+    bat: batcat
+    fd: fdfind
+  dnf: {}
+  pacman: {}
+
+# Minimum acceptable version for tools whose configs need a floor. A native
+# package below the floor is rejected in favour of ubi. Tools absent here
+# accept whatever the repo ships.
+min_versions:
+  neovim: "0.9.0"
+  yq: "4.0.0"  # Debian apt ships Python yq 3.x (jq-syntax); we need mikefarah yq 4.x

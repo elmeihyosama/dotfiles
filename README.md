@@ -4,9 +4,19 @@ A cross-platform (macOS and Linux) terminal environment — managed with
 [chezmoi], provisioned with [Ansible], and themed with [Rosé Pine Moon]. It
 bootstraps a fresh machine with a single command and works even without `sudo`.
 
-**Supported:** macOS, Debian/Ubuntu, and Arch Linux, plus any Linux without
-`sudo` (user-local installs). WSL is treated as Linux; native Windows is out of
-scope.
+## Supported platforms
+
+| Platform | Install strategy |
+| --- | --- |
+| ![macOS][badge-macos] | Homebrew (native) |
+| ![Debian][badge-debian] ![Ubuntu][badge-ubuntu] | apt native + ubi fallback |
+| ![Arch Linux][badge-arch] | pacman native + ubi fallback |
+| ![Fedora][badge-fedora] | dnf native + ubi fallback |
+| ![Rocky Linux][badge-rocky] ![AlmaLinux][badge-alma] | dnf + EPEL native (EL9+) + ubi fallback |
+| ![Any Linux][badge-linux] | ubi user-local binaries — works without `sudo` |
+
+Every distro × both paths (sudo-native and no-sudo) is provisioned for real in CI.
+WSL is supported and treated as Linux.
 
 ## Highlights
 
@@ -94,3 +104,12 @@ Released under the [MIT License](LICENSE).
 [uv]: https://docs.astral.sh/uv/
 [sheldon]: https://sheldon.cli.rs/
 [LazyVim]: https://www.lazyvim.org/
+
+[badge-macos]: https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white
+[badge-debian]: https://img.shields.io/badge/Debian-A81D33?logo=debian&logoColor=white
+[badge-ubuntu]: https://img.shields.io/badge/Ubuntu-E95420?logo=ubuntu&logoColor=white
+[badge-arch]: https://img.shields.io/badge/Arch_Linux-1793D1?logo=archlinux&logoColor=white
+[badge-fedora]: https://img.shields.io/badge/Fedora-51A2DA?logo=fedora&logoColor=white
+[badge-rocky]: https://img.shields.io/badge/Rocky_Linux-10B981?logo=rockylinux&logoColor=white
+[badge-alma]: https://img.shields.io/badge/AlmaLinux-0B6938?logo=almalinux&logoColor=white
+[badge-linux]: https://img.shields.io/badge/Any_Linux-FCC624?logo=linux&logoColor=black
