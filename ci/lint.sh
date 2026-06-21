@@ -90,6 +90,7 @@ lint_config() {
 	local f
 	# Every template must render without error.
 	while IFS= read -r f; do
+		[ -f "$f" ] || continue
 		render "$f" >/dev/null || {
 			note config "render: $f"
 			fail=1
@@ -97,18 +98,21 @@ lint_config() {
 	done < <(git ls-files '*.tmpl')
 	# Parse-validate JSON / TOML / YAML for non-template config (yq handles all three).
 	while IFS= read -r f; do
+		[ -f "$f" ] || continue
 		yq -p json -oy '.' "$f" >/dev/null || {
 			note config "json: $f"
 			fail=1
 		}
 	done < <(git ls-files '*.json')
 	while IFS= read -r f; do
+		[ -f "$f" ] || continue
 		yq -p toml -oy '.' "$f" >/dev/null || {
 			note config "toml: $f"
 			fail=1
 		}
 	done < <(git ls-files '*.toml' | grep -v '\.tmpl$')
 	while IFS= read -r f; do
+		[ -f "$f" ] || continue
 		yq -p yaml -oy '.' "$f" >/dev/null || {
 			note config "yaml: $f"
 			fail=1

@@ -1,2 +1,7 @@
 # Machine-local secrets/overrides — managed by hand, never by chezmoi.
 .config/zsh/local.zsh
+
+# LazyVim rewrites these at runtime — let Neovim own them, don't manage via
+# chezmoi (avoids "changed since chezmoi last wrote it" apply conflicts).
+.config/nvim/lazy-lock.json
+.config/nvim/lazyvim.json
