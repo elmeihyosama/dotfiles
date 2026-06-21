@@ -141,4 +141,12 @@ done
 ensure_ansible
 ensure_local_vars
 export PATH="$HOME/.local/bin:$PATH"
-exec ansible-playbook ansible/site.yml "$@"
+
+# Run from ansible/ so its ansible.cfg is loaded (ansible reads it from cwd).
+(cd "$self_dir/ansible" && ansible-playbook site.yml "$@")
+
+# Wire up the repo's pre-commit hook (binary installed by the playbook). Non-fatal.
+if have pre-commit; then
+	(cd "$self_dir" && pre-commit install) ||
+		echo "warning: 'pre-commit install' failed — run it manually in the repo later" >&2
+fi
