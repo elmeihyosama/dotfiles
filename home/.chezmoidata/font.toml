@@ -1,0 +1,5 @@
+# Centralized font — single source of truth (the terminal emulator sets the font;
+# all TUIs inherit it). Change here to restyle everywhere.
+[font]
+family = "JetBrainsMono Nerd Font"
+size = 14

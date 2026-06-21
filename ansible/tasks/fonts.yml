@@ -1,0 +1,38 @@
+---
+- name: Set font destination dir
+  ansible.builtin.set_fact:
+    font_dir: >-
+      {{ (ansible_facts.os_family == 'Darwin') | ternary(
+           ansible_facts['env']['HOME'] ~ '/Library/Fonts',
+           ansible_facts['env']['HOME'] ~ '/.local/share/fonts') }}
+
+- name: Ensure font dir exists
+  ansible.builtin.file:
+    path: "{{ font_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Check whether the Nerd Font is already installed
+  ansible.builtin.find:
+    paths: "{{ font_dir }}"
+    patterns: "JetBrainsMono*NerdFont*.ttf"
+  register: _font_found
+
+- name: Download + unpack JetBrainsMono Nerd Font
+  when: _font_found.matched == 0
+  block:
+    - name: Download font archive to a temp file
+      ansible.builtin.get_url:
+        url: "https://github.com/ryanoasis/nerd-fonts/releases/download/{{ nerd_font_version }}/{{ nerd_font }}.zip"
+        dest: "/tmp/{{ nerd_font }}.zip"
+        mode: "0644"
+    - name: Unpack the .ttf files into the font dir
+      ansible.builtin.unarchive:
+        src: "/tmp/{{ nerd_font }}.zip"
+        dest: "{{ font_dir }}"
+        remote_src: true
+        include: "*.ttf"
+    - name: Refresh font cache (Linux)
+      ansible.builtin.command: fc-cache -f "{{ font_dir }}"
+      changed_when: true
+      when: ansible_facts.os_family != 'Darwin'

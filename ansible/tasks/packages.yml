@@ -1,0 +1,82 @@
+---
+# Install strategy: native package manager when usable, else ubi user-local binaries.
+#  - macOS  → Homebrew. brew needs NO sudo, so allow_sudo is irrelevant here;
+#             fall back to ubi only if brew is genuinely absent.
+#  - Linux  → apt/pacman only when passwordless sudo is available (we run without a
+#             become password); otherwise ubi user-local (no-sudo hosts).
+- name: Check for Homebrew (macOS)
+  ansible.builtin.command: command -v brew
+  register: _brew
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: ansible_facts.os_family == 'Darwin'
+
+- name: Compute whether to use the no-sudo fallback
+  ansible.builtin.set_fact:
+    use_ubi_fallback: >-
+      {{ not (
+           (ansible_facts.os_family == 'Darwin' and (_brew.rc | default(1)) == 0)
+           or (ansible_facts.pkg_mgr in ['apt', 'pacman'] and allow_sudo)
+         ) }}
+
+# ---- No-sudo / fallback path: ubi → ~/.local/bin -------------------------
+- name: Ensure ~/.local/bin exists
+  ansible.builtin.file:
+    path: "{{ local_bin }}"
+    state: directory
+    mode: "0755"
+  when: use_ubi_fallback
+
+- name: Check for ubi
+  ansible.builtin.stat:
+    path: "{{ local_bin }}/ubi"
+  register: _ubi
+  when: use_ubi_fallback
+
+- name: Bootstrap ubi into ~/.local/bin  # noqa: command-instead-of-module risky-shell-pipe
+  # Piped `curl | sh` installer: no module equivalent, and the script handles its
+  # own errors. `creates` keeps the task idempotent.
+  ansible.builtin.shell: >
+    curl --silent --location
+    https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh
+    | TARGET={{ local_bin }} sh
+  args:
+    creates: "{{ local_bin }}/ubi"
+  when: use_ubi_fallback and not _ubi.stat.exists
+
+- name: Install each tool via ubi (idempotent — skips if the binary exists)
+  ansible.builtin.command:
+    cmd: >
+      {{ local_bin }}/ubi --project {{ ubi_tool_repos[item] }} --in {{ local_bin }}
+      {% if item in ubi_exe_overrides %}--exe {{ ubi_exe_overrides[item] }}{% endif %}
+    creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
+  loop: "{{ tools }}"
+  when: use_ubi_fallback
+
+# ---- Native path: macOS Homebrew ----------------------------------------
+- name: Install tools via Homebrew (macOS)
+  community.general.homebrew:
+    name: "{{ brew_formula_overrides[item] | default(item) }}"
+    state: present
+  loop: "{{ tools }}"
+  when: ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
+
+# ---- Native path: Debian/Ubuntu apt -------------------------------------
+- name: Install tools via apt (Debian/Ubuntu, sudo)
+  become: true
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: true
+  loop: "{{ tools }}"
+  when: ansible_facts.pkg_mgr == 'apt' and allow_sudo and not use_ubi_fallback
+
+# ---- Native path: Arch pacman -------------------------------------------
+- name: Install tools via pacman (Arch, sudo)
+  become: true
+  community.general.pacman:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ tools }}"
+  when: ansible_facts.pkg_mgr == 'pacman' and allow_sudo and not use_ubi_fallback

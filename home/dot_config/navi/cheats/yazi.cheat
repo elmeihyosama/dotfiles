@@ -1,0 +1,22 @@
+% yazi
+
+# Launch yazi (shell function `y` cds on exit)
+yazi
+
+# KEY: move down / up
+j / k
+
+# KEY: parent dir / open
+h / l
+
+# KEY: toggle hidden files
+.
+
+# KEY: search
+/
+
+# KEY: yank / paste / delete
+y / p / d
+
+# KEY: quit
+q

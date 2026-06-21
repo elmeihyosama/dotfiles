@@ -1,0 +1,45 @@
+# XDG base dirs
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+
+# PATH
+export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
+
+# Locale
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+# Editor
+export EDITOR=nvim
+export VISUAL=nvim
+
+# History
+export HISTFILE="${XDG_STATE_HOME}/zsh/history"
+export HISTSIZE=50000
+export SAVEHIST=50000
+[[ -d "${HISTFILE:h}" ]] || mkdir -p "${HISTFILE:h}"
+
+# zsh options
+setopt autocd interactivecomments
+setopt sharehistory histignoredups histreduceblanks incappendhistory \
+       histexpiredupsfirst histignorespace extendedhistory
+
+# Pager + bat-powered man pages
+export PAGER='less'
+export LESS='-R'
+command -v bat >/dev/null 2>&1 && export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+
+# Ripgrep config
+export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/config"
+
+# Default apps
+export TERMINAL="ghostty"
+export BROWSER="firefox"
+{{ if eq .chezmoi.os "linux" -}}
+# Wayland (Linux only)
+export QT_QPA_PLATFORM=wayland
+export XDG_SESSION_TYPE=wayland
+export MOZ_ENABLE_WAYLAND=1
+{{- end }}

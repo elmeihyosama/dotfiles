@@ -1,0 +1,16 @@
+% git
+
+# Interactive rebase last N commits
+git rebase -i HEAD~<count>
+
+# Amend last commit, keep message
+git commit --amend --no-edit
+
+# Graph log across all branches
+git log --oneline --graph --decorate --all
+
+# Discard unstaged changes in a file
+git checkout -- <file>
+
+# Show what changed in a commit
+git show <commit>

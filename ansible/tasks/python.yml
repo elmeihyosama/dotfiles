@@ -1,0 +1,23 @@
+---
+# Provide a default Python via uv. uv ships standalone interpreters, so
+# pip-backed tooling (Mason's ruff, formatters, language servers) builds the
+# same on every machine, independent of the OS package manager's Python.
+- name: Locate uv
+  ansible.builtin.command: command -v uv
+  register: _uv
+  changed_when: false
+  failed_when: false
+
+- name: Install uv (user-local, no sudo) when missing
+  ansible.builtin.shell: set -o pipefail; curl -LsSf https://astral.sh/uv/install.sh | sh  # noqa: command-instead-of-module
+  args:
+    executable: /bin/bash
+    creates: "{{ local_bin }}/uv"
+  when: _uv.rc != 0
+
+- name: Install the default Python interpreter via uv — {{ python_version }}
+  ansible.builtin.command: "uv python install {{ python_version }} --default"
+  args:
+    creates: "{{ local_bin }}/python3"
+  environment:
+    PATH: "{{ local_bin }}:{{ ansible_facts['env']['PATH'] }}"

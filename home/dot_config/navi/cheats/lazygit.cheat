@@ -1,0 +1,22 @@
+% lazygit, git
+
+# Launch lazygit
+lazygit
+
+# KEY: stage / unstage (toggle)
+space
+
+# KEY: commit
+c
+
+# KEY: push / pull
+P / p
+
+# KEY: switch panel
+Tab
+
+# KEY: help
+?
+
+# KEY: quit
+q

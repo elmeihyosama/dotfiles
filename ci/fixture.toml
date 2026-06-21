@@ -1,0 +1,6 @@
+# CI/pre-commit fixture: per-machine data for rendering chezmoi templates.
+# Mirrors ansible/local.yml.example. NO secrets. Theme/font come from home/.chezmoidata.
+[data]
+    allow_sudo = true
+    git_name = "CI"
+    git_email = "ci@example.com"

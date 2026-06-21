@@ -1,0 +1,25 @@
+% zellij
+
+# Attach to a session
+zellij attach <session>
+
+# List sessions
+zellij list-sessions
+
+# New named session
+zellij --session <name>
+
+# Kill a session
+zellij kill-session <session>
+
+# KEY: enter pane mode
+Ctrl-p
+
+# KEY: enter tab mode
+Ctrl-t
+
+# KEY: enter scroll/search mode
+Ctrl-s
+
+# KEY: detach session
+Ctrl-o then d

@@ -1,0 +1,34 @@
+% vi-mode, zsh, keybinds
+
+# Enter NORMAL mode from insert
+Esc
+
+# Return to INSERT mode
+i
+
+# Normal mode: word forward
+w
+
+# Normal mode: word back
+b
+
+# Normal mode: start of line
+0
+
+# Normal mode: end of line
+$
+
+# Normal mode: delete line
+dd
+
+# Insert mode: jump to start of line
+Ctrl-A
+
+# Insert mode: jump to end of line
+Ctrl-E
+
+# Insert mode: incremental history search
+Ctrl-R
+
+# Accept autosuggestion
+Ctrl-Space

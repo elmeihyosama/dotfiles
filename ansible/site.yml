@@ -1,0 +1,50 @@
+---
+- name: Provision dotfiles environment
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/local.yml"
+
+  pre_tasks:
+    - name: Detect passwordless sudo when allow_sudo is unset
+      ansible.builtin.command: sudo -n true
+      register: _sudo_probe
+      changed_when: false
+      failed_when: false
+      when: allow_sudo is not defined
+
+    - name: Set allow_sudo from probe when unset
+      ansible.builtin.set_fact:
+        allow_sudo: "{{ (_sudo_probe.rc | default(1)) == 0 }}"
+      when: allow_sudo is not defined
+
+    - name: Show effective install strategy
+      ansible.builtin.debug:
+        msg: "os_family={{ ansible_facts.os_family }} pkg_mgr={{ ansible_facts.pkg_mgr | default('n/a') }} allow_sudo={{ allow_sudo }}"
+
+  tasks:
+    - name: Packages
+      ansible.builtin.import_tasks: tasks/packages.yml
+      tags: [packages]
+
+    - name: Python (uv-managed default interpreter)
+      ansible.builtin.import_tasks: tasks/python.yml
+      tags: [python]
+
+    - name: Fonts
+      ansible.builtin.import_tasks: tasks/fonts.yml
+      tags: [fonts]
+
+    - name: Chezmoi apply
+      ansible.builtin.import_tasks: tasks/chezmoi.yml
+      tags: [chezmoi]
+
+    - name: Sheldon plugins
+      ansible.builtin.import_tasks: tasks/sheldon.yml
+      tags: [sheldon]
+
+    - name: Login shell
+      ansible.builtin.import_tasks: tasks/shell.yml
+      tags: [shell]

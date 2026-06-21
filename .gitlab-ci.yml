@@ -1,0 +1,52 @@
+stages: [lint]
+
+# Common setup: a small Debian image + ubi to fetch static linter binaries
+# (mirrors the repo's own no-sudo install approach), plus apt for zsh/python.
+.lint:
+  stage: lint
+  image: debian:bookworm-slim
+  interruptible: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq curl git zsh python3 python3-pip ca-certificates >/dev/null
+    - mkdir -p "$HOME/.local/bin"   # ubi bootstrap requires TARGET to already exist
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"   # ci/lint.sh uses git ls-files (root-owned checkout)
+    - export PATH="$HOME/.local/bin:$PATH"
+    - curl -fsLS https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh | TARGET="$HOME/.local/bin" sh
+    - ubi --project twpayne/chezmoi --in "$HOME/.local/bin"
+
+shell-lint:
+  extends: .lint
+  before_script:
+    - !reference [.lint, before_script]
+    - ubi --project koalaman/shellcheck --in "$HOME/.local/bin"
+    - ubi --project mvdan/sh --in "$HOME/.local/bin" --exe shfmt
+  script:
+    - ./ci/lint.sh shell
+
+lua-lint:
+  extends: .lint
+  before_script:
+    - !reference [.lint, before_script]
+    - ubi --project JohnnyMorganz/StyLua --in "$HOME/.local/bin" --exe stylua
+  script:
+    - ./ci/lint.sh lua
+
+config-lint:
+  extends: .lint
+  before_script:
+    - !reference [.lint, before_script]
+    - ubi --project mikefarah/yq --in "$HOME/.local/bin"
+  script:
+    - ./ci/lint.sh config
+
+ansible-lint:
+  extends: .lint
+  before_script:
+    - !reference [.lint, before_script]
+    - python3 -m pip install --quiet --break-system-packages ansible-core ansible-lint
+    - ansible-galaxy collection install -r ansible/requirements.yml
+  script:
+    - ./ci/lint.sh ansible

@@ -1,0 +1,9 @@
+{{- $p := index .themes .theme -}}
+[mgr]
+cwd = { fg = "{{ $p.foam }}" }
+hovered = { fg = "{{ $p.base }}", bg = "{{ $p.iris }}" }
+preview_hovered = { underline = true }
+marker_selected = { fg = "{{ $p.pine }}", bg = "{{ $p.pine }}" }
+[status]
+separator_open = ""
+separator_close = ""

@@ -1,0 +1,8 @@
+# Standard bashrc head (interactive guard)
+case $- in *i*) ;; *) return ;; esac
+{{ if not (.allow_sudo | default false) }}
+# No-sudo machines: login shell can't be changed to zsh → jump into it once, safely.
+if [[ -z "$ZSH_VERSION" ]] && command -v zsh >/dev/null 2>&1; then
+  exec zsh -l
+fi
+{{ end -}}

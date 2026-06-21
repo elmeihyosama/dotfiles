@@ -1,0 +1,26 @@
+---
+- name: Resolve zsh path
+  ansible.builtin.command: command -v zsh
+  register: _zsh
+  changed_when: false
+  failed_when: false
+
+- name: Set login shell to zsh (only with sudo; no-sudo machines use the .bashrc shim)
+  when:
+    - allow_sudo | default(false)
+    - _zsh.rc == 0
+    - ansible_facts['env']['SHELL'] | default('') != _zsh.stdout
+  block:
+    - name: Ensure zsh is listed in /etc/shells
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/shells
+        line: "{{ _zsh.stdout }}"
+        state: present
+      failed_when: false
+
+    - name: Change login shell to zsh for the current user
+      ansible.builtin.command: "chsh -s {{ _zsh.stdout }}"
+      register: _chsh
+      changed_when: _chsh.rc == 0
+      failed_when: false

@@ -1,0 +1,22 @@
+{{- $p := index .themes .theme -}}
+theme "rose-pine-moon"
+default_layout "compact"
+pane_frames true
+mouse_mode true
+copy_on_select false
+
+themes {
+    rose-pine-moon {
+        fg "{{ $p.text }}"
+        bg "{{ $p.base }}"
+        black "{{ $p.overlay }}"
+        red "{{ $p.love }}"
+        green "{{ $p.pine }}"
+        yellow "{{ $p.gold }}"
+        blue "{{ $p.foam }}"
+        magenta "{{ $p.iris }}"
+        cyan "{{ $p.rose }}"
+        white "{{ $p.text }}"
+        orange "{{ $p.gold }}"
+    }
+}

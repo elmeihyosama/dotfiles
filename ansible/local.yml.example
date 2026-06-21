@@ -1,0 +1,7 @@
+---
+# Copy to ansible/local.yml (git-ignored) and edit per machine.
+git_name: "Your Name"
+git_email: "you@example.com"
+# allow_sudo: false     # uncomment to force; otherwise auto-detected via `sudo -n true`.
+#                       # Drives install strategy (native vs user-local) and whether
+#                       # the login shell is switched to zsh or a .bashrc shim is used.

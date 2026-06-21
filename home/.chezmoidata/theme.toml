@@ -1,0 +1,3 @@
+# Active theme selector — single source of truth for which palette is used.
+# Override per-machine in ~/.config/chezmoi/chezmoi.toml if desired.
+theme = "rose-pine-moon"

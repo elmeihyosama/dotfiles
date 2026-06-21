@@ -1,0 +1,88 @@
+{{- $p := index .themes .theme -}}
+"$schema" = 'https://starship.rs/config-schema.json'
+add_newline = true
+palette = "rosepine"
+
+format = """
+[╭─](subtle)$directory$git_branch$git_status$nodejs$python$rust$golang$docker_context$kubernetes$fill$cmd_duration$time
+[╰─](subtle)$character"""
+
+[palettes.rosepine]
+base = "{{ $p.base }}"
+surface = "{{ $p.surface }}"
+overlay = "{{ $p.overlay }}"
+muted = "{{ $p.muted }}"
+subtle = "{{ $p.subtle }}"
+text = "{{ $p.text }}"
+love = "{{ $p.love }}"
+gold = "{{ $p.gold }}"
+rose = "{{ $p.rose }}"
+pine = "{{ $p.pine }}"
+foam = "{{ $p.foam }}"
+iris = "{{ $p.iris }}"
+
+[fill]
+symbol = " "
+
+[directory]
+style = "bold foam"
+truncation_length = 3
+truncate_to_repo = true
+format = "[$path]($style)[$read_only]($read_only_style) "
+
+[git_branch]
+symbol = " "
+style = "iris"
+format = "[$symbol$branch]($style) "
+
+[git_status]
+style = "love"
+format = '([$all_status$ahead_behind]($style)) '
+
+[nodejs]
+symbol = " "
+style = "pine"
+format = "[$symbol($version )]($style)"
+
+[python]
+symbol = " "
+style = "gold"
+format = '[$symbol(${version} )(\($virtualenv\) )]($style)'
+
+[rust]
+symbol = " "
+style = "rose"
+format = "[$symbol($version )]($style)"
+
+[golang]
+symbol = " "
+style = "foam"
+format = "[$symbol($version )]($style)"
+
+[docker_context]
+symbol = " "
+style = "subtle"
+only_with_files = true
+format = "[$symbol$context]($style) "
+
+[kubernetes]
+symbol = "☸ "
+style = "gold"
+disabled = false
+format = '[$symbol$context( \($namespace\))]($style) '
+
+[cmd_duration]
+min_time = 2000
+style = "subtle"
+format = "[ $duration]($style) "
+
+[time]
+disabled = false
+time_format = "%R"
+style = "muted"
+format = "[$time]($style)"
+
+[character]
+success_symbol = "[❯](bold pine)"
+error_symbol = "[❯](bold love)"
+vimcmd_symbol = "[❮](bold gold)"

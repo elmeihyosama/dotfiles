@@ -1,0 +1,2 @@
+# Machine-local secrets/overrides — managed by hand, never by chezmoi.
+.config/zsh/local.zsh

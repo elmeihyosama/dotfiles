@@ -1,0 +1,22 @@
+shell = "zsh"
+
+[plugins.zsh-completions]
+github = "zsh-users/zsh-completions"
+
+[plugins.fzf-tab]
+github = "Aloxaf/fzf-tab"
+
+[plugins.zsh-autosuggestions]
+github = "zsh-users/zsh-autosuggestions"
+
+[plugins.zsh-autopair]
+github = "hlissner/zsh-autopair"
+
+# MUST be last — wraps all widgets.
+[plugins.fast-syntax-highlighting]
+github = "zdharma-continuum/fast-syntax-highlighting"
+
+[templates]
+# Optional defer template — apply per-plugin with `apply = ["defer"]`. NOTE: it
+# uses `zsh-defer`, which is NOT loaded by default; install/source it before use.
+defer = "{{ hooks?.pre | nl }}{% for file in files %}zsh-defer source \"{{ file }}\"{% endfor %}{{ hooks?.post | nl }}"

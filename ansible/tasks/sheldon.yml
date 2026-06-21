@@ -1,0 +1,17 @@
+---
+- name: Locate sheldon
+  ansible.builtin.command: command -v sheldon
+  register: _sheldon
+  changed_when: false
+  failed_when: false
+
+- name: Ensure sheldon config is present (chezmoi-managed) before locking
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.config/sheldon/plugins.toml"
+  register: _sheldon_cfg
+
+- name: Fetch zsh plugins via sheldon lock
+  ansible.builtin.command: "{{ _sheldon.stdout }} lock"
+  register: _sheldon_lock
+  changed_when: "'Locked' in (_sheldon_lock.stderr | default('')) or _sheldon_lock.rc == 0"
+  when: _sheldon.rc == 0 and _sheldon_cfg.stat.exists

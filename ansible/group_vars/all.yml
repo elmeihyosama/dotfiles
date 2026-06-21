@@ -1,0 +1,67 @@
+---
+local_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+
+# pinned versions
+ubi_version: "latest"          # bootstrap script pulls the latest ubi release
+nerd_font: "JetBrainsMono"
+nerd_font_version: "v3.2.1"
+python_version: "3.13"         # uv-managed default python
+
+# Canonical tool list (installed on every machine).
+tools:
+  - sheldon
+  - zellij
+  - navi
+  - starship
+  - zoxide
+  - eza
+  - bat
+  - fd
+  - ripgrep
+  - fzf
+  - git-delta
+  - lazygit
+  - lazydocker
+  - yazi
+  - jq
+  - yq
+  - gh
+  - dust
+  - duf
+  - btop
+  - neovim
+
+# owner/repo for the ubi no-sudo fallback
+ubi_tool_repos:
+  sheldon: rossmacarthur/sheldon
+  zellij: zellij-org/zellij
+  navi: denisidoro/navi
+  starship: starship/starship
+  zoxide: ajeetdsouza/zoxide
+  eza: eza-community/eza
+  bat: sharkdp/bat
+  fd: sharkdp/fd
+  ripgrep: BurntSushi/ripgrep
+  fzf: junegunn/fzf
+  git-delta: dandavison/delta
+  lazygit: jesseduffield/lazygit
+  lazydocker: jesseduffield/lazydocker
+  yazi: sxyazi/yazi
+  jq: jqlang/jq
+  yq: mikefarah/yq
+  gh: cli/cli
+  dust: bootandy/dust
+  duf: muesli/duf
+  btop: aristocratos/btop
+  neovim: neovim/neovim
+
+# tools whose extracted binary name differs from the canonical name (for ubi --exe)
+ubi_exe_overrides:
+  git-delta: delta
+  ripgrep: rg
+  gh: gh        # repo is cli/cli, but the binary inside the archive is `gh`
+  neovim: nvim  # GitHub release extracts a binary named nvim
+
+# Homebrew formula names that differ from canonical
+brew_formula_overrides:
+  dust: dust            # the crate is du-dust on some taps; default tap = dust

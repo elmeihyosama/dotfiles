@@ -1,0 +1,12 @@
+{{- $p := index .themes .theme -}}
+gui:
+  nerdFontsVersion: "3"
+  theme:
+    activeBorderColor: ["{{ $p.iris }}", bold]
+    inactiveBorderColor: ["{{ $p.muted }}"]
+    selectedLineBgColor: ["{{ $p.highlight_med }}"]
+    optionsTextColor: ["{{ $p.foam }}"]
+git:
+  paging:
+    colorArg: always
+    pager: delta --paging=never

@@ -1,0 +1,38 @@
+---
+- name: Locate chezmoi
+  ansible.builtin.command: command -v chezmoi
+  register: _chezmoi
+  changed_when: false
+  failed_when: false
+
+- name: Fail clearly if chezmoi is missing
+  ansible.builtin.fail:
+    msg: "chezmoi not found — the packages task must run before chezmoi."
+  when: _chezmoi.rc != 0
+
+- name: Ensure chezmoi config dir
+  ansible.builtin.file:
+    path: "{{ ansible_facts['env']['HOME'] }}/.config/chezmoi"
+    state: directory
+    mode: "0755"
+
+- name: Template chezmoi.toml from per-machine vars (single source of truth)
+  ansible.builtin.copy:
+    dest: "{{ ansible_facts['env']['HOME'] }}/.config/chezmoi/chezmoi.toml"
+    mode: "0600"
+    content: |
+      sourceDir = "{{ playbook_dir | dirname }}"
+      [data]
+          allow_sudo = {{ allow_sudo | lower }}
+          git_name = "{{ git_name }}"
+          git_email = "{{ git_email }}"
+
+- name: Check for pending chezmoi changes
+  ansible.builtin.command: "{{ _chezmoi.stdout }} status"
+  register: _cz_status
+  changed_when: false
+
+- name: Apply chezmoi (only when there are pending changes)
+  ansible.builtin.command: "{{ _chezmoi.stdout }} apply"
+  when: _cz_status.stdout | length > 0
+  changed_when: true

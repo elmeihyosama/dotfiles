@@ -1,0 +1,29 @@
+# Run the SAME checks as CI locally. Opt in per machine: `pre-commit install`.
+# (Requires the lint tools on PATH — see README.)
+repos:
+  - repo: local
+    hooks:
+      - id: lint-shell
+        name: shell (shellcheck/shfmt + render-aware zsh -n)
+        entry: ci/lint.sh shell
+        language: system
+        pass_filenames: false
+        files: '\.(sh|zsh)(\.tmpl)?$'
+      - id: lint-lua
+        name: lua (stylua --check)
+        entry: ci/lint.sh lua
+        language: system
+        pass_filenames: false
+        files: '\.lua$'
+      - id: lint-config
+        name: config (render templates + parse yaml/toml/json)
+        entry: ci/lint.sh config
+        language: system
+        pass_filenames: false
+        files: '(\.tmpl|\.ya?ml|\.toml|\.json)$'
+      - id: lint-ansible
+        name: ansible (ansible-lint + syntax-check)
+        entry: ci/lint.sh ansible
+        language: system
+        pass_filenames: false
+        files: '^ansible/'

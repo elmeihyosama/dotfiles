@@ -1,0 +1,30 @@
+{{- $p := index .themes .theme -}}
+[user]
+    name = {{ .git_name }}
+    email = {{ .git_email }}
+
+[core]
+    pager = delta
+
+[interactive]
+    diffFilter = delta --color-only --line-numbers
+
+[delta]
+    side-by-side = true
+    line-numbers = true
+    navigate = true
+    syntax-theme = base16
+    minus-style = bold "{{ $p.love }}"
+    plus-style = bold "{{ $p.pine }}"
+    file-style = bold "{{ $p.iris }}"
+    hunk-header-style = omit
+    line-numbers-minus-style = "{{ $p.love }}"
+    line-numbers-plus-style = "{{ $p.pine }}"
+    line-numbers-zero-style = "{{ $p.muted }}"
+
+[credential]
+{{- if eq .chezmoi.os "darwin" }}
+    helper = osxkeychain
+{{- else }}
+    helper = cache --timeout=3600
+{{- end }}

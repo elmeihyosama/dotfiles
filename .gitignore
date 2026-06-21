@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Ansible per-machine vars (never committed)
+ansible/local.yml
+
+# Ansible local runtime artifacts (galaxy collections/roles cache)
+.ansible/

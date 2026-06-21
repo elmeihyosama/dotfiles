@@ -1,0 +1,5 @@
+# Thin entrypoint — all real config lives in numbered conf.d modules.
+for _zf in ${ZDOTDIR:-$HOME}/.config/zsh/conf.d/*.zsh(N); do
+  source "$_zf"
+done
+unset _zf

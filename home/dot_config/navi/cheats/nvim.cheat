@@ -1,0 +1,49 @@
+% nvim, lazyvim
+
+# Toggle file explorer (neo-tree)
+<leader>e
+
+# Find files (Telescope, project root)
+<leader>ff
+
+# Search in files (live grep)
+<leader>sg
+
+# Recent files
+<leader>fr
+
+# Switch buffer
+<leader>,
+
+# Close current buffer
+<leader>bd
+
+# LSP: go to definition
+gd
+
+# LSP: find references
+gr
+
+# LSP: hover documentation
+K
+
+# LSP: rename symbol
+<leader>cr
+
+# LSP: code action
+<leader>ca
+
+# Next / previous diagnostic
+]d ; [d
+
+# Plugin manager (Lazy) / LSP installer (Mason)
+<leader>l ; <leader>cm
+
+# Save file
+Ctrl-s
+
+# Quit all
+<leader>qq
+
+# Show keybindings (which-key) — press leader and wait
+<leader>
