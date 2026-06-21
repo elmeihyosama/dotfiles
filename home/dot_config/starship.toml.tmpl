@@ -4,7 +4,7 @@ add_newline = true
 palette = "rosepine"
 
 format = """
-[╭─](subtle)$directory$git_branch$git_status$nodejs$python$rust$golang$docker_context$kubernetes$fill$cmd_duration$time
+[╭─](subtle)$hostname$directory$git_branch$git_status$nodejs$python$rust$golang$docker_context$kubernetes$fill$cmd_duration$time
 [╰─](subtle)$character"""
 
 [palettes.rosepine]
@@ -20,6 +20,14 @@ rose = "{{ $p.rose }}"
 pine = "{{ $p.pine }}"
 foam = "{{ $p.foam }}"
 iris = "{{ $p.iris }}"
+
+# Shown only in SSH sessions (ssh_only), first on the left — a clear "you are
+# on a remote host" cue. Empty/absent on local sessions.
+[hostname]
+ssh_only = true
+ssh_symbol = " "
+style = "bold love"
+format = "[$ssh_symbol$hostname]($style) "
 
 [fill]
 symbol = " "
