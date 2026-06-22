@@ -30,6 +30,8 @@ tools:
   - duf
   - btop
   - neovim
+  - gitleaks
+  - editorconfig-checker
 
 # owner/repo for the ubi no-sudo fallback
 ubi_tool_repos:
@@ -54,6 +56,8 @@ ubi_tool_repos:
   duf: muesli/duf
   btop: aristocratos/btop
   neovim: neovim/neovim
+  gitleaks: gitleaks/gitleaks
+  editorconfig-checker: editorconfig-checker/editorconfig-checker
 
 # tools whose extracted binary name differs from the canonical name (for ubi --exe)
 ubi_exe_overrides:
@@ -61,6 +65,7 @@ ubi_exe_overrides:
   ripgrep: rg
   gh: gh        # repo is cli/cli, but the binary inside the archive is `gh`
   neovim: nvim  # GitHub release extracts a binary named nvim
+  editorconfig-checker: ec  # release archive ships ec-<os>-<arch>; binary we invoke is `ec`
 
 # Force a specific ubi release asset when a tool ships multiple (e.g. glibc vs
 # musl). yazi's gnu binary needs a very new glibc; the musl static build runs
@@ -71,6 +76,11 @@ ubi_match_overrides:
 # Homebrew formula names that differ from canonical
 brew_formula_overrides:
   dust: dust            # the crate is du-dust on some taps; default tap = dust
+
+# Homebrew installs a binary under a non-canonical name; symlink the canonical
+# command into ~/.local/bin. Keyed canonical-command -> Homebrew binary name.
+brew_bin_renames:
+  ec: editorconfig-checker   # brew ships `editorconfig-checker`; ubi/CI ships `ec`
 
 # --- Native package install (sudo path) ---------------------------------
 # Per-manager package name, only when it differs from the canonical tool name.
@@ -97,3 +107,9 @@ native_bin_renames:
 min_versions:
   neovim: "0.9.0"
   yq: "4.0.0"  # Debian apt ships Python yq 3.x (jq-syntax); we need mikefarah yq 4.x
+
+# Always install via ubi on Linux even when a native package exists — some distro
+# builds are unreliable (Ubuntu apt ships gitleaks 8.16, pre-`git` CLI; Arch's build
+# reports no version). The official ubi release is consistent. macOS uses Homebrew.
+force_ubi:
+  - gitleaks

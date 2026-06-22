@@ -1,4 +1,5 @@
-# https://editorconfig.org — advisory; CI (shfmt/stylua) is the source of truth.
+# https://editorconfig.org — enforced by editorconfig-checker in CI + pre-commit
+# (a few files with intentional alignment are excluded in .editorconfig-checker.json).
 root = true
 
 [*]

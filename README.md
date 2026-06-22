@@ -40,8 +40,10 @@ WSL is supported and treated as Linux.
 One command — clones to `~/dotfiles`, prompts for your details, provisions:
 
 ```bash
-sh -c "$(curl -fsSL https://gitlab.com/oelmeihy/dotfiles/-/raw/main/install.sh)"
+curl -fsSL https://oelmeihy.gitlab.io/dotfiles/install.sh | sh
 ```
+
+Served from the project's [landing page](https://oelmeihy.gitlab.io/dotfiles/).
 
 It installs Ansible (Homebrew, apt/pacman, or [uv] on no-sudo hosts), prompts
 once for `git_name`, `git_email`, and whether to use sudo, then runs the

@@ -27,3 +27,13 @@ repos:
         language: system
         pass_filenames: false
         files: '^ansible/'
+      - id: lint-editorconfig
+        name: editorconfig (editorconfig-checker)
+        entry: ci/lint.sh editorconfig
+        language: system
+        pass_filenames: false
+      - id: secret-scan
+        name: secrets (gitleaks git --staged)
+        entry: gitleaks git --staged --redact --no-banner .
+        language: system
+        pass_filenames: false

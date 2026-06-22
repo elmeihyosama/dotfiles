@@ -1,0 +1,7 @@
+{
+  "Exclude": [
+    "ansible/tasks/fonts\\.yml",
+    "ansible/tasks/packages\\.yml",
+    "home/dot_config/zsh/conf\\.d/00-env\\.zsh\\.tmpl"
+  ]
+}

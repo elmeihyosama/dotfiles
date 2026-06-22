@@ -48,6 +48,18 @@ write_local() { # $1 = allow_sudo value
 	printf '%s\n' '---' 'git_name: ci' 'git_email: ci@example.com' "allow_sudo: $1" >ansible/local.yml
 }
 
+# Assert a captured playbook run changed nothing (idempotence). The PLAY RECAP is
+# the only place `changed=N` appears (task lines use `changed: [host]`), so
+# `changed=[1-9]` matches iff the run was not convergent. $1 = log file, $2 = mode.
+assert_idempotent() {
+	if grep -qE 'changed=[1-9]' "$1"; then
+		echo "IDEMPOTENCE FAIL ($2): second run reported changes:"
+		grep -E 'PLAY RECAP|changed=' "$1"
+		exit 1
+	fi
+	echo "IDEMPOTENT ($2): second run reported changed=0"
+}
+
 # Run from ansible/ so its ansible.cfg loads (become=false, interpreter discovery,
 # inventory) — both modes must run under the same config. Only the packages tag:
 # fonts/chezmoi/sheldon/shell need a real home + TTY, out of scope for this matrix.
@@ -55,6 +67,13 @@ if [ "$MODE" = "sudo" ]; then
 	write_local true
 	(cd ansible && ansible-playbook site.yml --tags packages)
 	./ci/assert-tools.sh ansible/group_vars/all.yml
+	# Second run must be a no-op (idempotence).
+	(cd ansible && ansible-playbook site.yml --tags packages) >/tmp/run2.log 2>&1 || {
+		cat /tmp/run2.log
+		exit 1
+	}
+	cat /tmp/run2.log
+	assert_idempotent /tmp/run2.log sudo
 else
 	# Genuine unprivileged user with NO sudo rights. Pass the token + collections
 	# path inline — simple and portable across su versions; fine for a no-scope
@@ -64,4 +83,11 @@ else
 	chown -R tester "$PWD"
 	su tester -c "cd '$PWD/ansible' && GITHUB_TOKEN='${GITHUB_TOKEN:-}' ANSIBLE_COLLECTIONS_PATH='$COLLECTIONS_PATH' ansible-playbook site.yml --tags packages"
 	su tester -c "cd '$PWD' && ./ci/assert-tools.sh ansible/group_vars/all.yml"
+	# Second run must be a no-op (idempotence), same invocation as the first.
+	su tester -c "cd '$PWD/ansible' && GITHUB_TOKEN='${GITHUB_TOKEN:-}' ANSIBLE_COLLECTIONS_PATH='$COLLECTIONS_PATH' ansible-playbook site.yml --tags packages" >/tmp/run2.log 2>&1 || {
+		cat /tmp/run2.log
+		exit 1
+	}
+	cat /tmp/run2.log
+	assert_idempotent /tmp/run2.log nosudo
 fi

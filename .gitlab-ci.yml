@@ -1,4 +1,4 @@
-stages: [lint, provision]
+stages: [lint, provision, pages]
 
 # Common setup: a small Debian image + ubi to fetch static linter binaries
 # (mirrors the repo's own no-sudo install approach), plus apt for zsh/python.
@@ -51,6 +51,24 @@ ansible-lint:
   script:
     - ./ci/lint.sh ansible
 
+editorconfig:
+  extends: .lint
+  before_script:
+    - !reference [.lint, before_script]
+    - ubi --project editorconfig-checker/editorconfig-checker --in "$HOME/.local/bin" --exe ec
+  script:
+    - ./ci/lint.sh editorconfig
+
+secret-scan:
+  extends: .lint
+  variables:
+    GIT_DEPTH: 0   # full history for gitleaks
+  before_script:
+    - !reference [.lint, before_script]
+    - ubi --project gitleaks/gitleaks --in "$HOME/.local/bin"
+  script:
+    - gitleaks git --no-banner --redact .   # gitleaks 8.30: `git` scans full history
+
 provision:
   stage: provision
   image: $DISTRO
@@ -64,3 +82,18 @@ provision:
         MODE: [sudo, nosudo]
   script:
     - sh ci/provision-ci.sh
+
+# Publish the installer + landing page to GitLab Pages (https://oelmeihy.gitlab.io/dotfiles/).
+pages:
+  stage: pages
+  image: alpine:latest
+  interruptible: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - mkdir -p public
+    - cp -r site/. public/
+    - cp install.sh public/install.sh
+  artifacts:
+    paths:
+      - public
