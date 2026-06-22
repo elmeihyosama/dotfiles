@@ -120,20 +120,31 @@ lint_config() {
 	done < <(git ls-files '*.yml' '*.yaml' | grep -v '\.tmpl$')
 }
 
+# Enforce .editorconfig across the whole tracked tree (catches the file types the
+# formatters above don't cover: toml, kdl, json, md, cheat, …).
+lint_editorconfig() {
+	ec || {
+		note editorconfig "editorconfig-checker"
+		fail=1
+	}
+}
+
 main() {
 	case "${1:-all}" in
 	shell) lint_shell ;;
 	ansible) lint_ansible ;;
 	lua) lint_lua ;;
 	config) lint_config ;;
+	editorconfig) lint_editorconfig ;;
 	all)
 		lint_shell
 		lint_ansible
 		lint_lua
 		lint_config
+		lint_editorconfig
 		;;
 	*)
-		echo "usage: ci/lint.sh {shell|ansible|lua|config|all}" >&2
+		echo "usage: ci/lint.sh {shell|ansible|lua|config|editorconfig|all}" >&2
 		exit 2
 		;;
 	esac

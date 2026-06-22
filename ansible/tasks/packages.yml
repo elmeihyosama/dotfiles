@@ -26,7 +26,10 @@
     path: "{{ local_bin }}"
     state: directory
     mode: "0755"
-  when: use_ubi_fallback or (ansible_facts.system == 'Linux' and allow_sudo)
+  when: >-
+    use_ubi_fallback
+    or (ansible_facts.system == 'Linux' and allow_sudo)
+    or (ansible_facts.os_family == 'Darwin' and not use_ubi_fallback)
 
 - name: Check for ubi
   ansible.builtin.stat:
@@ -61,6 +64,15 @@
     name: "{{ brew_formula_overrides[item] | default(item) }}"
     state: present
   loop: "{{ tools }}"
+  when: ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
+
+- name: Shim Homebrew binaries to canonical names in ~/.local/bin (macOS)  # noqa command-instead-of-shell
+  ansible.builtin.shell: 'ln -sf "$(command -v {{ item.value }})" "{{ local_bin }}/{{ item.key }}"'
+  args:
+    creates: "{{ local_bin }}/{{ item.key }}"
+  loop: "{{ brew_bin_renames | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
   when: ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
 
 # ---- Native path: decision engine (Linux, sudo) -------------------------
@@ -144,7 +156,7 @@
     _clean: "{{ _cand | regex_replace('^[0-9]+:', '') | regex_replace('[-+~].*$', '') }}"
     _available: "{{ _cand | length > 0 and _cand != '(none)' }}"
     _floor: "{{ min_versions[item] | default('') }}"
-    _ok: "{{ _available and (_floor == '' or _clean is version(_floor, '>=')) }}"
+    _ok: "{{ item not in (force_ubi | default([])) and _available and (_floor == '' or _clean is version(_floor, '>=')) }}"
   loop: "{{ tools }}"
   when: _native_path
 
