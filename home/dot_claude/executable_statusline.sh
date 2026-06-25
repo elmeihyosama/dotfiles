@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Claude Code statusline — Rosé Pine Moon, sectioned (Direction C).
+# Reads the statusLine JSON on stdin. Dependency-free beyond jq/git (both provisioned).
+# Glyphs are raw UTF-8 byte escapes so they render in any bash/sh (macOS bash 3.2
+# lacks printf \U). Missing JSON fields just omit their segment.
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"
+input=$(cat)
+
+C() { printf '\033[38;2;%sm' "$1"; }
+FOAM=$(C '156;207;216')
+IRIS=$(C '196;167;231')
+GOLD=$(C '246;193;119')
+PINE=$(C '62;143;176')
+ROSE=$(C '234;154;151')
+LOVE=$(C '235;111;146')
+SUBTLE=$(C '144;140;170')
+DIM=$(C '110;106;134')
+RST=$'\033[0m'
+CLAUDE=$(C '217;119;87') # Claude terracotta
+# Nerd Font glyphs as UTF-8 byte escapes (bash-3.2 safe).
+BR=$(printf '\xee\x82\xa0')
+CTX=$(printf '\xf3\xb0\xa7\x91')
+CLK=$(printf '\xef\x80\x97')
+USD=$(printf '\xef\x85\x95')
+STY=$(printf '\xef\x87\xbc')
+MODEL=$(printf '\xf3\xb0\x9b\x84')
+EFFORT=$(printf '\xef\x83\xa7')
+DIV="${DIM} │ ${RST}"
+
+# One jq pass for every field (cheaper than a process per field).
+IFS=$'\037' read -r cwd model ostyle cost effort ctx h5 d7 rl < <(
+	printf '%s' "$input" | jq -r '[
+		(.workspace.current_dir // .cwd // ""),
+		(.model.display_name // ""),
+		(.output_style.name // ""),
+		(.cost.total_cost_usd // ""),
+		(.effort.level // ""),
+		(.context_window.used_percentage // ""),
+		(.rate_limits.five_hour.used_percentage // ""),
+		(.rate_limits.seven_day.used_percentage // ""),
+		(if .rate_limits != null then "1" else "" end)
+	] | map(tostring) | join("\u001f")' 2>/dev/null
+)
+[ -z "$cwd" ] && cwd="$PWD"
+model=${model% (*} # drop the model's "(… context)" suffix
+
+pcwd=$(pretty-cwd "$cwd" 2>/dev/null)
+[ -z "$pcwd" ] && pcwd="$cwd"
+branch=$( (cd "$cwd" 2>/dev/null && git rev-parse --abbrev-ref HEAD 2>/dev/null))
+dirty=""
+[ -n "$branch" ] && (cd "$cwd" 2>/dev/null && [ -n "$(git status --porcelain 2>/dev/null | head -1)" ]) && dirty=" ${GOLD}?${RST}"
+
+segs=()
+segs+=("${FOAM}${pcwd}${RST}")
+[ -n "$branch" ] && segs+=("${IRIS}${BR} ${branch}${RST}${dirty}")
+[ -n "$model" ] && segs+=("${CLAUDE}${MODEL}${RST} ${model}")
+[ -n "$effort" ] && segs+=("${ROSE}${EFFORT}${RST} ${SUBTLE}${effort}${RST}")
+[ -n "$ostyle" ] && [ "$ostyle" != "default" ] && segs+=("${SUBTLE}${STY} ${ostyle}${RST}")
+[ -n "$ctx" ] && segs+=("${PINE}${CTX}${RST} ${SUBTLE}${ctx%.*}%${RST}")
+if [ -n "$rl" ]; then
+	segs+=("${GOLD}[personal]${RST}")
+	usage=""
+	[ -n "$h5" ] && usage="5h ${h5%.*}%"
+	[ -n "$d7" ] && usage="${usage:+$usage · }7d ${d7%.*}%"
+	[ -n "$usage" ] && segs+=("${FOAM}${CLK}${RST} ${SUBTLE}${usage}${RST}")
+else
+	segs+=("${LOVE}[enterprise]${RST}")
+	if [ -n "$cost" ]; then
+		costf=$(printf '%.2f' "$cost" 2>/dev/null || printf '%s' "$cost")
+		segs+=("${GOLD}${USD}${RST} ${SUBTLE}\$${costf}${RST}")
+	fi
+fi
+
+out=""
+for s in "${segs[@]}"; do out="${out:+$out$DIV}$s"; done
+printf '%s' "$out"
