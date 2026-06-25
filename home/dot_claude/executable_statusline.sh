@@ -7,6 +7,21 @@ export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"
 input=$(cat)
 
 C() { printf '\033[38;2;%sm' "$1"; }
+# Repo-root-relative cwd (symlink-safe via git's own --show-prefix), else full ~ path.
+pretty_cwd() {
+	local d r p
+	d="$1"
+	if r=$(cd "$d" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) && [ -n "$r" ]; then
+		p=$(cd "$d" 2>/dev/null && git rev-parse --show-prefix 2>/dev/null)
+		printf '%s%s' "$(basename "$r")" "${p:+/${p%/}}"
+	else
+		case "$d" in
+		"$HOME") printf '~' ;;
+		"$HOME"/*) printf '~%s' "${d#"$HOME"}" ;;
+		*) printf '%s' "$d" ;;
+		esac
+	fi
+}
 FOAM=$(C '156;207;216')
 IRIS=$(C '196;167;231')
 GOLD=$(C '246;193;119')
@@ -44,7 +59,7 @@ IFS=$'\037' read -r cwd model ostyle cost effort ctx h5 d7 rl < <(
 [ -z "$cwd" ] && cwd="$PWD"
 model=${model% (*} # drop the model's "(… context)" suffix
 
-pcwd=$(pretty-cwd "$cwd" 2>/dev/null)
+pcwd=$(pretty_cwd "$cwd")
 [ -z "$pcwd" ] && pcwd="$cwd"
 branch=$( (cd "$cwd" 2>/dev/null && git rev-parse --abbrev-ref HEAD 2>/dev/null))
 dirty=""

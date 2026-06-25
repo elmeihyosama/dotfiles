@@ -4,7 +4,7 @@ add_newline = true
 palette = "rosepine"
 
 format = """
-[╭─ ](subtle)$hostname${custom.dir}$git_branch$git_status$nodejs$python$rust$golang$docker_context$kubernetes$fill$cmd_duration$time
+[╭─ ](subtle)$hostname$directory$git_branch$git_status$nodejs$python$rust$golang$docker_context$kubernetes$fill$cmd_duration$time
 [╰─](subtle)$character"""
 
 [palettes.rosepine]
@@ -32,15 +32,11 @@ format = "[$ssh_symbol$hostname]($style) "
 [fill]
 symbol = " "
 
-# cwd via the shared pretty-cwd helper (same rule as the Claude statusline): in a repo,
-# <repo-parent>/<repo>/<subpath>; otherwise the full ~ path. Replaces the built-in
-# $directory module, which can't express "repo + 1 parent".
-[custom.dir]
-command = "pretty-cwd"
-when = "true"
-shell = ["sh"]
+[directory]
 style = "bold foam"
-format = "[$output]($style) "
+truncation_length = 0 # no cap — show the full repo-relative path (matches the statusline)
+truncate_to_repo = true
+format = "[$path]($style)[$read_only]($read_only_style) "
 
 [git_branch]
 symbol = " "
