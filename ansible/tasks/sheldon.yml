@@ -13,5 +13,6 @@
 - name: Fetch zsh plugins via sheldon lock
   ansible.builtin.command: "{{ _sheldon.stdout }} lock"
   register: _sheldon_lock
-  changed_when: "'Locked' in (_sheldon_lock.stderr | default('')) or _sheldon_lock.rc == 0"
+  # Only a CLONED plugin is a real change; steady-state re-runs are all CHECKED.
+  changed_when: "'CLONED' in (_sheldon_lock.stderr | default(''))"
   when: _sheldon.rc == 0 and _sheldon_cfg.stat.exists

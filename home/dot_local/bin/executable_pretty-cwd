@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+# Display path for the Starship prompt + Claude statusline (kept identical via this one
+# helper). In a git repo: <repo-parent>/<repo>/<subpath> (parent == $HOME shows as ~,
+# else just the parent's basename — the deep prefix is dropped). Otherwise: full
+# home-rooted path. Clean, no marker — repo-ness is shown by the adjacent git segment.
+dir="${1:-$PWD}"
+root=$(cd "$dir" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null)
+if [ -n "$root" ]; then
+  sub=${dir#"$root"}
+  parent=$(dirname "$root")
+  if [ "$parent" = "$HOME" ]; then prefix="~"; else prefix=$(basename "$parent"); fi
+  printf '%s/%s%s\n' "$prefix" "$(basename "$root")" "$sub"
+else
+  case "$dir" in
+  "$HOME") printf '~\n' ;;
+  "$HOME"/*) printf '~%s\n' "${dir#"$HOME"}" ;;
+  *) printf '%s\n' "$dir" ;;
+  esac
+fi

@@ -4,6 +4,32 @@ A cross-platform (macOS and Linux) terminal environment — managed with
 [chezmoi], provisioned with [Ansible], and themed with [Rosé Pine Moon]. It
 bootstraps a fresh machine with a single command and works even without `sudo`.
 
+## Quick start
+
+```bash
+curl -fsSL https://oelmeihy.gitlab.io/dotfiles/install.sh | sh
+```
+
+One command — clones to `~/dotfiles`, prompts for your details, and provisions. Served from the project's [landing page](https://oelmeihy.gitlab.io/dotfiles/).
+
+It installs Ansible (Homebrew, apt/pacman, or [uv] on no-sudo hosts), prompts
+once for `git_name`, `git_email`, and whether to use sudo, then runs the
+playbook (toolchain, JetBrains Mono Nerd Font, shell plugins, login shell) and
+applies the config with `chezmoi apply`. Answers are saved to a git-ignored
+`ansible/local.yml`.
+
+It's safe to re-run: an existing clone is fast-forwarded, your saved answers
+are reused, and the playbook only changes what's drifted. Re-run the prompts
+with `./install.sh --reconfigure`.
+
+### Manual clone
+
+```bash
+git clone https://gitlab.com/oelmeihy/dotfiles ~/dotfiles
+cd ~/dotfiles
+./install.sh
+```
+
 ## Supported platforms
 
 | Platform | Install strategy |
@@ -35,34 +61,6 @@ WSL is supported and treated as Linux.
 | `ci/` | Shared lint script used by CI and pre-commit |
 | `install.sh` | Fresh-machine entry point (clone + provision) |
 
-## Quick start
-
-One command — clones to `~/dotfiles`, prompts for your details, provisions:
-
-```bash
-curl -fsSL https://oelmeihy.gitlab.io/dotfiles/install.sh | sh
-```
-
-Served from the project's [landing page](https://oelmeihy.gitlab.io/dotfiles/).
-
-It installs Ansible (Homebrew, apt/pacman, or [uv] on no-sudo hosts), prompts
-once for `git_name`, `git_email`, and whether to use sudo, then runs the
-playbook (toolchain, JetBrains Mono Nerd Font, shell plugins, login shell) and
-applies the config with `chezmoi apply`. Answers are saved to a git-ignored
-`ansible/local.yml`.
-
-It's safe to re-run: an existing clone is fast-forwarded, your saved answers
-are reused, and the playbook only changes what's drifted. Re-run the prompts
-with `./install.sh --reconfigure`.
-
-### Manual clone
-
-```bash
-git clone https://gitlab.com/oelmeihy/dotfiles ~/dotfiles
-cd ~/dotfiles
-./install.sh
-```
-
 ## The stack
 
 | Area | Tools |
@@ -71,6 +69,7 @@ cd ~/dotfiles
 | Terminal · Prompt · Multiplexer | Ghostty · Starship · zellij |
 | Editor | Neovim ([LazyVim]) |
 | Files & CLI | yazi, bat, ripgrep, fzf, navi, git-delta, lazygit |
+| Claude Code | Themed statusline (cwd · git · model · context · usage/cost) |
 | Theme | Rosé Pine Moon throughout |
 
 ## How it works
