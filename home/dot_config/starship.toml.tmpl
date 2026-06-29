@@ -1,70 +1,70 @@
 {{- $p := index .themes .theme -}}
 "$schema" = 'https://starship.rs/config-schema.json'
 add_newline = true
-palette = "rosepine"
+palette = "base16"
 
 format = """
 [╭─ ](subtle)$hostname$directory$git_branch$git_status$nodejs$python$rust$golang$docker_context$kubernetes$fill$cmd_duration$time
 [╰─](subtle)$character"""
 
-[palettes.rosepine]
-base = "{{ $p.base }}"
-surface = "{{ $p.surface }}"
-overlay = "{{ $p.overlay }}"
-muted = "{{ $p.muted }}"
-subtle = "{{ $p.subtle }}"
-text = "{{ $p.text }}"
-love = "{{ $p.love }}"
-gold = "{{ $p.gold }}"
-rose = "{{ $p.rose }}"
-pine = "{{ $p.pine }}"
-foam = "{{ $p.foam }}"
-iris = "{{ $p.iris }}"
+[palettes.base16]
+# structural
+bg      = "{{ $p.base00 }}"
+surface = "{{ $p.base01 }}"
+muted   = "{{ $p.base03 }}"
+subtle  = "{{ $p.base04 }}"
+text    = "{{ $p.base05 }}"
+# accents
+red     = "{{ $p.base08 }}"
+orange  = "{{ $p.base09 }}"
+yellow  = "{{ $p.base0A }}"
+green   = "{{ $p.base0B }}"
+cyan    = "{{ $p.base0C }}"
+blue    = "{{ $p.base0D }}"
+magenta = "{{ $p.base0E }}"
 
-# Shown only in SSH sessions (ssh_only), first on the left — a clear "you are
-# on a remote host" cue. Empty/absent on local sessions.
 [hostname]
 ssh_only = true
 ssh_symbol = " "
-style = "bold love"
+style = "bold red"
 format = "[$ssh_symbol$hostname]($style) "
 
 [fill]
 symbol = " "
 
 [directory]
-style = "bold foam"
-truncation_length = 0 # no cap — show the full repo-relative path (matches the statusline)
+style = "bold cyan"
+truncation_length = 0
 truncate_to_repo = true
 format = "[$path]($style)[$read_only]($read_only_style) "
 
 [git_branch]
-symbol = " "
-style = "iris"
+symbol = " "
+style = "magenta"
 format = "[$symbol$branch]($style) "
 
 [git_status]
-style = "love"
+style = "red"
 format = '([$all_status$ahead_behind]($style)) '
 
 [nodejs]
 symbol = " "
-style = "pine"
+style = "green"
 format = "[$symbol($version )]($style)"
 
 [python]
 symbol = " "
-style = "gold"
+style = "yellow"
 format = '[$symbol(${version} )(\($virtualenv\) )]($style)'
 
 [rust]
 symbol = " "
-style = "rose"
+style = "orange"
 format = "[$symbol($version )]($style)"
 
 [golang]
 symbol = " "
-style = "foam"
+style = "cyan"
 format = "[$symbol($version )]($style)"
 
 [docker_context]
@@ -75,7 +75,7 @@ format = "[$symbol$context]($style) "
 
 [kubernetes]
 symbol = "☸ "
-style = "gold"
+style = "yellow"
 disabled = false
 format = '[$symbol$context( \($namespace\))]($style) '
 
@@ -91,6 +91,6 @@ style = "muted"
 format = "[$time]($style)"
 
 [character]
-success_symbol = "[❯](bold pine)"
-error_symbol = "[❯](bold love)"
-vimcmd_symbol = "[❮](bold gold)"
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+vimcmd_symbol = "[❮](bold yellow)"

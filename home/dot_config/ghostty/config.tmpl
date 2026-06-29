@@ -1,29 +1,30 @@
 {{- $p := index .themes .theme -}}
 font-family = {{ .font.family }}
 font-size = {{ .font.size }}
-background-opacity = 0.95
+background-opacity = 0.8
+background-blur = 20
 
-# Rosé Pine Moon (raw hex from palette)
-background = {{ $p.base }}
-foreground = {{ $p.text }}
-cursor-color = {{ $p.text }}
-selection-background = {{ $p.highlight_med }}
-selection-foreground = {{ $p.text }}
+# Colors from the active base16 palette ({{ .theme }})
+background = {{ $p.base00 }}
+foreground = {{ $p.base05 }}
+cursor-color = {{ $p.base05 }}
+selection-background = {{ $p.base02 }}
+selection-foreground = {{ $p.base05 }}
 
-# palette 0-15
-palette = 0={{ $p.overlay }}
-palette = 1={{ $p.love }}
-palette = 2={{ $p.pine }}
-palette = 3={{ $p.gold }}
-palette = 4={{ $p.foam }}
-palette = 5={{ $p.iris }}
-palette = 6={{ $p.rose }}
-palette = 7={{ $p.text }}
-palette = 8={{ $p.muted }}
-palette = 9={{ $p.love }}
-palette = 10={{ $p.pine }}
-palette = 11={{ $p.gold }}
-palette = 12={{ $p.foam }}
-palette = 13={{ $p.iris }}
-palette = 14={{ $p.rose }}
-palette = 15={{ $p.subtle }}
+# palette 0-15 (standard base16 → ANSI mapping)
+palette = 0={{ $p.base00 }}
+palette = 1={{ $p.base08 }}
+palette = 2={{ $p.base0B }}
+palette = 3={{ $p.base0A }}
+palette = 4={{ $p.base0D }}
+palette = 5={{ $p.base0E }}
+palette = 6={{ $p.base0C }}
+palette = 7={{ $p.base05 }}
+palette = 8={{ $p.base03 }}
+palette = 9={{ $p.base08 }}
+palette = 10={{ $p.base0B }}
+palette = 11={{ $p.base0A }}
+palette = 12={{ $p.base0D }}
+palette = 13={{ $p.base0E }}
+palette = 14={{ $p.base0C }}
+palette = 15={{ $p.base07 }}

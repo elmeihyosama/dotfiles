@@ -1,22 +1,22 @@
 {{- $p := index .themes .theme -}}
-theme "rose-pine-moon"
+theme "base16"
 default_layout "split"
 pane_frames true
 mouse_mode true
 copy_on_select false
 
 themes {
-    rose-pine-moon {
-        fg "{{ $p.text }}"
-        bg "{{ $p.base }}"
-        black "{{ $p.overlay }}"
-        red "{{ $p.love }}"
-        green "{{ $p.pine }}"
-        yellow "{{ $p.gold }}"
-        blue "{{ $p.foam }}"
-        magenta "{{ $p.iris }}"
-        cyan "{{ $p.rose }}"
-        white "{{ $p.text }}"
-        orange "{{ $p.gold }}"
+    base16 {
+        fg "{{ $p.base05 }}"
+        bg "{{ $p.base00 }}"
+        black "{{ $p.base00 }}"
+        red "{{ $p.base08 }}"
+        green "{{ $p.base0B }}"
+        yellow "{{ $p.base0A }}"
+        blue "{{ $p.base0D }}"
+        magenta "{{ $p.base0E }}"
+        cyan "{{ $p.base0C }}"
+        white "{{ $p.base05 }}"
+        orange "{{ $p.base09 }}"
     }
 }

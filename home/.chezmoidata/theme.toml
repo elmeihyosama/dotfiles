@@ -1,3 +1,8 @@
-# Active theme selector — single source of truth for which palette is used.
-# Override per-machine in ~/.config/chezmoi/chezmoi.toml if desired.
+# Active theme selector — single source of truth for which base16 palette is used.
+# Override per-machine in ~/.config/chezmoi/chezmoi.toml ([data] theme = "...").
+# Switch interactively with the `theme` command. See docs/themes.md for the full list.
+#
+# Recommended: rose-pine-moon, rose-pine, rose-pine-dawn, catppuccin-mocha,
+# catppuccin-macchiato, gruvbox-dark-medium, nord, tomorrow-night, dracula,
+# solarized-dark, solarized-light, everforest, kanagawa, onedark, ayu-mirage
 theme = "rose-pine-moon"
