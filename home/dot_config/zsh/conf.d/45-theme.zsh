@@ -39,7 +39,7 @@ theme() {
     slug=$1
   elif command -v fzf >/dev/null 2>&1; then
     slug=$(print -l -- $themes | fzf --prompt='theme ❯ ' --height 40% --reverse \
-      --preview="grep -E '^base0' ${src}/.chezmoidata/themes/{}.toml") || return 0
+      --preview="${src:h}/scripts/theme-preview.sh ${src}/.chezmoidata/themes/{}.toml") || return 0
   else
     echo "usage: theme <slug>" >&2; print -l -- $themes; return 1
   fi
