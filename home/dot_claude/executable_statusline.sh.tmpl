@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Claude Code statusline — Rosé Pine Moon, sectioned (Direction C).
+# Claude Code statusline — sectioned (Direction C). Colours resolve against
+# the active base16 theme (currently {{ .theme }}) via home/.chezmoidata/design.toml
+# roles where the usage is "chrome" (cwd, branch, context/effort/plan badges);
+# purely informational accents (dirty flag, cost, muted text, dividers) read
+# straight base16 slots per design.toml's own "content vs chrome" convention.
 # Reads the statusLine JSON on stdin. Dependency-free beyond jq/git (both provisioned).
 # Glyphs are raw UTF-8 byte escapes so they render in any bash/sh (macOS bash 3.2
 # lacks printf \U). Missing JSON fields just omit their segment.
@@ -22,16 +26,33 @@ pretty_cwd() {
 		esac
 	fi
 }
-FOAM=$(C '156;207;216')
-IRIS=$(C '196;167;231')
-GOLD=$(C '246;193;119')
-PINE=$(C '62;143;176')
-ROSE=$(C '234;154;151')
-LOVE=$(C '235;111;146')
-SUBTLE=$(C '144;140;170')
-DIM=$(C '110;106;134')
+{{- $p := index .themes .theme -}}
+{{- define "hex2rgb" -}}
+{{- $hex := trimPrefix "#" . -}}
+{{- $r := substr 0 2 $hex -}}
+{{- $g := substr 2 4 $hex -}}
+{{- $b := substr 4 6 $hex -}}
+{{- output "sh" "-c" (printf "printf %s $((0x%s)) $((0x%s)) $((0x%s))" "'%d;%d;%d'" $r $g $b) -}}
+{{- end }}
+# Colour-role mapping:
+#   FOAM   cwd            design.accent2 / base0C ("prompt directory")
+#   IRIS   git branch     design.link    / base0D ("git branch")
+#   GOLD   dirty/plan/$   raw base09               (content-tier accent)
+#   PINE   context icon   design.accent  / base0B (primary chrome badge)
+#   ROSE   effort badge   design.warn    / base0A
+#   LOVE   enterprise tag design.err     / base08
+#   SUBTLE secondary text raw base04                (muted, content-tier)
+#   DIM    divider        raw base03                (muted, content-tier)
+FOAM=$(C '{{ template "hex2rgb" (index $p .design.accent2) }}')
+IRIS=$(C '{{ template "hex2rgb" (index $p .design.link) }}')
+GOLD=$(C '{{ template "hex2rgb" $p.base09 }}')
+PINE=$(C '{{ template "hex2rgb" (index $p .design.accent) }}')
+ROSE=$(C '{{ template "hex2rgb" (index $p .design.warn) }}')
+LOVE=$(C '{{ template "hex2rgb" (index $p .design.err) }}')
+SUBTLE=$(C '{{ template "hex2rgb" $p.base04 }}')
+DIM=$(C '{{ template "hex2rgb" $p.base03 }}')
 RST=$'\033[0m'
-CLAUDE=$(C '217;119;87') # Claude terracotta
+CLAUDE=$(C '217;119;87') # Claude terracotta (brand colour, not base16)
 # Nerd Font glyphs as UTF-8 byte escapes (bash-3.2 safe).
 BR=$(printf '\xee\x82\xa0')
 CTX=$(printf '\xf3\xb0\xa7\x91')

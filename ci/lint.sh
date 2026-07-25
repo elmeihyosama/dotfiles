@@ -48,6 +48,27 @@ lint_shell() {
 			fail=1
 		}
 	done < <(git ls-files '*.zsh.tmpl')
+	# bash/sh templates (e.g. chezmoi-templated executable_*.sh.tmpl):
+	# render, then shellcheck + shfmt the rendered output.
+	while IFS= read -r f; do
+		[ -f "$f" ] || continue
+		local rendered
+		rendered="$(mktemp)"
+		if render "$f" >"$rendered"; then
+			shellcheck "$rendered" || {
+				note shell "render+shellcheck: $f"
+				fail=1
+			}
+			shfmt -d "$rendered" || {
+				note shell "render+shfmt: $f"
+				fail=1
+			}
+		else
+			note shell "render: $f"
+			fail=1
+		fi
+		rm -f "$rendered"
+	done < <(git ls-files '*.sh.tmpl')
 	# Shell-content templates whose filename lacks a .zsh/.sh infix.
 	for f in home/dot_zshrc.tmpl home/dot_bashrc.tmpl; do
 		[ -f "$f" ] || continue

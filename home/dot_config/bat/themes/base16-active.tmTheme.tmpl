@@ -1,0 +1,37 @@
+{{- $p := index .themes .theme -}}
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>name</key><string>base16-active ({{ .theme }})</string>
+  <key>settings</key><array>
+    <dict><key>settings</key><dict>
+      <key>background</key><string>{{ $p.base00 }}</string>
+      <key>foreground</key><string>{{ $p.base05 }}</string>
+      <key>caret</key><string>{{ $p.base05 }}</string>
+      <key>selection</key><string>{{ $p.base02 }}</string>
+      <key>lineHighlight</key><string>{{ $p.base01 }}</string>
+    </dict></dict>
+    <dict><key>scope</key><string>comment, punctuation.definition.comment</string>
+      <key>settings</key><dict><key>foreground</key><string>{{ $p.base03 }}</string><key>fontStyle</key><string>italic</string></dict></dict>
+    <dict><key>scope</key><string>string, punctuation.definition.string</string>
+      <key>settings</key><dict><key>foreground</key><string>{{ $p.base0B }}</string></dict></dict>
+    <dict><key>scope</key><string>constant.numeric, constant.language, constant.character</string>
+      <key>settings</key><dict><key>foreground</key><string>{{ $p.base09 }}</string></dict></dict>
+    <dict><key>scope</key><string>keyword, storage.type, storage.modifier</string>
+      <key>settings</key><dict><key>foreground</key><string>{{ $p.base0E }}</string></dict></dict>
+    <dict><key>scope</key><string>entity.name.function, support.function</string>
+      <key>settings</key><dict><key>foreground</key><string>{{ $p.base0D }}</string></dict></dict>
+    <dict><key>scope</key><string>variable, entity.name.tag</string>
+      <key>settings</key><dict><key>foreground</key><string>{{ $p.base08 }}</string></dict></dict>
+    <dict><key>scope</key><string>entity.name.type, entity.name.class, support.type, support.class</string>
+      <key>settings</key><dict><key>foreground</key><string>{{ $p.base0A }}</string></dict></dict>
+    <dict><key>scope</key><string>support.constant, constant.other, punctuation.separator</string>
+      <key>settings</key><dict><key>foreground</key><string>{{ $p.base0C }}</string></dict></dict>
+    <dict><key>scope</key><string>markup.inserted</string>
+      <key>settings</key><dict><key>foreground</key><string>{{ $p.base0B }}</string></dict></dict>
+    <dict><key>scope</key><string>markup.deleted</string>
+      <key>settings</key><dict><key>foreground</key><string>{{ $p.base08 }}</string></dict></dict>
+    <dict><key>scope</key><string>markup.heading, entity.name.section</string>
+      <key>settings</key><dict><key>foreground</key><string>{{ $p.base0D }}</string><key>fontStyle</key><string>bold</string></dict></dict>
+  </array>
+</dict></plist>

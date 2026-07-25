@@ -6,3 +6,6 @@ ansible/local.yml
 
 # Ansible local runtime artifacts (galaxy collections/roles cache)
 .ansible/
+
+# Brainstorming session artifacts (local-only)
+.superpowers/

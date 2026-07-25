@@ -1,0 +1,12 @@
+# Design tokens — semantic roles for UI chrome, resolved against the active
+# base16 palette. Content colouring (syntax, diffs, file types) keeps using
+# raw base0X slots; chrome templates use these roles.
+[design]
+accent  = "base0B" # primary chrome: active tab/session pill, ❯, mode block
+accent2 = "base0C" # highlights: prompt directory, focused borders
+link    = "base0D" # secondary: git branch, directories in listings
+ok      = "base0B"
+warn    = "base0A"
+err     = "base08"
+rail    = "base04" # prompt elbow
+border  = "rounded"

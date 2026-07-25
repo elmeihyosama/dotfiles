@@ -13,8 +13,8 @@ export FZF_DEFAULT_OPTS="${FZF_DEFAULT_OPTS:+$FZF_DEFAULT_OPTS }\
 --height 40% --ansi --layout=reverse --border --prompt='❯ ' --pointer='▶' --marker='✓' \
 --color=fg:{{ $p.base05 }},bg:{{ $p.base00 }},hl:{{ $p.base08 }} \
 --color=fg+:{{ $p.base05 }},bg+:{{ $p.base01 }},hl+:{{ $p.base08 }} \
---color=info:{{ $p.base0C }},prompt:{{ $p.base0E }},pointer:{{ $p.base0E }} \
---color=marker:{{ $p.base0C }},spinner:{{ $p.base0E }},header:{{ $p.base08 }}"
+--color=info:{{ $p.base0C }},prompt:{{ index $p .design.accent }},pointer:{{ index $p .design.accent }} \
+--color=marker:{{ $p.base0C }},spinner:{{ index $p .design.accent2 }},header:{{ $p.base08 }}"
 
 # Source for the Ctrl-T (file) and Alt-C/Ctrl-O (cd) widgets
 if command -v fd >/dev/null 2>&1; then

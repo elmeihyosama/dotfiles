@@ -1,0 +1,20 @@
+{{- $p := index .themes .theme -}}
+# Palette-driven styles for fast-syntax-highlighting (loaded via sheldon;
+# reads FAST_HIGHLIGHT_STYLES, not ZSH_HIGHLIGHT_STYLES).
+typeset -gA FAST_HIGHLIGHT_STYLES
+FAST_HIGHLIGHT_STYLES[command]='fg={{ index $p .design.ok }}'
+FAST_HIGHLIGHT_STYLES[builtin]='fg={{ index $p .design.ok }}'
+FAST_HIGHLIGHT_STYLES[alias]='fg={{ index $p .design.ok }}'
+FAST_HIGHLIGHT_STYLES[function]='fg={{ index $p .design.ok }}'
+FAST_HIGHLIGHT_STYLES[precommand]='fg={{ index $p .design.ok }},italic'
+FAST_HIGHLIGHT_STYLES[unknown-token]='fg={{ index $p .design.err }}'
+FAST_HIGHLIGHT_STYLES[reserved-word]='fg={{ $p.base0E }}'
+FAST_HIGHLIGHT_STYLES[single-quoted-argument]='fg={{ index $p .design.warn }}'
+FAST_HIGHLIGHT_STYLES[double-quoted-argument]='fg={{ index $p .design.warn }}'
+FAST_HIGHLIGHT_STYLES[dollar-quoted-argument]='fg={{ index $p .design.warn }}'
+FAST_HIGHLIGHT_STYLES[path]='fg={{ $p.base05 }},underline'
+FAST_HIGHLIGHT_STYLES[path-to-dir]='fg={{ $p.base05 }},underline'
+FAST_HIGHLIGHT_STYLES[globbing]='fg={{ $p.base0C }}'
+FAST_HIGHLIGHT_STYLES[comment]='fg={{ $p.base03 }},italic'
+FAST_HIGHLIGHT_STYLES[redirection]='fg={{ $p.base0C }}'
+FAST_HIGHLIGHT_STYLES[suffix-alias]='fg={{ index $p .design.ok }},underline'

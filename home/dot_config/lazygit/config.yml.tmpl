@@ -2,10 +2,18 @@
 gui:
   nerdFontsVersion: "3"
   theme:
-    activeBorderColor: ["{{ $p.base0E }}", bold]
+    activeBorderColor: ["{{ index $p .design.accent2 }}", bold]
     inactiveBorderColor: ["{{ $p.base03 }}"]
-    selectedLineBgColor: ["{{ $p.base02 }}"]
+    searchingActiveBorderColor: ["{{ index $p .design.warn }}", bold]
     optionsTextColor: ["{{ $p.base0C }}"]
+    selectedLineBgColor: ["{{ $p.base02 }}"]
+    inactiveViewSelectedLineBgColor: ["{{ $p.base01 }}"]
+    cherryPickedCommitFgColor: ["{{ $p.base0C }}"]
+    cherryPickedCommitBgColor: ["{{ $p.base02 }}"]
+    markedBaseCommitFgColor: ["{{ $p.base0D }}"]
+    markedBaseCommitBgColor: ["{{ $p.base02 }}"]
+    unstagedChangesColor: ["{{ index $p .design.err }}"]
+    defaultFgColor: ["{{ $p.base05 }}"]
 git:
   paging:
     colorArg: always

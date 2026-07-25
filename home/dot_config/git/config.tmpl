@@ -10,14 +10,17 @@
     diffFilter = delta --color-only --line-numbers
 
 [delta]
-    side-by-side = true
-    line-numbers = true
     navigate = true
-    syntax-theme = base16
-    minus-style = bold "{{ $p.base08 }}"
-    plus-style = bold "{{ $p.base0B }}"
-    file-style = bold "{{ $p.base0E }}"
-    hunk-header-style = omit
+    line-numbers = true
+    syntax-theme = base16-active
+    minus-style = "{{ $p.base08 }} {{ $p.base01 }}"
+    minus-emph-style = "{{ $p.base05 }} {{ $p.base08 }}"
+    plus-style = "{{ $p.base0B }} {{ $p.base01 }}"
+    plus-emph-style = "{{ $p.base00 }} {{ $p.base0B }}"
+    hunk-header-style = "{{ index $p .design.accent }} bold"
+    hunk-header-decoration-style = "{{ $p.base02 }} ul"
+    file-style = "{{ index $p .design.accent2 }} bold"
+    file-decoration-style = "{{ $p.base02 }} ul"
     line-numbers-minus-style = "{{ $p.base08 }}"
     line-numbers-plus-style = "{{ $p.base0B }}"
     line-numbers-zero-style = "{{ $p.base03 }}"

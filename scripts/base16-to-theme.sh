@@ -10,7 +10,7 @@
 set -eu
 
 REPO_ROOT=$(CDPATH='' cd "$(dirname "$0")/.." && pwd)
-OUT_DIR="$REPO_ROOT/home/.chezmoidata/themes"
+OUT_DIR="${OUT_DIR:-$REPO_ROOT/home/.chezmoidata/themes}"
 mkdir -p "$OUT_DIR"
 
 convert_one() {
