@@ -13,8 +13,10 @@ if command -v apt-get >/dev/null 2>&1; then
 	apt-get install -y -qq python3 python3-pip git curl ca-certificates sudo >/dev/null
 	pip install --quiet --break-system-packages ansible-core
 elif command -v pacman >/dev/null 2>&1; then
-	pacman -Sy --noconfirm --quiet python python-pip git curl sudo >/dev/null
-	pip install --quiet --break-system-packages ansible-core
+	# ansible-core from pacman, not pip: pip's PyYAML in system site-packages
+	# collides with pacman's python-yaml when the playbook later installs yq
+	# (same source install.sh uses on real Arch machines).
+	pacman -Sy --noconfirm --quiet python git curl sudo ansible-core >/dev/null
 elif command -v dnf >/dev/null 2>&1; then
 	# Fedora's python3 is new enough for ansible-core; EL (Rocky/Alma/RHEL) ships
 	# too old, so pin python3.12. --allowerasing resolves the curl vs curl-minimal

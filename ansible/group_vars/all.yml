@@ -6,6 +6,8 @@ ubi_version: "latest"          # bootstrap script pulls the latest ubi release
 nerd_font: "JetBrainsMono"
 nerd_font_version: "v3.2.1"
 python_version: "3.13"         # uv-managed default python
+zjstatus_version: "v0.24.0"    # zellij status-bar plugin; bump manually + re-pin sha256
+zjstatus_sha256: "1ccedece1ded62cf3e209be690cdd39ca6fb9e8228ed71a951f6507f9956669b"
 
 # Canonical tool list (installed on every machine).
 tools:
@@ -32,6 +34,7 @@ tools:
   - neovim
   - gitleaks
   - editorconfig-checker
+  - fastfetch
 
 # owner/repo for the ubi no-sudo fallback
 ubi_tool_repos:
@@ -58,6 +61,7 @@ ubi_tool_repos:
   neovim: neovim/neovim
   gitleaks: gitleaks/gitleaks
   editorconfig-checker: editorconfig-checker/editorconfig-checker
+  fastfetch: fastfetch-cli/fastfetch
 
 # tools whose extracted binary name differs from the canonical name (for ubi --exe)
 ubi_exe_overrides:
@@ -113,3 +117,4 @@ min_versions:
 # reports no version). The official ubi release is consistent. macOS uses Homebrew.
 force_ubi:
   - gitleaks
+  - yq # native "yq" is often the incompatible Python/jq wrapper (Arch, Debian); we need mikefarah yq

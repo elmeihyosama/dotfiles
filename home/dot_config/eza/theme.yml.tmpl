@@ -1,0 +1,20 @@
+{{- $p := index .themes .theme -}}
+colourful: true
+
+filekinds:
+  normal: { foreground: "{{ $p.base05 }}" }
+  directory: { foreground: "{{ index $p .design.link }}" }
+  symlink: { foreground: "{{ $p.base0C }}" }
+  pipe: { foreground: "{{ $p.base03 }}" }
+  block_device: { foreground: "{{ $p.base09 }}" }
+  char_device: { foreground: "{{ $p.base09 }}" }
+  socket: { foreground: "{{ $p.base03 }}" }
+  special: { foreground: "{{ $p.base0E }}" }
+  executable: { foreground: "{{ index $p .design.ok }}" }
+  mount_point: { foreground: "{{ $p.base0A }}" }
+
+perms:
+  user_read: { foreground: "{{ $p.base05 }}" }
+  user_write: { foreground: "{{ $p.base0A }}" }
+  user_execute_file: { foreground: "{{ $p.base0B }}" }
+  other_write: { foreground: "{{ $p.base08 }}" }

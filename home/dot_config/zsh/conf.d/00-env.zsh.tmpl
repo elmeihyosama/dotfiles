@@ -34,6 +34,10 @@ command -v bat >/dev/null 2>&1 && export MANPAGER="sh -c 'col -bx | bat -l man -
 # Ripgrep config
 export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/config"
 
+# eza: on macOS it ignores XDG and reads ~/Library/Application Support/eza
+# unless EZA_CONFIG_DIR is set explicitly. Force it to our themed config.
+export EZA_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/eza"
+
 # Default apps
 export TERMINAL="ghostty"
 export BROWSER="firefox"

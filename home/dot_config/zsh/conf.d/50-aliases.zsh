@@ -33,3 +33,28 @@ command -v btop >/dev/null 2>&1 && alias bt="btop"
 
 # Zoxide interactive (guarded)
 command -v zoxide >/dev/null 2>&1 && alias zz="zoxide query --interactive"
+
+# fastfetch splash — ssh sessions get the red-hostname variant.
+if command -v fastfetch >/dev/null 2>&1; then
+  ff() {
+    local cfg=~/.config/fastfetch/config.jsonc
+    [[ -n ${SSH_TTY:-}${SSH_CONNECTION:-} ]] && cfg=~/.config/fastfetch/config-ssh.jsonc
+    fastfetch --config "$cfg" "$@"
+  }
+
+  # Splash rules: inside zellij, only the first pane of a session (flag file
+  # in tmp, so a reboot naturally resets it); outside zellij, every new
+  # top-level shell (SHLVL guard keeps splits/subshells quiet).
+  if [[ -o interactive ]]; then
+    if [[ -n $ZELLIJ ]]; then
+      () {
+        local flag="${TMPDIR:-/tmp}/fastfetch-shown-${ZELLIJ_SESSION_NAME:-default}-${USER}"
+        [[ -f $flag ]] && return
+        ff
+        : >| "$flag" 2>/dev/null
+      }
+    elif [[ $SHLVL -eq 1 ]]; then
+      ff
+    fi
+  fi
+fi

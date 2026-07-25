@@ -20,6 +20,12 @@ return {
           base0C = "{{ $p.base0C }}", base0D = "{{ $p.base0D }}",
           base0E = "{{ $p.base0E }}", base0F = "{{ $p.base0F }}",
         })
+        -- Quiet-interior tweaks on top of the generated palette.
+        local hl = vim.api.nvim_set_hl
+        hl(0, "FloatBorder", { fg = "{{ $p.base03 }}", bg = "{{ $p.base00 }}" })
+        hl(0, "SnacksIndent", { fg = "{{ $p.base02 }}" })
+        hl(0, "DiagnosticVirtualTextError", { fg = "{{ $p.base08 }}", italic = true })
+        hl(0, "DiagnosticVirtualTextWarn", { fg = "{{ $p.base0A }}", italic = true })
       end,
     },
   },

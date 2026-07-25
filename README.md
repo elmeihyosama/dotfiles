@@ -94,6 +94,10 @@ WSL is supported and treated as Linux.
 - Switch theme: edit `theme` in `home/.chezmoidata/theme.toml`, then apply.
 - Lint locally: `ci/lint.sh all`. `install.sh` also sets up a pre-commit hook
   that runs these checks on each commit.
+- Fresh machine, `chezmoi apply` before `./install.sh`: the zellij `glow`
+  layout's status bar needs the zjstatus plugin that ansible installs, so it
+  shows a plugin error until you run `./install.sh` — use `zellij -l split`
+  in the meantime.
 
 ## License
 

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Rebuild bat's cache when the generated base16-active theme changes.
+# active theme: {{ .theme }}
+# palette hash: {{ index .themes .theme | toJson | sha256sum }}
+# run_onchange: chezmoi reruns this whenever the rendered content above
+# changes, i.e. when the theme slug or its palette values change.
+set -eu
+command -v bat >/dev/null 2>&1 || exit 0
+bat cache --build >/dev/null

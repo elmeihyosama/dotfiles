@@ -29,6 +29,10 @@
       ansible.builtin.import_tasks: tasks/packages.yml
       tags: [packages]
 
+    - name: Zellij plugins
+      ansible.builtin.import_tasks: tasks/zjstatus.yml
+      tags: [zjstatus]
+
     - name: Python (uv-managed default interpreter)
       ansible.builtin.import_tasks: tasks/python.yml
       tags: [python]

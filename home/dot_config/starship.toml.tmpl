@@ -4,17 +4,24 @@ add_newline = true
 palette = "base16"
 
 format = """
-[╭─ ](subtle)$hostname$directory$git_branch$git_status$nodejs$python$rust$golang$docker_context$kubernetes$fill$cmd_duration$time
-[╰─](subtle)$character"""
+[╭─ ](rail)$hostname$directory$git_branch$git_status$jobs$nodejs$python$rust$golang$docker_context$kubernetes$fill$cmd_duration$time
+[╰─](rail)$character"""
 
 [palettes.base16]
 # structural
 bg      = "{{ $p.base00 }}"
 surface = "{{ $p.base01 }}"
 muted   = "{{ $p.base03 }}"
-subtle  = "{{ $p.base04 }}"
+rail    = "{{ index $p .design.rail }}"
 text    = "{{ $p.base05 }}"
-# accents
+# design roles (chrome)
+accent  = "{{ index $p .design.accent }}"
+accent2 = "{{ index $p .design.accent2 }}"
+link    = "{{ index $p .design.link }}"
+ok      = "{{ index $p .design.ok }}"
+warn    = "{{ index $p .design.warn }}"
+err     = "{{ index $p .design.err }}"
+# content spectrum (language segments)
 red     = "{{ $p.base08 }}"
 orange  = "{{ $p.base09 }}"
 yellow  = "{{ $p.base0A }}"
@@ -25,64 +32,69 @@ magenta = "{{ $p.base0E }}"
 
 [hostname]
 ssh_only = true
-ssh_symbol = " "
-style = "bold red"
+ssh_symbol = "󰣀 "
+style = "bold err"
 format = "[$ssh_symbol$hostname]($style) "
 
 [fill]
 symbol = " "
 
 [directory]
-style = "bold cyan"
+style = "bold accent2"
 truncation_length = 0
 truncate_to_repo = true
-format = "[$path]($style)[$read_only]($read_only_style) "
+format = "[󰉋 $path]($style)[$read_only]($read_only_style) "
 
 [git_branch]
-symbol = " "
-style = "magenta"
+symbol = " "
+style = "link"
 format = "[$symbol$branch]($style) "
 
 [git_status]
-style = "red"
+style = "err"
 format = '([$all_status$ahead_behind]($style)) '
 
+[jobs]
+symbol = "✦"
+style = "warn"
+format = "[$symbol $number]($style) "
+
 [nodejs]
-symbol = " "
+symbol = " "
 style = "green"
 format = "[$symbol($version )]($style)"
 
 [python]
-symbol = " "
+symbol = " "
 style = "yellow"
 format = '[$symbol(${version} )(\($virtualenv\) )]($style)'
 
 [rust]
-symbol = " "
+symbol = " "
 style = "orange"
 format = "[$symbol($version )]($style)"
 
 [golang]
-symbol = " "
+symbol = " "
 style = "cyan"
 format = "[$symbol($version )]($style)"
 
 [docker_context]
-symbol = " "
-style = "subtle"
+symbol = " "
+style = "muted"
 only_with_files = true
 format = "[$symbol$context]($style) "
 
 [kubernetes]
 symbol = "☸ "
-style = "yellow"
+style = "warn"
 disabled = false
 format = '[$symbol$context( \($namespace\))]($style) '
 
 [cmd_duration]
 min_time = 2000
-style = "subtle"
-format = "[ $duration]($style) "
+style = "muted"
+format = "[󱦟 $duration]($style) "
 
 [time]
 disabled = false
@@ -91,6 +103,6 @@ style = "muted"
 format = "[$time]($style)"
 
 [character]
-success_symbol = "[❯](bold green)"
-error_symbol = "[❯](bold red)"
-vimcmd_symbol = "[❮](bold yellow)"
+success_symbol = "[❯](bold accent)"
+error_symbol = "[❯](bold err)"
+vimcmd_symbol = "[❮](bold warn)"

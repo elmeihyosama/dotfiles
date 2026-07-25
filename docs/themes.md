@@ -44,3 +44,17 @@ To refresh the snapshot or pull in new schemes:
     sh scripts/base16-to-theme.sh -d /tmp/schemes/base16
 
 The converter is idempotent — re-running regenerates the files in place.
+
+## Canonical mappings
+
+- **ANSI (terminals):** 0=base00 1=base08 2=base0B 3=base0A 4=base0D 5=base0E
+  6=base0C 7=base05 8=base03 9–14=repeat 1–6, 15=base07.
+- **Design roles (UI chrome):** defined in `home/.chezmoidata/design.toml`;
+  chrome templates must use roles, content colouring uses raw slots.
+
+## Auditing
+
+`scripts/theme-audit.sh` re-fetches tinted-theming/schemes, regenerates all
+TOMLs, and reports DRIFT / COLLISION / LOWCONTRAST. Collisions are upstream
+facts (e.g. rose-pine-moon's gold appears as both base09 and base0E) — the
+role layer exists so chrome can route around them.

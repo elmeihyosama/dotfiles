@@ -1,0 +1,15 @@
+---
+# zjstatus — zellij status-bar plugin. A single wasm file in the user home:
+# identical on sudo and no-sudo hosts.
+- name: Ensure zellij plugin directory
+  ansible.builtin.file:
+    path: "{{ ansible_facts['env']['HOME'] }}/.config/zellij/plugins"
+    state: directory
+    mode: "0755"
+
+- name: Install zjstatus {{ zjstatus_version }}
+  ansible.builtin.get_url:
+    url: "https://github.com/dj95/zjstatus/releases/download/{{ zjstatus_version }}/zjstatus.wasm"
+    dest: "{{ ansible_facts['env']['HOME'] }}/.config/zellij/plugins/zjstatus.wasm"
+    checksum: "sha256:{{ zjstatus_sha256 }}"
+    mode: "0644"
