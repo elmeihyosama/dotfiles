@@ -52,6 +52,8 @@ theme() {
   fi
   _theme_set_config "$cfg" "$slug" || return 1
   chezmoi apply || return 1
-  echo "theme → ${slug}.  New shells, ghostty windows, zellij & nvim need a restart to fully apply."
+  # cmux reads ~/.config/ghostty/config directly; repaint running sessions live.
+  command -v cmux >/dev/null 2>&1 && cmux reload-config >/dev/null 2>&1
+  echo "theme → ${slug}.  cmux repaints live; new shells, ghostty windows, zellij & nvim need a restart to fully apply."
   exec zsh
 }
