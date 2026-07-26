@@ -31,3 +31,24 @@
 {{- else }}
     helper = cache --timeout=3600
 {{- end }}
+
+[push]
+    autoSetupRemote = true
+[rebase]
+    autostash = true
+    autosquash = true
+[merge]
+    autostash = true
+[rerere]
+    enabled = true
+[branch]
+    sort = -committerdate
+[tag]
+    sort = version:refname
+[column]
+    ui = auto
+[fetch]
+    prune = true
+[diff]
+    colorMoved = default
+    algorithm = histogram

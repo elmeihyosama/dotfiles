@@ -25,6 +25,13 @@ fi
 # Git shortcuts
 alias g="git" gs="git status" gl="git log --oneline --graph --decorate" \
       ga="git add" gc="git commit" gp="git push" gco="git checkout"
+alias gd="git diff" gds="git diff --staged" gb="git branch" gsw="git switch" \
+      gst="git stash" gf="git fetch" gpl="git pull" grs="git restore" \
+      glg="git log --graph --all --oneline --decorate"
+
+# git-absorb: stage changes (git add -p / fga), then `gab` folds each into the
+# ancestor commit that introduced those lines (pairs with rebase.autosquash).
+command -v git-absorb >/dev/null 2>&1 && alias gab="git absorb --and-rebase"
 
 # System info — non-shadowing names (do NOT override df/du/top)
 command -v duf  >/dev/null 2>&1 && alias dfh="duf"
