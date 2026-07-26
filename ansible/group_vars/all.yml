@@ -36,6 +36,7 @@ tools:
   - gitleaks
   - editorconfig-checker
   - fastfetch
+  - git-absorb
 
 # owner/repo for the ubi no-sudo fallback
 ubi_tool_repos:
@@ -64,6 +65,7 @@ ubi_tool_repos:
   gitleaks: gitleaks/gitleaks
   editorconfig-checker: editorconfig-checker/editorconfig-checker
   fastfetch: fastfetch-cli/fastfetch
+  git-absorb: tummychow/git-absorb
 
 # tools whose extracted binary name differs from the canonical name (for ubi --exe)
 ubi_exe_overrides:
@@ -130,3 +132,4 @@ min_versions:
 force_ubi:
   - gitleaks
   - yq # native "yq" is often the incompatible Python/jq wrapper (Arch, Debian); we need mikefarah yq
+  - git-absorb # apt (debian/ubuntu) ships a package that installs no `git-absorb` on PATH; ubi is reliable

@@ -12,6 +12,9 @@ github = "zsh-users/zsh-autosuggestions"
 [plugins.zsh-autopair]
 github = "hlissner/zsh-autopair"
 
+[plugins.forgit]
+github = "wfxr/forgit"
+
 # MUST be last — wraps all widgets.
 [plugins.fast-syntax-highlighting]
 github = "zdharma-continuum/fast-syntax-highlighting"
