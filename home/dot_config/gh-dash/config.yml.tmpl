@@ -1,0 +1,28 @@
+{{- $p := index .themes .theme -}}
+theme:
+  ui:
+    sectionsShowCount: true
+    table:
+      showSeparator: true
+      compact: false
+  colors:
+    text:
+      primary: "{{ $p.base05 }}"
+      secondary: "{{ $p.base04 }}"
+      inverted: "{{ $p.base00 }}"
+      faint: "{{ $p.base03 }}"
+      warning: "{{ $p.base0A }}"
+      success: "{{ $p.base0B }}"
+    background:
+      selected: "{{ $p.base02 }}"
+    border:
+      primary: "{{ index $p .design.accent }}"
+      secondary: "{{ $p.base03 }}"
+      faint: "{{ $p.base02 }}"
+prSections:
+  - title: My Pull Requests
+    filters: is:open author:@me
+  - title: Needs My Review
+    filters: is:open review-requested:@me
+  - title: Involved
+    filters: is:open involves:@me -author:@me

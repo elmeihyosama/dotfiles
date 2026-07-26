@@ -65,7 +65,9 @@
     name: "{{ brew_formula_overrides[item] | default(item) }}"
     state: present
   loop: "{{ tools }}"
-  when: ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
+  when: >-
+    ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
+    and item not in (brew_unavailable | default([]))
 
 - name: Shim Homebrew binaries to canonical names in ~/.local/bin (macOS)  # noqa command-instead-of-shell
   ansible.builtin.shell: 'ln -sf "$(command -v {{ item.value }})" "{{ local_bin }}/{{ item.key }}"'
@@ -74,6 +76,40 @@
   loop: "{{ brew_bin_renames | dict2items }}"
   loop_control:
     label: "{{ item.key }}"
+  when: ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
+
+# Tools with no Homebrew formula at all still need ubi on macOS (brew present,
+# but nothing to install). Reuses the same bootstrap-ubi-into-~/.local/bin
+# approach as the no-sudo fallback above.
+- name: Check for ubi (macOS, tools with no brew formula)
+  ansible.builtin.stat:
+    path: "{{ local_bin }}/ubi"
+  register: _ubi_macos
+  when: >-
+    ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
+    and (tools | intersect(brew_unavailable | default([])) | length > 0)
+
+- name: Bootstrap ubi into ~/.local/bin (macOS, tools with no brew formula)  # noqa: command-instead-of-module risky-shell-pipe
+  ansible.builtin.shell: >
+    curl --silent --location
+    https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh
+    | TARGET={{ local_bin }} sh
+  args:
+    creates: "{{ local_bin }}/ubi"
+  when: >-
+    ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
+    and (tools | intersect(brew_unavailable | default([])) | length > 0)
+    and not _ubi_macos.stat.exists
+
+- name: Install tools with no brew formula via ubi (macOS)
+  ansible.builtin.command:
+    cmd: >
+      {{ local_bin }}/ubi --project {{ ubi_tool_repos[item] }} --in {{ local_bin }}
+      {% if item in ubi_exe_overrides %}--exe {{ ubi_exe_overrides[item] }}{% endif %}
+      {% if item in ubi_matching_regex_overrides %}--matching-regex '{{ ubi_matching_regex_overrides[item] }}'{% endif %}
+      {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
+    creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
+  loop: "{{ tools | intersect(brew_unavailable | default([])) }}"
   when: ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
 
 # ---- Native path: decision engine (Linux, sudo) -------------------------
