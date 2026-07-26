@@ -1,0 +1,31 @@
+{{- /* atuin: database-backed history. Owns Ctrl-R and Up-arrow. */ -}}
+if command -v atuin >/dev/null 2>&1; then
+  # One-time import of the existing zsh history file into atuin's DB.
+  _atuin_flag="${XDG_STATE_HOME:-$HOME/.local/state}/atuin/.imported"
+  if [[ ! -f $_atuin_flag ]]; then
+    if atuin import auto >/dev/null 2>&1; then
+      mkdir -p "${_atuin_flag:h}" && : >| "$_atuin_flag"
+    fi
+  fi
+  unset _atuin_flag
+
+  # init zsh binds Ctrl-R and Up-arrow to the atuin search TUI (both wanted).
+  eval "$(atuin init zsh)"
+
+  # atuin's init binds `?` to its AI-assistant widget (sends the buffer to a
+  # remote service). Restore local-only behavior: plain typing in insert
+  # mode, and vi's normal search-backward-in-history in command mode.
+  bindkey -M viins '?' self-insert
+  bindkey -M vicmd '?' vi-history-search-backward
+
+  # atuin's own init (verified via `atuin init zsh`, v18.17.1) already binds
+  # Up-arrow correctly per vi keymap:
+  #   viins: ^[[A/^[OA -> atuin-up-search-viins
+  #   vicmd: ^[[A/^[OA -> atuin-up-search-vicmd
+  # These lines re-assert the same keymap-specific widgets explicitly and
+  # defensively; they are idempotent/harmless given atuin's current defaults.
+  bindkey -M viins "^[[A" atuin-up-search-viins
+  bindkey -M vicmd "^[[A" atuin-up-search-vicmd
+  bindkey -M viins "^[OA" atuin-up-search-viins
+  bindkey -M vicmd "^[OA" atuin-up-search-vicmd
+fi

@@ -11,6 +11,7 @@ zjstatus_sha256: "1ccedece1ded62cf3e209be690cdd39ca6fb9e8228ed71a951f6507f995666
 
 # Canonical tool list (installed on every machine).
 tools:
+  - atuin
   - sheldon
   - zellij
   - navi
@@ -38,6 +39,7 @@ tools:
 
 # owner/repo for the ubi no-sudo fallback
 ubi_tool_repos:
+  atuin: atuinsh/atuin
   sheldon: rossmacarthur/sheldon
   zellij: zellij-org/zellij
   navi: denisidoro/navi
@@ -76,6 +78,16 @@ ubi_exe_overrides:
 # on any Linux, so we always pick it.
 ubi_match_overrides:
   yazi: musl
+  atuin: musl
+
+# Some projects publish assets that collide with `--matching` substrings across
+# unrelated binaries. atuin's release ships atuin-server-*, cargo-dist self
+# updater helpers (*-update), and the real CLI (atuin-*.tar.gz) — all of which
+# contain "musl"/"gnu", so `--matching` alone can't tell them apart. Filter to
+# the real CLI archive first via `--matching-regex`, then let `--matching`
+# (above) pick musl vs gnu within that filtered set.
+ubi_matching_regex_overrides:
+  atuin: '^atuin-[a-z0-9_]+-unknown-linux-(gnu|musl)\.tar\.gz$'
 
 # Homebrew formula names that differ from canonical
 brew_formula_overrides:

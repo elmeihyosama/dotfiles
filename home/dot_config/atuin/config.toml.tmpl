@@ -1,0 +1,22 @@
+{{- /* atuin config. Sync is per-machine via .atuin_sync (default false):
+false = fully local DB, no account, nothing leaves the box. */ -}}
+## general
+update_check = false
+style = "compact"
+inline_height = 15
+show_preview = true
+enter_accept = true
+
+## history filtering
+filter_mode = "global"
+search_mode = "fuzzy"
+
+## sync
+{{ if .atuin_sync -}}
+auto_sync = true
+sync_frequency = "10m"
+sync_address = "https://api.atuin.sh"
+{{- else -}}
+auto_sync = false
+sync_frequency = "0"
+{{- end }}

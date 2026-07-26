@@ -9,3 +9,10 @@ else
   compinit -C -d "$_zcd"
 fi
 unset _zcd
+
+# Fuzzy matching: case-insensitive, then partial-word after ._-, then substring.
+# Feeds the existing fzf-tab menu — cfg->config, gco->git checkout, dtc->dot_config.
+zstyle ':completion:*' matcher-list '' \
+  'm:{a-zA-Z}={A-Za-z}' \
+  'r:|[._-]=* r:|=*' \
+  'l:|=*'
