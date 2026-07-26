@@ -41,6 +41,9 @@ command -v btop >/dev/null 2>&1 && alias bt="btop"
 # Zoxide interactive (guarded)
 command -v zoxide >/dev/null 2>&1 && alias zz="zoxide query --interactive"
 
+# gh-dash GitHub PR/issue dashboard (guarded)
+command -v gh-dash >/dev/null 2>&1 && alias ghd="gh-dash"
+
 # sz — fuzzy project → zellij session (sessionizer). Resolves the repo script
 # via chezmoi like the `theme` function does.
 sz() {

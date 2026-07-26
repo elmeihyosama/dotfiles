@@ -37,6 +37,7 @@ tools:
   - editorconfig-checker
   - fastfetch
   - git-absorb
+  - gh-dash
 
 # owner/repo for the ubi no-sudo fallback
 ubi_tool_repos:
@@ -66,6 +67,7 @@ ubi_tool_repos:
   editorconfig-checker: editorconfig-checker/editorconfig-checker
   fastfetch: fastfetch-cli/fastfetch
   git-absorb: tummychow/git-absorb
+  gh-dash: dlvhdr/gh-dash
 
 # tools whose extracted binary name differs from the canonical name (for ubi --exe)
 ubi_exe_overrides:
@@ -133,3 +135,10 @@ force_ubi:
   - gitleaks
   - yq # native "yq" is often the incompatible Python/jq wrapper (Arch, Debian); we need mikefarah yq
   - git-absorb # apt (debian/ubuntu) ships a package that installs no `git-absorb` on PATH; ubi is reliable
+
+# Tools with NO Homebrew formula at all (verified against formulae.brew.sh —
+# no homebrew-core formula/alias/oldname, and no formula in the upstream
+# maintainer's own tap). On macOS these are installed via ubi into
+# ~/.local/bin instead of `brew install`, same as the no-sudo Linux fallback.
+brew_unavailable:
+  - gh-dash # distributed as a `gh` CLI extension or raw GitHub release binaries; no brew formula/tap
