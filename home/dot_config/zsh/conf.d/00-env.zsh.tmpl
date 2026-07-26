@@ -45,6 +45,10 @@ export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/config"
 # unless EZA_CONFIG_DIR is set explicitly. Force it to our themed config.
 export EZA_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/eza"
 
+# Sessionizer project roots (from chezmoi data); expand ~ to $HOME so the
+# script's `[ -d "$root" ]` checks resolve.
+SESSIONIZE_ROOTS="{{ .sessionize_roots }}"; export SESSIONIZE_ROOTS="${SESSIONIZE_ROOTS//\~/$HOME}"
+
 # Default apps
 export TERMINAL="ghostty"
 export BROWSER="firefox"

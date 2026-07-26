@@ -40,3 +40,13 @@ take() {
   [[ -z $1 ]] && { print -u2 'take: need a directory'; return 1; }
   mkdir -p -- "$1" && cd -- "$1"
 }
+
+# --- Ctrl-F: sessionizer (fuzzy project → zellij session). Safe key — plain
+#     self-insert otherwise; zellij passes Ctrl-F through in normal mode. ---
+_sessionize() {
+  sz </dev/tty
+  zle reset-prompt
+}
+zle -N _sessionize
+bindkey -M viins '^F' _sessionize
+bindkey -M vicmd '^F' _sessionize
