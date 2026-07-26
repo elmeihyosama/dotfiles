@@ -1,0 +1,5 @@
+# Shell feature flags. Override per-machine in ~/.config/chezmoi/chezmoi.toml
+# ([data] atuin_sync = true). Default false → atuin is fully local, nothing
+# leaves the machine. Enable only on personal machines you want history synced
+# across; the work machine must stay false.
+atuin_sync = false

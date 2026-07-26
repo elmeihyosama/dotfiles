@@ -23,8 +23,15 @@ export SAVEHIST=50000
 
 # zsh options
 setopt autocd interactivecomments
+setopt autopushd pushdignoredups pushdsilent   # `cd` builds a stack; `cd -<Tab>` to revisit
 setopt sharehistory histignoredups histreduceblanks incappendhistory \
        histexpiredupsfirst histignorespace extendedhistory
+
+# Vi keymap, established before any plugin/tool binds keys so bindings are
+# deterministic (not dependent on the EDITOR=nvim default). KEYTIMEOUT keeps
+# the Esc->normal switch snappy.
+bindkey -v
+export KEYTIMEOUT=1
 
 # Pager + bat-powered man pages
 export PAGER='less'

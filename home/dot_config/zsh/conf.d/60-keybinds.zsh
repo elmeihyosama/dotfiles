@@ -1,21 +1,16 @@
-# vi-mode line editing
-bindkey -v
-export KEYTIMEOUT=1   # snappy Esc->normal-mode switch (default ~0.4s feels laggy)
-
-# Prefix history search on up/down, in BOTH insert (viins) and normal (vicmd) keymaps
-for _km in viins vicmd; do
-  bindkey -M $_km "^[[A" history-search-backward
-  bindkey -M $_km "^[[B" history-search-forward
-done
-unset _km
+# vi-mode keymap + KEYTIMEOUT are set early in 00-env so all tools bind into a
+# known viins main. Up-arrow is intentionally left to atuin (bound in 35-atuin);
+# keep only down-arrow prefix-search here.
+bindkey -M viins "^[[B" history-search-forward
+bindkey -M vicmd "^[[B" history-search-forward
 
 # Insert-mode emacs-style line-editing shortcuts
 bindkey -M viins "^A" beginning-of-line
 bindkey -M viins "^E" end-of-line
 bindkey -M viins "^W" backward-kill-word
 bindkey -M viins "^H" backward-kill-word   # Ctrl-Backspace
-# NOTE: ^R is intentionally left to fzf's fuzzy-history widget (bound in 40-fzf
-# across all keymaps). Do not rebind it here or it overrides fzf history.
+# NOTE: ^R is owned by atuin (bound in 35-atuin; fzf's own ^R bind is suppressed
+# in 40-fzf). Do not rebind ^R here.
 
 # Accept autosuggestion (insert mode)
 bindkey -M viins '^ ' autosuggest-accept
