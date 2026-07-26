@@ -3,3 +3,7 @@
 # leaves the machine. Enable only on personal machines you want history synced
 # across; the work machine must stay false.
 atuin_sync = false
+
+# Roots the sessionizer scans for projects (space-separated). Per-machine
+# override in ~/.config/chezmoi/chezmoi.toml. Nonexistent roots are skipped.
+sessionize_roots = "~/workspace ~/workspaces ~/projects ~/dotfiles"

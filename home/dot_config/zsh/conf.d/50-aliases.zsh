@@ -34,6 +34,17 @@ command -v btop >/dev/null 2>&1 && alias bt="btop"
 # Zoxide interactive (guarded)
 command -v zoxide >/dev/null 2>&1 && alias zz="zoxide query --interactive"
 
+# sz — fuzzy project → zellij session (sessionizer). Resolves the repo script
+# via chezmoi like the `theme` function does.
+sz() {
+  emulate -L zsh
+  local src script
+  src=$(chezmoi source-path 2>/dev/null) || { echo "sz: chezmoi not found" >&2; return 1; }
+  script="${src:h}/scripts/sessionize.sh"
+  [[ -x $script ]] || { echo "sz: $script not found" >&2; return 1; }
+  "$script" "$@"
+}
+
 # fastfetch splash — ssh sessions get the red-hostname variant.
 if command -v fastfetch >/dev/null 2>&1; then
   ff() {

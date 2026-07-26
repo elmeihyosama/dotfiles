@@ -20,3 +20,16 @@ themes {
         orange "{{ $p.base09 }}"
     }
 }
+
+keybinds {
+    session {
+        // Ctrl-o then f → fuzzy project→session switcher in a floating pane.
+        bind "f" {
+            Run "{{ .chezmoi.sourceDir }}/../scripts/sessionize.sh" {
+                floating true
+                close_on_exit true
+            }
+            SwitchToMode "Normal"
+        }
+    }
+}
