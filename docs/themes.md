@@ -26,6 +26,16 @@ those 16 colors, so switching the active theme restyles everything at once.
 New shells and new ghostty windows pick the theme up automatically; existing
 **ghostty windows, zellij sessions, and nvim** need a reload/restart.
 
+### cmux
+
+[cmux] reads `~/.config/ghostty/config` directly, so it follows the switcher
+with no extra config; the `theme` command runs `cmux reload-config` to repaint
+running sessions live. Do **not** run `cmux themes set <preset>` — that writes a
+cmux override that shadows the Ghostty config with a vendored preset, breaking
+the base16 sync (`cmux themes clear` restores it).
+
+[cmux]: https://cmux.com/
+
 ## Recommended
 
 rose-pine-moon · rose-pine · rose-pine-dawn · catppuccin-mocha ·
