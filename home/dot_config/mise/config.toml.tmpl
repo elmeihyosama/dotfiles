@@ -1,0 +1,7 @@
+{{- /* Global mise config. No global tool pins — per-project mise.toml drives
+versions. Add globals yourself with `mise use -g node@lts`. Kept as a .tmpl
+so machine-specific settings can be templated in later without a rename. */ -}}
+[settings]
+# Show which tools/env a directory's config loads (nice feedback on cd).
+status.show_tools = true
+status.show_env = true

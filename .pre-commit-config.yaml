@@ -8,7 +8,7 @@ repos:
         entry: ci/lint.sh shell
         language: system
         pass_filenames: false
-        files: '\.(sh|zsh)(\.tmpl)?$'
+        files: '(\.(sh|zsh)(\.tmpl)?|^home/dot_zshenv)$'
       - id: lint-lua
         name: lua (stylua --check)
         entry: ci/lint.sh lua

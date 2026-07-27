@@ -1,0 +1,8 @@
+# Runs for every zsh (incl. non-interactive). Keep MINIMAL — only ensure mise
+# shims resolve project runtimes in non-interactive/child contexts (interactive
+# shells get the richer dynamic `mise activate` in conf.d/49-mise.zsh).
+_mise_shims="${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims"
+if [[ -d $_mise_shims && ":$PATH:" != *":$_mise_shims:"* ]]; then
+  export PATH="$_mise_shims:$PATH"
+fi
+unset _mise_shims
