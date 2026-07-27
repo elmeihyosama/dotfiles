@@ -1,7 +1,18 @@
 # mise — per-project tool versions + env + tasks. Dynamic activation (cd-aware)
 # for interactive shells; shims for non-interactive live in ~/.zshenv.
 if command -v mise >/dev/null 2>&1; then
-  eval "$(mise activate zsh)"
+  # Cache `mise activate zsh` (a binary fork) to a file; re-source that and only
+  # regenerate when missing or the mise binary is upgraded. This caches the
+  # activation-script GENERATION only — the runtime `_mise_hook` (cd-aware env
+  # resolve) still runs each prompt exactly as before, so per-project env is
+  # unchanged. Same self-refreshing idiom as the completion cache below.
+  _mise_activate="${XDG_CACHE_HOME:-$HOME/.cache}/mise/activate.zsh"
+  if [[ ! -s "$_mise_activate" || "$_mise_activate" -ot ${commands[mise]:A} ]]; then
+    mkdir -p "${_mise_activate:h}"
+    mise activate zsh >| "$_mise_activate"
+  fi
+  source "$_mise_activate"
+  unset _mise_activate
 
   # Completions.
   #
