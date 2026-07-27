@@ -1,32 +1,34 @@
-# theme — switch the active base16 theme (per-machine; no git diff).
-#   theme            fzf-pick from available themes
-#   theme <slug>     set directly
-_theme_set_config() {
-  # $1 = config path, $2 = slug. Set theme="slug" inside the [data] table,
-  # scoped to [data] only. Replaces an existing or commented theme key; if
-  # [data] exists without one, inserts it there; if [data] is absent, appends
-  # a new [data] table. Writes back in place to preserve mode/inode/symlink.
-  local cfg=$1 slug=$2 tmp
+# _chezmoi_set_data KEY VALUE CFG — set `KEY = "VALUE"` inside the [data] table
+# of the chezmoi config, scoped to [data] only. Replaces an existing or
+# commented KEY; if [data] exists without it, inserts it there; if [data] is
+# absent, appends a new [data] table. Writes back in place to preserve
+# mode/inode/symlink. Used by `theme` and `wallpaper`. KEY must be a literal
+# name (no regex metacharacters) since it is interpolated into an awk regex.
+_chezmoi_set_data() {
+  local key=$1 val=$2 cfg=$3 tmp
   tmp=$(mktemp) || return 1
-  awk -v slug="$slug" '
+  awk -v key="$key" -v val="$val" '
     /^[[:space:]]*\[/ {
-      if (indata && !done) { print "    theme = \"" slug "\""; done=1 }
+      if (indata && !done) { print "    " key " = \"" val "\""; done=1 }
       indata = ($0 ~ /^[[:space:]]*\[data\][[:space:]]*$/)
       print; next
     }
-    indata && /^[[:space:]]*#?[[:space:]]*theme[[:space:]]*=/ && !done {
-      print "    theme = \"" slug "\""; done=1; next
+    indata && $0 ~ ("^[[:space:]]*#?[[:space:]]*" key "[[:space:]]*=") && !done {
+      print "    " key " = \"" val "\""; done=1; next
     }
     { print }
     END {
-      if (indata && !done) { print "    theme = \"" slug "\""; done=1 }
-      if (!done) { print "[data]"; print "    theme = \"" slug "\"" }
+      if (indata && !done) { print "    " key " = \"" val "\""; done=1 }
+      if (!done) { print "[data]"; print "    " key " = \"" val "\"" }
     }
   ' "$cfg" > "$tmp" || { rm -f "$tmp"; return 1; }
   cat "$tmp" > "$cfg"
   rm -f "$tmp"
 }
 
+# theme — switch the active base16 theme (per-machine; no git diff).
+#   theme            fzf-pick from available themes
+#   theme <slug>     set directly
 theme() {
   emulate -L zsh
   local src cfg slug
@@ -50,10 +52,37 @@ theme() {
   if [[ ! -f ${src}/.chezmoidata/themes/${slug}.toml ]]; then
     echo "theme: unknown theme '${slug}'" >&2; return 1
   fi
-  _theme_set_config "$cfg" "$slug" || return 1
+  _chezmoi_set_data theme "$slug" "$cfg" || return 1
   chezmoi apply || return 1
   # cmux reads ~/.config/ghostty/config directly; repaint running sessions live.
   command -v cmux >/dev/null 2>&1 && cmux reload-config >/dev/null 2>&1
   echo "theme → ${slug}.  cmux repaints live; new shells, ghostty windows, zellij & nvim need a restart to fully apply."
   exec zsh
+}
+
+# wallpaper — toggle the themed terminal background image (machine-local; no git
+# diff). Pairs with the active theme via .chezmoidata/wallpaper.toml.
+#   wallpaper on | off | toggle   (bare `wallpaper` = toggle)
+wallpaper() {
+  emulate -L zsh
+  local cfg action cur next
+  command -v chezmoi >/dev/null 2>&1 || { echo "wallpaper: chezmoi not found" >&2; return 1; }
+  cfg=${CHEZMOI_CONFIG:-$HOME/.config/chezmoi/chezmoi.toml}
+  [[ -f $cfg ]] || { echo "wallpaper: missing $cfg" >&2; return 1; }
+  action=${1:-toggle}
+  case $action in
+    on|off) next=$action ;;
+    toggle)
+      cur=$(awk -F'"' '
+        /^[[:space:]]*\[/ { indata = ($0 ~ /^[[:space:]]*\[data\][[:space:]]*$/); next }
+        indata && /^[[:space:]]*wallpaper_mode[[:space:]]*=/ { print $2; exit }
+      ' "$cfg")
+      [[ $cur == off ]] && next=on || next=off
+      ;;
+    *) echo "usage: wallpaper on|off|toggle" >&2; return 1 ;;
+  esac
+  _chezmoi_set_data wallpaper_mode "$next" "$cfg" || return 1
+  chezmoi apply || return 1
+  command -v cmux >/dev/null 2>&1 && cmux reload-config >/dev/null 2>&1
+  echo "wallpaper → ${next}"
 }

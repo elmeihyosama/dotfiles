@@ -39,6 +39,7 @@ tools:
   - git-absorb
   - gh-dash
   - mise
+  - cava
 
 # owner/repo for the ubi no-sudo fallback
 ubi_tool_repos:
@@ -145,3 +146,9 @@ force_ubi:
 # ~/.local/bin instead of `brew install`, same as the no-sudo Linux fallback.
 brew_unavailable:
   - gh-dash # distributed as a `gh` CLI extension or raw GitHub release binaries; no brew formula/tap
+
+# Tools with NO usable ubi binary release — upstream ships source-only archives,
+# so ubi cannot install them. Provisioned via Homebrew (macOS) or the native
+# package manager (sudo Linux); SKIPPED on no-sudo Linux. Non-critical eye-candy.
+ubi_unavailable:
+  - cava # karlstav/cava releases ship only cava-<v>.tar.gz (source) + a Windows .msi

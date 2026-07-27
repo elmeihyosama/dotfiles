@@ -1,0 +1,33 @@
+{{- $p := index .themes .theme -}}
+## cava — themed from the active base16 palette ({{ .theme }}). Managed by
+## chezmoi; re-themes on `chezmoi apply` (restart cava or press `r` to repaint).
+
+[general]
+framerate = 60
+bars = 0            ; 0 = auto-fit terminal width
+
+[input]
+{{- if eq .chezmoi.os "darwin" }}
+method = coreaudio
+source = auto_input ; default input device (mic) — no extra driver needed on macOS
+{{- else }}
+method = pulse
+source = @DEFAULT_SOURCE@        ; default input device (mic) on Linux/pulse
+{{- end }}
+
+[output]
+method = ncurses
+channels = stereo
+
+[color]
+background = default          ; keep terminal transparency (shows wallpaper behind)
+foreground = '{{ $p.base05 }}'
+gradient = 1
+gradient_color_1 = '{{ $p.base08 }}'
+gradient_color_2 = '{{ $p.base09 }}'
+gradient_color_3 = '{{ $p.base0A }}'
+gradient_color_4 = '{{ $p.base0B }}'
+gradient_color_5 = '{{ $p.base0C }}'
+gradient_color_6 = '{{ $p.base0D }}'
+gradient_color_7 = '{{ $p.base0E }}'
+gradient_color_8 = '{{ $p.base05 }}'

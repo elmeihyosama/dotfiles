@@ -56,7 +56,7 @@
       {% if item in ubi_matching_regex_overrides %}--matching-regex '{{ ubi_matching_regex_overrides[item] }}'{% endif %}
       {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
     creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
-  loop: "{{ tools }}"
+  loop: "{{ tools | difference(ubi_unavailable | default([])) }}"
   when: use_ubi_fallback
 
 # ---- Native path: macOS Homebrew ----------------------------------------
@@ -186,7 +186,7 @@
 - name: Partition tools into native vs ubi
   ansible.builtin.set_fact:
     native_tools: "{{ (native_tools | default([])) + ([item] if _ok else []) }}"
-    ubi_tools: "{{ (ubi_tools | default([])) + ([] if _ok else [item]) }}"
+    ubi_tools: "{{ (ubi_tools | default([])) + ([] if (_ok or item in (ubi_unavailable | default([]))) else [item]) }}"
   vars:
     _cand: "{{ _candidate_versions[item] | default('') }}"
     # Strip epoch (1:) and distro revision (-1, ~rc, +deb) before the compare.
