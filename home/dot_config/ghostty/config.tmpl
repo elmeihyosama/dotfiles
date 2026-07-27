@@ -3,6 +3,19 @@ font-family = {{ .font.family }}
 font-size = {{ .font.size }}
 background-opacity = 0.8
 background-blur = 20
+{{- /* Wallpaper pairing: themed background-image when the active theme has a
+  map entry in .chezmoidata/wallpaper.toml AND machine-local `wallpaper_mode`
+  is not "off" (absent = on). Unmapped/off → solid base00 background below. */ -}}
+{{- $mode := "on" -}}
+{{- if hasKey . "wallpaper_mode" }}{{ $mode = .wallpaper_mode }}{{ end -}}
+{{- $wp := "" -}}
+{{- if ne $mode "off" }}{{ $wp = index $.wallpaper.map $.theme }}{{ end -}}
+{{- if $wp }}
+background-image = {{ $.chezmoi.homeDir }}/.config/wallpapers/{{ $wp }}
+background-image-opacity = {{ $.wallpaper.opacity }}
+background-image-fit = {{ $.wallpaper.fit }}
+background-image-position = {{ $.wallpaper.position }}
+{{- end }}
 
 # Colors from the active base16 palette ({{ .theme }})
 background = {{ $p.base00 }}

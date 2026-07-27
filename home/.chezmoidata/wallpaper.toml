@@ -1,0 +1,25 @@
+# Wallpaper pairing — maps the active base16 theme to a ghostty terminal
+# background image. Aesthetics here are shared/committed; the on/off kill-switch
+# is machine-local (see the `wallpaper` command in conf.d/45-theme.zsh, which
+# writes `wallpaper_mode` into ~/.config/chezmoi/chezmoi.toml [data]).
+[wallpaper]
+opacity  = 0.15          # background-image-opacity: subtle texture (tunable)
+fit      = "cover"       # background-image-fit
+position = "center"      # background-image-position
+
+# theme slug → wallpaper filename (lives in ~/.config/wallpapers/). Themes NOT
+# listed here render with no background image (solid base00 background). Add a
+# line to pair more. Unassigned spares: nord-outer-space, rp-noise-line,
+# eat-sleep-code, i-am-root.
+[wallpaper.map]
+rose-pine-moon       = "rp-leafy-moon.jpg"
+rose-pine            = "rp-obliquas-dark.jpg"
+rose-pine-dawn       = "rp-contour-line.jpg"
+catppuccin-mocha     = "ctp-black-hole.png"
+catppuccin-macchiato = "ctp-pixel-galaxy.png"
+catppuccin-frappe    = "ctp-abstract-swirls.jpg"
+catppuccin-latte     = "ctp-astronaut.jpg"
+nord                 = "nord-mountains.png"
+nord-light           = "nord-lake.png"
+greenscreen          = "matrix-falling-code.jpg"
+digital-rain         = "matrix-quote.jpg"
