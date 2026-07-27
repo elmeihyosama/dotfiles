@@ -1,0 +1,48 @@
+name: Lint
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - area: shell
+            install: |
+              ubi --project koalaman/shellcheck --in "$HOME/.local/bin"
+              ubi --project mvdan/sh --in "$HOME/.local/bin" --exe shfmt
+            run: ./ci/lint.sh shell
+          - area: lua
+            install: |
+              sudo apt-get install -y -qq luajit
+              ubi --project JohnnyMorganz/StyLua --in "$HOME/.local/bin" --exe stylua
+            run: ./ci/lint.sh lua
+          - area: config
+            install: ubi --project mikefarah/yq --in "$HOME/.local/bin"
+            run: ./ci/lint.sh config
+          - area: ansible
+            install: |
+              python3 -m pip install --quiet --break-system-packages ansible-core ansible-lint
+              ansible-galaxy collection install -r ansible/requirements.yml
+            run: ./ci/lint.sh ansible
+          - area: editorconfig
+            install: ubi --project editorconfig-checker/editorconfig-checker --in "$HOME/.local/bin" --exe ec
+            run: ./ci/lint.sh editorconfig
+          - area: secret-scan
+            install: ubi --project gitleaks/gitleaks --in "$HOME/.local/bin"
+            run: gitleaks git --no-banner --redact .
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ matrix.area == 'secret-scan' && 0 || 1 }}
+      - uses: ./.github/actions/setup-lint
+      - name: Install ${{ matrix.area }} tools
+        shell: bash
+        run: ${{ matrix.install }}
+      - name: Run ${{ matrix.area }}
+        shell: bash
+        run: ${{ matrix.run }}

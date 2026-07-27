@@ -1,0 +1,40 @@
+name: Provision
+on:
+  pull_request:
+    paths:
+      - 'ansible/**'
+      - 'ci/provision-ci.sh'
+      - 'ci/assert-tools.sh'
+      - '.github/workflows/provision.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ansible/**'
+      - 'ci/provision-ci.sh'
+      - 'ci/assert-tools.sh'
+      - '.github/workflows/provision.yml'
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - debian:bookworm-slim
+          - ubuntu:24.04
+          - archlinux:latest
+          - fedora:latest
+          - rockylinux:9
+          - quay.io/rockylinux/rockylinux:10
+        mode: [sudo, nosudo]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Provision (${{ matrix.distro }} / ${{ matrix.mode }})
+        run: |
+          docker run --rm \
+            -e MODE='${{ matrix.mode }}' \
+            -e GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
+            -v "$PWD:/repo" -w /repo \
+            '${{ matrix.distro }}' \
+            sh ci/provision-ci.sh

@@ -1,0 +1,18 @@
+name: setup-lint
+description: Bootstrap zsh + ubi + chezmoi for lint jobs (mirrors the repo's no-sudo install).
+runs:
+  using: composite
+  steps:
+    - name: Install zsh
+      shell: bash
+      run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh ca-certificates
+    - name: Bootstrap ubi + chezmoi
+      shell: bash
+      run: |
+        mkdir -p "$HOME/.local/bin"
+        curl -fsLS https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh | TARGET="$HOME/.local/bin" sh
+        "$HOME/.local/bin/ubi" --project twpayne/chezmoi --in "$HOME/.local/bin"
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+    - name: Mark workspace safe for git
+      shell: bash
+      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
