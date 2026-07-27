@@ -114,6 +114,38 @@ lint_lua() {
 		note lua "stylua --check"
 		fail=1
 	}
+	# Render each *.lua.tmpl and parse-check the output — rendered Lua isn't
+	# covered by stylua's *.lua glob, and a broken render would only surface at
+	# nvim startup. Prefer luac -p; fall back to luajit/lua loadfile.
+	local f rendered
+	while IFS= read -r f; do
+		[ -f "$f" ] || continue
+		rendered="$(mktemp)"
+		if render "$f" >"$rendered"; then
+			if command -v luac >/dev/null 2>&1; then
+				luac -p "$rendered" || {
+					note lua "render+luac: $f"
+					fail=1
+				}
+			elif command -v luajit >/dev/null 2>&1; then
+				luajit -e "assert(loadfile('$rendered'))" || {
+					note lua "render+luajit: $f"
+					fail=1
+				}
+			elif command -v lua >/dev/null 2>&1; then
+				lua -e "assert(loadfile('$rendered'))" || {
+					note lua "render+lua: $f"
+					fail=1
+				}
+			else
+				note lua "no lua interpreter to check rendered $f (skipped)"
+			fi
+		else
+			note lua "render: $f"
+			fail=1
+		fi
+		rm -f "$rendered"
+	done < <(git ls-files '*.lua.tmpl')
 }
 
 lint_config() {
