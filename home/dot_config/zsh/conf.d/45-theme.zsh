@@ -6,6 +6,10 @@
 # name (no regex metacharacters) since it is interpolated into an awk regex.
 _chezmoi_set_data() {
   local key=$1 val=$2 cfg=$3 tmp
+  # KEY is interpolated into an awk regex and VAL into a "..."-quoted TOML value;
+  # reject a value containing a double-quote (would emit malformed TOML). Both
+  # current callers pass safe strings, but this guards a future third caller.
+  [[ $val == *'"'* ]] && { print -u2 "_chezmoi_set_data: value may not contain a double-quote"; return 1; }
   tmp=$(mktemp) || return 1
   awk -v key="$key" -v val="$val" '
     /^[[:space:]]*\[/ {

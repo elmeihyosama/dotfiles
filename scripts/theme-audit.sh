@@ -19,11 +19,24 @@ REF=HEAD
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
-git clone --quiet --depth 1 https://github.com/tinted-theming/schemes "$tmp/schemes"
-if [ "$REF" != "HEAD" ]; then
-	git -C "$tmp/schemes" fetch --quiet --depth 1 origin "$REF"
-	git -C "$tmp/schemes" checkout --quiet FETCH_HEAD
+# Cache the upstream clone under $XDG_CACHE_HOME so re-runs reuse it and an
+# offline run still works (fetch is best-effort). The rest of the script keeps
+# using "$tmp/schemes" via a symlink into the cache.
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/tinted-schemes"
+if [ -d "$CACHE/.git" ]; then
+	if git -C "$CACHE" fetch --quiet --depth 1 origin "$REF" 2>/dev/null; then
+		git -C "$CACHE" checkout --quiet -f FETCH_HEAD 2>/dev/null || true
+	else
+		printf 'note: could not fetch upstream (offline?) — using cached schemes\n' >&2
+	fi
+else
+	git clone --quiet --depth 1 https://github.com/tinted-theming/schemes "$CACHE"
+	if [ "$REF" != "HEAD" ]; then
+		git -C "$CACHE" fetch --quiet --depth 1 origin "$REF"
+		git -C "$CACHE" checkout --quiet -f FETCH_HEAD
+	fi
 fi
+ln -s "$CACHE" "$tmp/schemes"
 printf 'upstream commit: %s\n' "$(git -C "$tmp/schemes" rev-parse HEAD)"
 
 SCHEMES_SRC="$tmp/schemes/base16"
