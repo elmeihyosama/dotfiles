@@ -14,9 +14,9 @@
     line-numbers = true
     syntax-theme = base16-active
     minus-style = "{{ $p.base08 }} {{ $p.base01 }}"
-    minus-emph-style = "{{ $p.base00 }} {{ $p.base08 }}"
+    minus-emph-style = "{{ index (index .on_colors .theme) "base08" }} {{ $p.base08 }}"
     plus-style = "{{ $p.base0B }} {{ $p.base01 }}"
-    plus-emph-style = "{{ $p.base00 }} {{ $p.base0B }}"
+    plus-emph-style = "{{ index (index .on_colors .theme) "base0B" }} {{ $p.base0B }}"
     hunk-header-style = "{{ index $p .design.accent }} bold"
     hunk-header-decoration-style = "{{ $p.base02 }} ul"
     file-style = "{{ index $p .design.accent2 }} bold"

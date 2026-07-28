@@ -1,7 +1,7 @@
 {{- $p := index .themes .theme -}}
 [mgr]
 cwd = { fg = "{{ $p.base0C }}" }
-hovered = { fg = "{{ $p.base00 }}", bg = "{{ $p.base0E }}" }
+hovered = { fg = "{{ index (index .on_colors .theme) "base0E" }}", bg = "{{ $p.base0E }}" }
 preview_hovered = { underline = true }
 marker_selected = { fg = "{{ $p.base0B }}", bg = "{{ $p.base0B }}" }
 [status]
