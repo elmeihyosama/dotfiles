@@ -36,9 +36,23 @@ jobs:
       - uses: actions/checkout@v4
       - name: Provision (${{ matrix.distro }} / ${{ matrix.mode }})
         run: |
-          docker run --rm \
-            -e MODE='${{ matrix.mode }}' \
-            -e GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
-            -v "$PWD:/repo" -w /repo \
-            '${{ matrix.distro }}' \
-            sh ci/provision-ci.sh
+          # Retry up to 3× (fresh container each) to absorb transient network
+          # blips — ubi GitHub-API/download hiccups and dnf makecache timeouts
+          # across a 12-job network-heavy matrix. The provisioning is idempotent
+          # (ubi `creates:`, package managers skip installed), so a retry mostly
+          # re-checks and only redoes what actually failed.
+          for attempt in 1 2 3; do
+            echo "::group::provision attempt $attempt"
+            if docker run --rm \
+              -e MODE='${{ matrix.mode }}' \
+              -e GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
+              -v "$PWD:/repo" -w /repo \
+              '${{ matrix.distro }}' \
+              sh ci/provision-ci.sh; then
+              echo "::endgroup::"; exit 0
+            fi
+            echo "::endgroup::"
+            echo "attempt $attempt failed" >&2
+            [ "$attempt" -lt 3 ] && sleep 15
+          done
+          exit 1
