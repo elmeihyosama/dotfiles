@@ -7,6 +7,11 @@
 {{- $subtle := $p.base04 -}}
 {{- $text := $p.base05 -}}
 {{- $bg := $p.base00 -}}
+{{- /* Contrast-safe fg for text on a coloured chip (base00 or base05, picked per
+theme by scripts/gen-on-colors.sh) — base00 alone fails on light/pastel accents. */ -}}
+{{- $on := index .on_colors .theme -}}
+{{- $onaccent := index $on .design.accent -}}
+{{- $onwarn := index $on .design.warn -}}
 {{- /* zjstatus's WASM sandbox can't read the system tz, and "local" is not a
 valid chrono-tz name (it silently falls back to UTC). Resolve the real
 IANA zone at render time from the /etc/localtime symlink — macOS points
@@ -21,7 +26,7 @@ layout {
     default_tab_template {
         pane size=1 borderless=true {
             plugin location="file:{{ .chezmoi.homeDir }}/.config/zellij/plugins/zjstatus.wasm" {
-                format_left   "{mode}#[fg={{ $accent }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $accent }},bold] {session} #[fg={{ $accent }},bg={{ $bar }}] {tabs}"
+                format_left   "{mode}#[fg={{ $accent }},bg={{ $bar }}]#[fg={{ $onaccent }},bg={{ $accent }},bold] {session} #[fg={{ $accent }},bg={{ $bar }}] {tabs}"
                 format_right  "{datetime}"
                 format_space  "#[bg={{ $bar }}]"
                 border_enabled "false"
@@ -31,7 +36,7 @@ layout {
                 datetime_timezone "{{ $tz }}"
 
                 tab_normal    "#[fg={{ $overlay }},bg={{ $bar }}]#[fg={{ $subtle }},bg={{ $overlay }}] {index} {name} #[fg={{ $overlay }},bg={{ $bar }}] "
-                tab_active    "#[fg={{ $accent }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $accent }},bold] {index} {name} #[fg={{ $accent }},bg={{ $bar }}] "
+                tab_active    "#[fg={{ $accent }},bg={{ $bar }}]#[fg={{ $onaccent }},bg={{ $accent }},bold] {index} {name} #[fg={{ $accent }},bg={{ $bar }}] "
 
                 // NOTE: `{session}` is its own top-level widget (src/widgets/session.rs) — it
                 // is NOT a substitution variable inside mode_* strings (only `{name}`, the mode
@@ -39,20 +44,20 @@ layout {
                 // format_left with a static accent style; mode_normal/mode_locked below render
                 // only a small colour-coded icon chip immediately to its left, which is what
                 // actually recolours per mode.
-                mode_normal        "#[fg={{ $accent }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $accent }},bold] 󱂬 #[fg={{ $accent }},bg={{ $bar }}] "
+                mode_normal        "#[fg={{ $accent }},bg={{ $bar }}]#[fg={{ $onaccent }},bg={{ $accent }},bold] 󱂬 #[fg={{ $accent }},bg={{ $bar }}] "
                 mode_locked        "#[fg={{ $muted }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $muted }},bold] 󱂬 #[fg={{ $muted }},bg={{ $bar }}] "
-                mode_pane          "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
-                mode_tab           "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
-                mode_resize        "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
-                mode_scroll        "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
-                mode_enter_search  "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
-                mode_search        "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
-                mode_rename_tab    "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
-                mode_rename_pane   "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
-                mode_session       "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
-                mode_move          "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
-                mode_prompt        "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
-                mode_tmux          "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
+                mode_pane          "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $onwarn }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
+                mode_tab           "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $onwarn }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
+                mode_resize        "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $onwarn }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
+                mode_scroll        "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $onwarn }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
+                mode_enter_search  "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $onwarn }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
+                mode_search        "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $onwarn }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
+                mode_rename_tab    "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $onwarn }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
+                mode_rename_pane   "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $onwarn }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
+                mode_session       "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $onwarn }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
+                mode_move          "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $onwarn }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
+                mode_prompt        "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $onwarn }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
+                mode_tmux          "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $onwarn }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "
                 mode_default_to_mode "pane"
             }
         }

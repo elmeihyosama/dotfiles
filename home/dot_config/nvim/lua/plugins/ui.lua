@@ -1,20 +1,20 @@
 local d = require("config.design")
 
-local function block(color)
+local function block(color, on)
   return {
-    a = { bg = color, fg = d.bg, gui = "bold" },
+    a = { bg = color, fg = on, gui = "bold" },
     b = { bg = d.surface, fg = d.text },
     c = { bg = d.surface, fg = d.subtle },
   }
 end
 
 local theme = {
-  normal = block(d.accent),
-  insert = block(d.warn),
-  visual = block(d.link),
-  replace = block(d.err),
-  command = block(d.accent2),
-  inactive = block(d.overlay),
+  normal = block(d.accent, d.on_accent),
+  insert = block(d.warn, d.on_warn),
+  visual = block(d.link, d.on_link),
+  replace = block(d.err, d.on_err),
+  command = block(d.accent2, d.on_accent2),
+  inactive = block(d.overlay, d.text), -- overlay is a mono slot; text is fine
 }
 
 local muted = { fg = d.muted, bg = d.surface }

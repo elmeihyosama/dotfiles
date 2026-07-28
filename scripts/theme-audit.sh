@@ -3,7 +3,8 @@
 # report per-theme quirks. Sections:
 #   DRIFT:        vendored TOML differs from freshly-converted upstream
 #   COLLISION:    accent slots (base08–base0E) sharing one colour
-#   LOWCONTRAST:  fg/bg contrast ratio < 3.0 for text or accent roles
+#   LOWCONTRAST:  text/bg < 3.0, or a chip (text ON an accent slot) whose best
+#                 on-color (base00/base05, see gen-on-colors.sh) still can't reach 3.0
 # Usage: scripts/theme-audit.sh [--ref REF]   (default: upstream HEAD)
 #
 # Note: the COLLISION/LOWCONTRAST pass runs awk once per theme file (END,
@@ -77,8 +78,19 @@ for f in "$THEMES_DIR"/*.toml; do
 				printf "COLLISION %s: %s == %s (%s)\n", slug, i, j, v[i]
 		if (ratio(v["base05"], v["base00"]) < 3.0)
 			printf "LOWCONTRAST %s: text/bg %.2f\n", slug, ratio(v["base05"], v["base00"])
-		if (ratio(v["base0B"], v["base00"]) < 3.0)
-			printf "LOWCONTRAST %s: accent(base0B)/bg %.2f\n", slug, ratio(v["base0B"], v["base00"])
+		# Chrome chips put text ON an accent slot (zellij pills, lualine block,
+		# delta emph, yazi hover). The foreground is on-color = base00 or base05,
+		# whichever contrasts more (scripts/gen-on-colors.sh). Report slots where
+		# even the best on-color stays < 3.0 — inherently marginal, unfixable by
+		# token choice. This is the guardrail for the fg-on-accent bug class.
+		split("base08 base0A base0B base0C base0D base0E", chips, " ")
+		for (c = 1; c <= 6; c++) {
+			s = chips[c]
+			best = ratio(v["base00"], v[s])
+			if (ratio(v["base05"], v[s]) > best) best = ratio(v["base05"], v[s])
+			if (best < 3.0)
+				printf "LOWCONTRAST %s: chip-on-%s best %.2f\n", slug, s, best
+		}
 	}
 	' "$f"
 done
