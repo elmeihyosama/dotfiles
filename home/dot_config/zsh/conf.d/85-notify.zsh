@@ -32,7 +32,13 @@ _notify_precmd() {
     local elapsed=$(( EPOCHSECONDS - _notify_start ))
     local full=$_notify_cmd
     unset _notify_start _notify_cmd
-    local base=${${full%% *}:t}
+    # Strip leading wrappers / env-assignments so `sudo nvim`, `time btop`,
+    # `NODE_ENV=x node` match the exclude list on the real command.
+    local -a _w=(${(z)full})
+    while (( ${#_w} )) && [[ ${_w[1]} == (sudo|doas|command|builtin|exec|time|nice|env) || ${_w[1]} == *=* ]]; do
+      _w=(${_w[2,-1]})
+    done
+    local base=${_w[1]:t}
     if (( elapsed >= NOTIFY_THRESHOLD )) && [[ -n $base ]] \
       && ! (( ${NOTIFY_EXCLUDE[(Ie)$base]} )); then
       local glyph; (( ret == 0 )) && glyph="✓" || glyph="✗"

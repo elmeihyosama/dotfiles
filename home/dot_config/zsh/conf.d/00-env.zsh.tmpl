@@ -24,7 +24,7 @@ export SAVEHIST=50000
 # zsh options
 setopt autocd interactivecomments
 setopt autopushd pushdignoredups pushdsilent   # `cd` builds a stack; `cd -<Tab>` to revisit
-setopt sharehistory histignoredups histreduceblanks incappendhistory \
+setopt sharehistory histignoredups histreduceblanks \
        histexpiredupsfirst histignorespace extendedhistory
 
 # Vi keymap, established before any plugin/tool binds keys so bindings are
@@ -38,8 +38,8 @@ export PAGER='less'
 export LESS='-R'
 command -v bat >/dev/null 2>&1 && export MANPAGER="sh -c 'col -bx | bat -l man -p'"
 
-# Ripgrep config
-export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/config"
+# Ripgrep config (guard: an unset-but-nonexistent path makes every `rg` error)
+[[ -f "$HOME/.config/ripgrep/config" ]] && export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/config"
 
 # eza: on macOS it ignores XDG and reads ~/Library/Application Support/eza
 # unless EZA_CONFIG_DIR is set explicitly. Force it to our themed config.
