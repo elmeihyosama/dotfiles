@@ -1,0 +1,6 @@
+# Bash LOGIN shells read this file, not ~/.bashrc. Source ~/.bashrc so its
+# interactive config — and, on no-sudo machines, the one-shot jump into zsh —
+# runs on login too. Without this, a minimal distro that ships no
+# .bashrc-sourcing ~/.profile leaves a login bash with none of this config
+# (and the no-sudo recovery never fires).
+[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
