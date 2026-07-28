@@ -15,7 +15,7 @@
 - name: Check whether the Nerd Font is already installed
   ansible.builtin.find:
     paths: "{{ font_dir }}"
-    patterns: "JetBrainsMono*NerdFont*.ttf"
+    patterns: "{{ nerd_font }}*NerdFont*.ttf"
   register: _font_found
 
 - name: Download + unpack JetBrainsMono Nerd Font

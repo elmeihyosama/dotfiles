@@ -97,9 +97,10 @@ ubi_match_overrides:
 ubi_matching_regex_overrides:
   atuin: '^atuin-[a-z0-9_]+-unknown-linux-(gnu|musl)\.tar\.gz$'
 
-# Homebrew formula names that differ from canonical
-brew_formula_overrides:
-  dust: dust            # the crate is du-dust on some taps; default tap = dust
+# Homebrew formula names that differ from canonical (canonical name is used when
+# a tool is absent here). Empty today — the default homebrew-core `dust` formula
+# is correct, so no override is needed.
+brew_formula_overrides: {}
 
 # Homebrew installs a binary under a non-canonical name; symlink the canonical
 # command into ~/.local/bin. Keyed canonical-command -> Homebrew binary name.
@@ -130,7 +131,10 @@ native_bin_renames:
 # accept whatever the repo ships.
 min_versions:
   neovim: "0.9.0"
-  yq: "4.0.0"  # Debian apt ships Python yq 3.x (jq-syntax); we need mikefarah yq 4.x
+  # yq is also in force_ubi, so the native/ubi partition never consults this
+  # floor for it — kept only because ci/assert-tools.sh re-reads min_versions to
+  # verify the INSTALLED yq is 4.x (Debian apt ships the incompatible Python yq 3.x).
+  yq: "4.0.0"
 
 # Always install via ubi on Linux even when a native package exists — some distro
 # builds are unreliable (Ubuntu apt ships gitleaks 8.16, pre-`git` CLI; Arch's build
