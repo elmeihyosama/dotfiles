@@ -14,6 +14,12 @@ on:
       - 'ci/assert-tools.sh'
       - '.github/workflows/provision.yml'
 
+# Read-only ephemeral token: GITHUB_TOKEN is passed into the container only to
+# raise ubi's GitHub API rate limit; contents:read keeps it minimal so exposure
+# to the (same-repo) provisioning script carries negligible risk.
+permissions:
+  contents: read
+
 jobs:
   provision:
     runs-on: ubuntu-latest
@@ -34,6 +40,8 @@ jobs:
         mode: [sudo, nosudo]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Provision (${{ matrix.distro }} / ${{ matrix.mode }})
         run: |
           # Retry up to 3× (fresh container each) to absorb transient network

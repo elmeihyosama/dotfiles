@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
 
+# Read-only ephemeral token — lint jobs only read the repo (they never push).
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -43,7 +47,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: ${{ matrix.area == 'secret-scan' && 0 || 1 }}
+          # Quote the operands: GH Actions `&&`/`||` return the operand and 0 is
+          # FALSY, so `&& 0` would fall through to `|| 1` and secret-scan would get
+          # a shallow clone (gitleaks needs full history). '0'/'1' are truthy.
+          fetch-depth: ${{ matrix.area == 'secret-scan' && '0' || '1' }}
+          persist-credentials: false
       - uses: ./.github/actions/setup-lint
       - name: Install ${{ matrix.area }} tools
         shell: bash
