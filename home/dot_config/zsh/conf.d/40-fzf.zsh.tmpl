@@ -33,8 +33,9 @@ if command -v fzf >/dev/null 2>&1; then
   fi
 fi
 
-# Also map Ctrl-O to the cd widget
-bindkey '^O' fzf-cd-widget
+# Also map Ctrl-O to the cd widget (both keymaps — vi-mode; matches the rest)
+bindkey -M viins '^O' fzf-cd-widget
+bindkey -M vicmd '^O' fzf-cd-widget
 
 # fzf-tab styling
 zstyle ':completion:*' menu no-select
