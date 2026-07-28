@@ -79,10 +79,10 @@ lint_shell() {
 		rm -f "$rendered"
 	done < <(git ls-files '*.sh.tmpl')
 	# Shell-content templates whose filename lacks a .zsh/.sh infix.
-	for f in home/dot_zshrc.tmpl home/dot_bashrc.tmpl; do
+	for f in home/dot_zshrc.tmpl home/dot_bashrc.tmpl home/dot_bash_profile.tmpl; do
 		[ -f "$f" ] || continue
 		case "$f" in
-		*bashrc*)
+		*bashrc* | *bash_profile*)
 			render "$f" | bash -n /dev/stdin || {
 				note shell "render+bash -n: $f"
 				fail=1
