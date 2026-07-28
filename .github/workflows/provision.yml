@@ -20,12 +20,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Pull from mirror.gcr.io (Google's Docker Hub mirror) + quay.io, not
+        # Docker Hub directly — GitHub Actions' shared runner IPs hit Docker
+        # Hub's anonymous pull limit and the daemon times out. Same images;
+        # provision-ci.sh detects the distro by package manager, not image name.
         distro:
-          - debian:bookworm-slim
-          - ubuntu:24.04
-          - archlinux:latest
-          - fedora:latest
-          - rockylinux:9
+          - mirror.gcr.io/library/debian:bookworm-slim
+          - mirror.gcr.io/library/ubuntu:24.04
+          - mirror.gcr.io/library/archlinux:latest
+          - mirror.gcr.io/library/fedora:latest
+          - quay.io/rockylinux/rockylinux:9
           - quay.io/rockylinux/rockylinux:10
         mode: [sudo, nosudo]
     steps:
