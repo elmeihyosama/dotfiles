@@ -7,6 +7,11 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    # ubi (chezmoi + the linter binaries) queries api.github.com for releases;
+    # give it the token so it uses the authenticated 5000/hr limit, not the
+    # anonymous 60/hr-per-IP one (which the matrix exhausts).
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
