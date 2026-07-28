@@ -42,7 +42,7 @@
   # own errors. `creates` keeps the task idempotent.
   ansible.builtin.shell: >
     curl --silent --location
-    https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh
+    https://raw.githubusercontent.com/houseabsolute/ubi/v0.10.0/bootstrap/bootstrap-ubi.sh
     | TARGET={{ local_bin }} sh
   args:
     creates: "{{ local_bin }}/ubi"
@@ -92,7 +92,7 @@
 - name: Bootstrap ubi into ~/.local/bin (macOS, tools with no brew formula)  # noqa: command-instead-of-module risky-shell-pipe
   ansible.builtin.shell: >
     curl --silent --location
-    https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh
+    https://raw.githubusercontent.com/houseabsolute/ubi/v0.10.0/bootstrap/bootstrap-ubi.sh
     | TARGET={{ local_bin }} sh
   args:
     creates: "{{ local_bin }}/ubi"
@@ -130,6 +130,7 @@
   become: true
   ansible.builtin.apt:
     update_cache: true
+    cache_valid_time: 3600  # skip the refresh if apt metadata is < 1h old
   when: _native_path and _pkgmgr == 'apt'
 
 - name: Refresh pacman metadata before querying
@@ -167,7 +168,10 @@
   when: _native_path and _pkgmgr == 'pacman'
 
 - name: Query dnf candidate versions  # noqa command-instead-of-shell risky-shell-pipe
-  ansible.builtin.shell: "dnf -q info {{ _pkg_map[item] }} 2>/dev/null | awk -F': +' '/^Version/ {print $2; exit}'"
+  # repoquery (not `dnf info`): queries the REPOS for the candidate, so it can't
+  # accidentally report the *installed* version — `dnf info` lists the Installed
+  # stanza first when a package is present, which the old awk would pick up.
+  ansible.builtin.shell: "dnf -q repoquery --qf '%{version}\\n' {{ _pkg_map[item] }} 2>/dev/null | sort -V | tail -n1"
   loop: "{{ tools }}"
   register: _dnf_q
   changed_when: false
@@ -235,7 +239,7 @@
 - name: Bootstrap ubi for native-path ubi_tools  # noqa command-instead-of-module risky-shell-pipe
   ansible.builtin.shell: >
     curl --silent --location
-    https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh
+    https://raw.githubusercontent.com/houseabsolute/ubi/v0.10.0/bootstrap/bootstrap-ubi.sh
     | TARGET={{ local_bin }} sh
   args:
     creates: "{{ local_bin }}/ubi"

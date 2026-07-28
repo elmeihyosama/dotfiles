@@ -26,6 +26,8 @@
         url: "https://github.com/ryanoasis/nerd-fonts/releases/download/{{ nerd_font_version }}/{{ nerd_font }}.zip"
         dest: "/tmp/{{ nerd_font }}.zip"
         mode: "0644"
+        # sha256 of JetBrainsMono.zip @ nerd_font_version — bump both together.
+        checksum: "sha256:6596922aabaf8876bb657c36a47009ac68c388662db45d4ac05c2536c2f07ade"
     - name: Unpack the .ttf files into the font dir
       ansible.builtin.unarchive:
         src: "/tmp/{{ nerd_font }}.zip"
