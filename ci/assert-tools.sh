@@ -35,8 +35,8 @@ for tool in $(yq '.tools[]' "$VARS"); do
 		fail=1
 		continue
 	fi
-	if ! "$bin" --version >/dev/null 2>&1; then
-		echo "FAIL: $tool -> '$bin' did not run '--version'"
+	if ! out="$("$bin" --version 2>&1)"; then
+		echo "FAIL: $tool -> '$bin' did not run '--version': $(printf '%s' "$out" | head -n1)"
 		fail=1
 		continue
 	fi

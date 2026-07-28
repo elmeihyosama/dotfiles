@@ -16,7 +16,10 @@ elif command -v pacman >/dev/null 2>&1; then
 	# ansible-core from pacman, not pip: pip's PyYAML in system site-packages
 	# collides with pacman's python-yaml when the playbook later installs yq
 	# (same source install.sh uses on real Arch machines).
-	pacman -Sy --noconfirm --quiet python git curl sudo ansible-core >/dev/null
+	# -Syu (full upgrade), not -Sy: the frozen container base has older libs, so
+	# a `pacman -Sy pkg` partial upgrade installs binaries built against newer
+	# gcc-libs than are present, breaking them at runtime (e.g. `btop --version`).
+	pacman -Syu --noconfirm --quiet python git curl sudo ansible-core >/dev/null
 elif command -v dnf >/dev/null 2>&1; then
 	# Fedora's python3 is new enough for ansible-core; EL (Rocky/Alma/RHEL) ships
 	# too old, so pin python3.12. --allowerasing resolves the curl vs curl-minimal
