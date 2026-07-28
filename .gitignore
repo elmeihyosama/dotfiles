@@ -9,3 +9,6 @@ ansible/local.yml
 
 # Brainstorming session artifacts (local-only)
 .superpowers/
+
+# Claude Code project dir (local-only)
+.claude/
