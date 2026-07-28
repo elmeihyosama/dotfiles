@@ -184,16 +184,21 @@
   when: _native_path
 
 - name: Partition tools into native vs ubi
+  # A tool with a min_version floor always goes to ubi (a static latest binary,
+  # guaranteed >= floor). Rationale: native installs use `state: present`, so a
+  # floored tool installed once can silently drift below its floor and never
+  # upgrade; and on Arch a native latest-against-a-frozen-base is a partial-
+  # upgrade hazard. ubi sidesteps both. Non-floored tools still prefer native
+  # when the repo has them; assert-tools.sh re-verifies floors on the installed
+  # binaries either way.
   ansible.builtin.set_fact:
     native_tools: "{{ (native_tools | default([])) + ([item] if _ok else []) }}"
     ubi_tools: "{{ (ubi_tools | default([])) + ([] if (_ok or item in (ubi_unavailable | default([]))) else [item]) }}"
   vars:
     _cand: "{{ _candidate_versions[item] | default('') }}"
-    # Strip epoch (1:) and distro revision (-1, ~rc, +deb) before the compare.
-    _clean: "{{ _cand | regex_replace('^[0-9]+:', '') | regex_replace('[-+~].*$', '') }}"
     _available: "{{ _cand | length > 0 and _cand != '(none)' }}"
     _floor: "{{ min_versions[item] | default('') }}"
-    _ok: "{{ item not in (force_ubi | default([])) and _available and (_floor == '' or _clean is version(_floor, '>=')) }}"
+    _ok: "{{ item not in (force_ubi | default([])) and _floor == '' and _available }}"
   loop: "{{ tools }}"
   when: _native_path
 
