@@ -68,6 +68,15 @@ assert_idempotent() {
 if [ "$MODE" = "sudo" ]; then
 	write_local true
 	(cd ansible && ansible-playbook site.yml --tags packages)
+	# Some distro btop packages setcap the binary (cap_perfmon) so it can read
+	# perf counters. A default container's capability bounding set can't grant
+	# that, so exec'ing it fails with EPERM (even as root) — a container-only
+	# artifact. Strip the cap so the smoke-test can run `btop --version`; real
+	# machines keep it. Best-effort (setcap may be absent on distros that didn't
+	# set the cap in the first place).
+	if command -v setcap >/dev/null 2>&1 && command -v btop >/dev/null 2>&1; then
+		setcap -r "$(command -v btop)" 2>/dev/null || true
+	fi
 	./ci/assert-tools.sh ansible/group_vars/all.yml
 	# Second run must be a no-op (idempotence).
 	(cd ansible && ansible-playbook site.yml --tags packages) >/tmp/run2.log 2>&1 || {

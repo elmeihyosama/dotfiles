@@ -15,8 +15,19 @@ command -v yq >/dev/null 2>&1 || {
 # $1 >= $2  (semantic version compare via sort -V)
 vge() { [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$2" ]; }
 
+# Tools with no ubi binary (source-only, e.g. cava) are best-effort: installed
+# only where a native package or brew exists, and deliberately skipped on no-sudo
+# Linux. They are not a hard requirement, so exempt them from the assertion.
+ubi_unavailable=" $(yq '.ubi_unavailable // [] | .[]' "$VARS" | tr '\n' ' ') "
+
 fail=0
 for tool in $(yq '.tools[]' "$VARS"); do
+	case "$ubi_unavailable" in
+	*" $tool "*)
+		echo "SKIP: $tool (ubi_unavailable — optional, platform-conditional)"
+		continue
+		;;
+	esac
 	bin="$(yq ".ubi_exe_overrides.\"$tool\" // \"$tool\"" "$VARS")"
 
 	if ! command -v "$bin" >/dev/null 2>&1; then
@@ -24,8 +35,8 @@ for tool in $(yq '.tools[]' "$VARS"); do
 		fail=1
 		continue
 	fi
-	if ! "$bin" --version >/dev/null 2>&1; then
-		echo "FAIL: $tool -> '$bin' did not run '--version'"
+	if ! out="$("$bin" --version 2>&1)"; then
+		echo "FAIL: $tool -> '$bin' did not run '--version': $(printf '%s' "$out" | head -n1)"
 		fail=1
 		continue
 	fi

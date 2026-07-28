@@ -1,7 +1,7 @@
 #!/bin/sh
 # One-command bootstrap for a fresh machine:
 #
-#   sh -c "$(curl -fsSL https://gitlab.com/oelmeihy/dotfiles/-/raw/main/install.sh)"
+#   sh -c "$(curl -fsSL https://elmeihyosama.github.io/dotfiles/install.sh)"
 #
 # Clones (or reuses) the repo, installs Ansible, prompts once for per-machine
 # values, then runs the playbook. Idempotent: an existing clone is
@@ -13,7 +13,7 @@
 # DOTFILES_DIR.
 set -eu
 
-REPO_URL="${DOTFILES_REPO:-https://gitlab.com/oelmeihy/dotfiles.git}"
+REPO_URL="${DOTFILES_REPO:-https://github.com/elmeihyosama/dotfiles.git}"
 DEST="${DOTFILES_DIR:-$HOME/dotfiles}"
 
 have() { command -v "$1" >/dev/null 2>&1; }

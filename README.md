@@ -1,5 +1,8 @@
 # Dotfiles
 
+[![Lint](https://github.com/elmeihyosama/dotfiles/actions/workflows/lint.yml/badge.svg)](https://github.com/elmeihyosama/dotfiles/actions/workflows/lint.yml)
+[![Provision](https://github.com/elmeihyosama/dotfiles/actions/workflows/provision.yml/badge.svg)](https://github.com/elmeihyosama/dotfiles/actions/workflows/provision.yml)
+
 A cross-platform (macOS and Linux) terminal environment — managed with
 [chezmoi], provisioned with [Ansible], and themed with [Rosé Pine Moon]. It
 bootstraps a fresh machine with a single command and works even without `sudo`.
@@ -7,10 +10,10 @@ bootstraps a fresh machine with a single command and works even without `sudo`.
 ## Quick start
 
 ```bash
-curl -fsSL https://oelmeihy.gitlab.io/dotfiles/install.sh | sh
+curl -fsSL https://elmeihyosama.github.io/dotfiles/install.sh | sh
 ```
 
-One command — clones to `~/dotfiles`, prompts for your details, and provisions. Served from the project's [landing page](https://oelmeihy.gitlab.io/dotfiles/).
+One command — clones to `~/dotfiles`, prompts for your details, and provisions. Served from the project's [landing page](https://elmeihyosama.github.io/dotfiles/).
 
 It installs Ansible (Homebrew, apt/pacman, or [uv] on no-sudo hosts), prompts
 once for `git_name`, `git_email`, and whether to use sudo, then runs the
@@ -25,7 +28,7 @@ with `./install.sh --reconfigure`.
 ### Manual clone
 
 ```bash
-git clone https://gitlab.com/oelmeihy/dotfiles ~/dotfiles
+git clone https://github.com/elmeihyosama/dotfiles ~/dotfiles
 cd ~/dotfiles
 ./install.sh
 ```

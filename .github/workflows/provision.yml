@@ -1,0 +1,66 @@
+name: Provision
+on:
+  pull_request:
+    paths:
+      - 'ansible/**'
+      - 'ci/provision-ci.sh'
+      - 'ci/assert-tools.sh'
+      - '.github/workflows/provision.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ansible/**'
+      - 'ci/provision-ci.sh'
+      - 'ci/assert-tools.sh'
+      - '.github/workflows/provision.yml'
+
+# Read-only ephemeral token: GITHUB_TOKEN is passed into the container only to
+# raise ubi's GitHub API rate limit; contents:read keeps it minimal so exposure
+# to the (same-repo) provisioning script carries negligible risk.
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Pull from mirror.gcr.io (Google's Docker Hub mirror) + quay.io, not
+        # Docker Hub directly — GitHub Actions' shared runner IPs hit Docker
+        # Hub's anonymous pull limit and the daemon times out. Same images;
+        # provision-ci.sh detects the distro by package manager, not image name.
+        distro:
+          - mirror.gcr.io/library/debian:bookworm-slim
+          - mirror.gcr.io/library/ubuntu:24.04
+          - mirror.gcr.io/library/archlinux:latest
+          - mirror.gcr.io/library/fedora:latest
+          - quay.io/rockylinux/rockylinux:9
+          - quay.io/rockylinux/rockylinux:10
+        mode: [sudo, nosudo]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Provision (${{ matrix.distro }} / ${{ matrix.mode }})
+        run: |
+          # Retry up to 3× (fresh container each) to absorb transient network
+          # blips — ubi GitHub-API/download hiccups and dnf makecache timeouts
+          # across a 12-job network-heavy matrix. The provisioning is idempotent
+          # (ubi `creates:`, package managers skip installed), so a retry mostly
+          # re-checks and only redoes what actually failed.
+          for attempt in 1 2 3; do
+            echo "::group::provision attempt $attempt"
+            if docker run --rm \
+              -e MODE='${{ matrix.mode }}' \
+              -e GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
+              -v "$PWD:/repo" -w /repo \
+              '${{ matrix.distro }}' \
+              sh ci/provision-ci.sh; then
+              echo "::endgroup::"; exit 0
+            fi
+            echo "::endgroup::"
+            echo "attempt $attempt failed" >&2
+            [ "$attempt" -lt 3 ] && sleep 15
+          done
+          exit 1

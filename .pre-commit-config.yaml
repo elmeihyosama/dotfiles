@@ -8,13 +8,13 @@ repos:
         entry: ci/lint.sh shell
         language: system
         pass_filenames: false
-        files: '(\.(sh|zsh)(\.tmpl)?|^home/dot_zshenv)$'
+        files: '(\.(sh|zsh)(\.tmpl)?$|^home/dot_zshenv$|^home/dot_(zsh|bash)rc\.tmpl$)'
       - id: lint-lua
         name: lua (stylua --check)
         entry: ci/lint.sh lua
         language: system
         pass_filenames: false
-        files: '\.lua$'
+        files: '\.lua(\.tmpl)?$'
       - id: lint-config
         name: config (render templates + parse yaml/toml/json)
         entry: ci/lint.sh config
