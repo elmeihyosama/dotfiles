@@ -30,6 +30,15 @@ printf "%s = \"#%s\"\n", key, tolower(substr(rest, RSTART, RLENGTH))
 }
 ' "$src"
 	} >"$out"
+	# Completeness guard: base16 must yield all 16 slots. Catches an upstream YAML
+	# reshape that the regex would otherwise silently drop (theme-audit's diff can't
+	# catch it — it runs the same parser both sides).
+	n=$(grep -c '^base0' "$out" || true)
+	[ "$n" -eq 16 ] || {
+		echo "ERROR: $slug produced $n/16 base0X colours (upstream format change?)" >&2
+		rm -f "$out"
+		return 1
+	}
 	echo "wrote $out"
 }
 
