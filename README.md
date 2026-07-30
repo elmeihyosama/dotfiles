@@ -5,8 +5,8 @@
 
 A cross-platform (macOS and Linux) terminal environment — managed with
 [chezmoi], provisioned with [Ansible], and themed with [base16] (300+ palettes,
-switchable live; [Rosé Pine Moon] by default). It bootstraps a fresh machine
-with a single command and works even without `sudo`.
+switchable with one command; [Rosé Pine Moon] by default). It bootstraps a fresh
+machine with a single command and works even without `sudo`.
 
 ## Quick start
 
@@ -52,7 +52,7 @@ WSL is supported and treated as Linux.
 
 - **One-command bootstrap** on a new machine via `install.sh`.
 - **Declarative everywhere** — Ansible provisions, chezmoi configures.
-- **Centralised theming** — 300+ base16 palettes; switch the whole stack live with the `theme` command.
+- **Centralised theming** — 300+ base16 palettes; switch the whole stack with the `theme` command.
 - **No-sudo friendly** — user-local installs; works on locked-down machines.
 - **Linted** — shell, Ansible, Lua, and config checked in CI + pre-commit.
 
@@ -74,7 +74,7 @@ WSL is supported and treated as Linux.
 | Editor | Neovim ([LazyVim]) |
 | Files & CLI | yazi, bat, ripgrep, fzf, navi, git-delta, lazygit |
 | Claude Code | Themed statusline (cwd · git · model · context · usage/cost) |
-| Theme | base16 — 300+ palettes, live `theme` switcher (Rosé Pine Moon default) |
+| Theme | base16 — 300+ palettes, `theme` switcher (Rosé Pine Moon default) |
 
 ## How it works
 
@@ -96,8 +96,9 @@ WSL is supported and treated as Linux.
 - Apply changes: `chezmoi apply` — preview with `chezmoi diff`.
 - Add an editor language: `:LazyExtras` in Neovim.
 - Switch theme: run `theme` (fuzzy picker with live preview) or `theme <slug>`;
-  toggle the themed wallpaper with `wallpaper`. The repo default lives in
-  `home/.chezmoidata/theme.toml`.
+  toggle the themed wallpaper with `wallpaper`. cmux repaints running sessions
+  immediately; new shells, Ghostty windows, zellij, and Neovim pick it up on
+  restart. The repo default lives in `home/.chezmoidata/theme.toml`.
 - Command cheatsheets: run `navi` to browse the custom keybindings and workflow
   commands (theme, sessionizer, forgit, …).
 - Lint locally: `.github/scripts/lint.sh all`. `install.sh` also sets up a pre-commit hook
