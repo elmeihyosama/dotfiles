@@ -22,27 +22,38 @@ permissions:
 
 jobs:
   provision:
+    # Short, stable check name ("debian (sudo)", "rocky10 (nosudo)", …) instead
+    # of the full image URL; the image itself rides in matrix.image below.
+    name: ${{ matrix.distro }} (${{ matrix.mode }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        distro: [debian, ubuntu, arch, fedora, rocky9, rocky10]
+        mode: [sudo, nosudo]
         # Pull from mirror.gcr.io (Google's Docker Hub mirror) + quay.io, not
         # Docker Hub directly — GitHub Actions' shared runner IPs hit Docker
         # Hub's anonymous pull limit and the daemon times out. Same images;
         # provision-ci.sh detects the distro by package manager, not image name.
-        distro:
-          - mirror.gcr.io/library/debian:bookworm-slim
-          - mirror.gcr.io/library/ubuntu:24.04
-          - mirror.gcr.io/library/archlinux:latest
-          - mirror.gcr.io/library/fedora:latest
-          - quay.io/rockylinux/rockylinux:9
-          - quay.io/rockylinux/rockylinux:10
-        mode: [sudo, nosudo]
+        # `include` attaches each distro's image to its two (sudo/nosudo) combos.
+        include:
+          - distro: debian
+            image: mirror.gcr.io/library/debian:bookworm-slim
+          - distro: ubuntu
+            image: mirror.gcr.io/library/ubuntu:24.04
+          - distro: arch
+            image: mirror.gcr.io/library/archlinux:latest
+          - distro: fedora
+            image: mirror.gcr.io/library/fedora:latest
+          - distro: rocky9
+            image: quay.io/rockylinux/rockylinux:9
+          - distro: rocky10
+            image: quay.io/rockylinux/rockylinux:10
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Provision (${{ matrix.distro }} / ${{ matrix.mode }})
+      - name: Provision (${{ matrix.image }} / ${{ matrix.mode }})
         run: |
           # Retry up to 3× (fresh container each) to absorb transient network
           # blips — ubi GitHub-API/download hiccups and dnf makecache timeouts
@@ -55,7 +66,7 @@ jobs:
               -e MODE='${{ matrix.mode }}' \
               -e GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
               -v "$PWD:/repo" -w /repo \
-              '${{ matrix.distro }}' \
+              '${{ matrix.image }}' \
               sh .github/scripts/provision-ci.sh; then
               echo "::endgroup::"; exit 0
             fi
