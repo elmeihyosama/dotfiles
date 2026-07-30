@@ -10,6 +10,12 @@ permissions:
 
 jobs:
   lint:
+    # Stable check name derived only from the area, so the required-status-check
+    # contexts (a repo ruleset pins them) stay "lint (shell)", "lint (config)",
+    # … regardless of how the install/run commands change. Without this, the
+    # matrix appends the full command string to the job name and every command
+    # edit silently renames the checks and breaks the ruleset.
+    name: lint (${{ matrix.area }})
     runs-on: ubuntu-latest
     # ubi (chezmoi + the linter binaries) queries api.github.com for releases;
     # give it the token so it uses the authenticated 5000/hr limit, not the
