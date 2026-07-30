@@ -64,14 +64,25 @@ ensure_ansible() {
 			# XDG_BIN_HOME/UV_* env in ansible/tasks/python.yml.
 			_lbin="$(local_bin_dir)"
 			_lshare="$(local_share_dir)"
-			if ! have uv; then
+			# In shared-home mode a `uv` already on PATH may be the OTHER arch's
+			# binary (exec-format error on `uv tool install`), so require the
+			# arch-local $_lbin/uv explicitly; single-arch hosts accept any uv.
+			if [ "$SHARED_HOME" = "true" ]; then
+				_uv="$_lbin/uv"
+				[ -x "$_uv" ] || _need_uv=1
+			else
+				_uv="uv"
+				have uv || _need_uv=1
+			fi
+			if [ "${_need_uv:-0}" = 1 ]; then
 				curl -LsSf https://astral.sh/uv/install.sh | XDG_BIN_HOME="$_lbin" sh
 				export PATH="$_lbin:$HOME/.local/bin:$PATH"
+				_uv="$_lbin/uv"
 			fi
 			XDG_BIN_HOME="$_lbin" \
 				UV_PYTHON_INSTALL_DIR="$_lshare/uv/python" \
 				UV_TOOL_DIR="$_lshare/uv/tools" \
-				uv tool install ansible-core
+				"$_uv" tool install ansible-core
 			export PATH="$_lbin:$HOME/.local/bin:$PATH"
 		fi
 		;;

@@ -61,7 +61,11 @@
   # A tool with no release asset for this OS/arch (e.g. git-absorb ships no
   # aarch64 Linux build) must not abort provisioning of everything else — skip
   # it and report below. Any OTHER non-zero exit (network, bad project) still fails.
-  changed_when: (_ubi_installs.rc | default(1)) == 0
+  #
+  # changed only when the command ACTUALLY ran and installed: a `creates`-skip
+  # (binary already present, second run) reports changed=false but rc=0, so
+  # keying on rc alone would flag every skip as changed and break idempotence.
+  changed_when: _ubi_installs.changed and (_ubi_installs.rc | default(1)) == 0
   failed_when: >-
     (_ubi_installs.rc | default(0)) != 0
     and 'could not find a release asset' not in (_ubi_installs.stderr | default(''))
