@@ -4,8 +4,9 @@
 [![Provision](https://github.com/elmeihyosama/dotfiles/actions/workflows/provision.yml/badge.svg)](https://github.com/elmeihyosama/dotfiles/actions/workflows/provision.yml)
 
 A cross-platform (macOS and Linux) terminal environment — managed with
-[chezmoi], provisioned with [Ansible], and themed with [Rosé Pine Moon]. It
-bootstraps a fresh machine with a single command and works even without `sudo`.
+[chezmoi], provisioned with [Ansible], and themed with [base16] (300+ palettes,
+switchable live; [Rosé Pine Moon] by default). It bootstraps a fresh machine
+with a single command and works even without `sudo`.
 
 ## Quick start
 
@@ -51,7 +52,7 @@ WSL is supported and treated as Linux.
 
 - **One-command bootstrap** on a new machine via `install.sh`.
 - **Declarative everywhere** — Ansible provisions, chezmoi configures.
-- **Centralised theming** — restyle the entire stack from a single value.
+- **Centralised theming** — 300+ base16 palettes; switch the whole stack live with the `theme` command.
 - **No-sudo friendly** — user-local installs; works on locked-down machines.
 - **Linted** — shell, Ansible, Lua, and config checked in CI + pre-commit.
 
@@ -73,7 +74,7 @@ WSL is supported and treated as Linux.
 | Editor | Neovim ([LazyVim]) |
 | Files & CLI | yazi, bat, ripgrep, fzf, navi, git-delta, lazygit |
 | Claude Code | Themed statusline (cwd · git · model · context · usage/cost) |
-| Theme | Rosé Pine Moon throughout |
+| Theme | base16 — 300+ palettes, live `theme` switcher (Rosé Pine Moon default) |
 
 ## How it works
 
@@ -94,7 +95,11 @@ WSL is supported and treated as Linux.
 
 - Apply changes: `chezmoi apply` — preview with `chezmoi diff`.
 - Add an editor language: `:LazyExtras` in Neovim.
-- Switch theme: edit `theme` in `home/.chezmoidata/theme.toml`, then apply.
+- Switch theme: run `theme` (fuzzy picker with live preview) or `theme <slug>`;
+  toggle the themed wallpaper with `wallpaper`. The repo default lives in
+  `home/.chezmoidata/theme.toml`.
+- Command cheatsheets: run `navi` to browse the custom keybindings and workflow
+  commands (theme, sessionizer, forgit, …).
 - Lint locally: `.github/scripts/lint.sh all`. `install.sh` also sets up a pre-commit hook
   that runs these checks on each commit.
 - Fresh machine, `chezmoi apply` before `./install.sh`: the zellij `glow`
@@ -102,12 +107,22 @@ WSL is supported and treated as Linux.
   shows a plugin error until you run `./install.sh` — use `zellij -l split`
   in the meantime.
 
+## Docs
+
+Deeper guides for the non-obvious pieces:
+
+- [Theming](docs/themes.md) — the base16 pipeline, semantic design tokens, and the switcher.
+- [mise](docs/mise.md) — per-project runtimes, environment, and tasks.
+- [Eye-candy](docs/eye-candy.md) — wallpaper↔theme pairing and themed cava.
+- [Clipboard & notifications](docs/clipboard-notify.md) — OSC escape sequences that work over SSH.
+
 ## License
 
 Released under the [MIT License](LICENSE).
 
 [chezmoi]: https://www.chezmoi.io/
 [Ansible]: https://www.ansible.com/
+[base16]: https://github.com/tinted-theming/home
 [Rosé Pine Moon]: https://rosepinetheme.com/
 [uv]: https://docs.astral.sh/uv/
 [sheldon]: https://sheldon.cli.rs/
