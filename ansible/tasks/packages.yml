@@ -57,7 +57,29 @@
       {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
     creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
   loop: "{{ tools | difference(ubi_unavailable | default([])) }}"
+  register: _ubi_installs
+  # A tool with no release asset for this OS/arch (e.g. git-absorb ships no
+  # aarch64 Linux build) must not abort provisioning of everything else — skip
+  # it and report below. Any OTHER non-zero exit (network, bad project) still fails.
+  #
+  # changed only when the command ACTUALLY ran and installed: a `creates`-skip
+  # (binary already present, second run) reports changed=false but rc=0, so
+  # keying on rc alone would flag every skip as changed and break idempotence.
+  changed_when: _ubi_installs.changed and (_ubi_installs.rc | default(1)) == 0
+  failed_when: >-
+    (_ubi_installs.rc | default(0)) != 0
+    and 'could not find a release asset' not in (_ubi_installs.stderr | default(''))
   when: use_ubi_fallback
+
+- name: Report tools skipped for lack of a platform binary (no silent gaps)
+  ansible.builtin.debug:
+    msg: >-
+      Skipped (no {{ ansible_facts.architecture }} release asset via ubi):
+      {{ _ubi_installs.results | selectattr('rc', 'defined') | selectattr('rc', 'ne', 0)
+         | map(attribute='item') | list }}
+  when:
+    - use_ubi_fallback
+    - _ubi_installs.results | default([]) | selectattr('rc', 'defined') | selectattr('rc', 'ne', 0) | list | length > 0
 
 # ---- Native path: macOS Homebrew ----------------------------------------
 - name: Install tools via Homebrew (macOS)

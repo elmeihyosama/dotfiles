@@ -5,3 +5,7 @@ git_email: "you@example.com"
 # allow_sudo: false     # uncomment to force; otherwise auto-detected via `sudo -n true`.
 #                       # Drives install strategy (native vs user-local) and whether
 #                       # the login shell is switched to zsh or a .bashrc shim is used.
+# shared_home: false    # default false. Set true ONLY when one $HOME is shared across
+#                       # CPU architectures (e.g. x86_64 + aarch64 login hosts): binaries
+#                       # and runtimes then go to ~/.local/bin-<arch> / ~/.local/share-<arch>
+#                       # so the two arches don't clobber each other.

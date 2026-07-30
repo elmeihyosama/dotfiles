@@ -6,7 +6,7 @@ if command -v mise >/dev/null 2>&1; then
   # activation-script GENERATION only — the runtime `_mise_hook` (cd-aware env
   # resolve) still runs each prompt exactly as before, so per-project env is
   # unchanged. Same self-refreshing idiom as the completion cache below.
-  _mise_activate="${XDG_CACHE_HOME:-$HOME/.cache}/mise/activate.zsh"
+  _mise_activate="${ZSH_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}}/mise/activate.zsh"
   if [[ ! -s "$_mise_activate" || "$_mise_activate" -ot ${commands[mise]:A} ]]; then
     mkdir -p "${_mise_activate:h}"
     mise activate zsh >| "$_mise_activate"

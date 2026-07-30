@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Shared lint logic for GitLab CI and pre-commit. Render-aware (chezmoi templates)
-# and zsh-aware (shellcheck is bash-only; zsh is checked with `zsh -n`).
+# Shared lint logic for GitHub Actions CI and pre-commit. Render-aware (chezmoi
+# templates) and zsh-aware (shellcheck is bash-only; zsh is checked with `zsh -n`).
 set -uo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,6 +11,16 @@ note() { printf '[lint:%s] %s\n' "$1" "$2" >&2; }
 
 # Render a chezmoi template file to stdout using the CI fixture + repo data.
 render() { chezmoi execute-template --source "$REPO" --config "$FIXTURE" <"$1"; }
+
+# A shared_home=true variant of the fixture, generated on the fly, so the
+# architecture-specific template branches get render-checked too (the committed
+# fixture only sets shared_home=false). chezmoi infers config format from the
+# extension, so the temp file must keep a .toml name. Cleaned up on exit.
+_shared_tmpdir="$(mktemp -d)"
+SHARED_FIXTURE="$_shared_tmpdir/fixture.toml"
+trap 'rm -rf "$_shared_tmpdir"' EXIT
+sed 's/shared_home[[:space:]]*=[[:space:]]*false/shared_home = true/' "$FIXTURE" >"$SHARED_FIXTURE"
+render_shared() { chezmoi execute-template --source "$REPO" --config "$SHARED_FIXTURE" <"$1"; }
 
 # Bash files; zsh handled separately.
 bash_files() {
@@ -40,15 +50,6 @@ lint_shell() {
 			fail=1
 		}
 	done < <(git ls-files '*.zsh')
-	# Non-template zsh-content files whose filename lacks a .zsh infix.
-	# shellcheck disable=SC2043  # single entry today; loop kept for easy extension
-	for f in home/dot_zshenv; do
-		[ -f "$f" ] || continue
-		zsh -n "$f" || {
-			note shell "zsh -n: $f"
-			fail=1
-		}
-	done
 	# zsh templates: render then zsh -n
 	while IFS= read -r f; do
 		[ -f "$f" ] || continue
@@ -79,7 +80,7 @@ lint_shell() {
 		rm -f "$rendered"
 	done < <(git ls-files '*.sh.tmpl')
 	# Shell-content templates whose filename lacks a .zsh/.sh infix.
-	for f in home/dot_zshrc.tmpl home/dot_bashrc.tmpl home/dot_bash_profile.tmpl; do
+	for f in home/dot_zshenv.tmpl home/dot_zshrc.tmpl home/dot_bashrc.tmpl home/dot_bash_profile.tmpl; do
 		[ -f "$f" ] || continue
 		case "$f" in
 		*bashrc* | *bash_profile*)
@@ -91,6 +92,25 @@ lint_shell() {
 		*)
 			render "$f" | zsh -n /dev/stdin || {
 				note shell "render+zsh -n: $f"
+				fail=1
+			}
+			;;
+		esac
+	done
+	# Arch-aware templates: also render the shared_home=true branch so BOTH code
+	# paths stay syntax-valid (the loops above only exercise shared_home=false).
+	for f in home/dot_zshenv.tmpl home/dot_config/zsh/conf.d/00-env.zsh.tmpl home/dot_bashrc.tmpl; do
+		[ -f "$f" ] || continue
+		case "$f" in
+		*bashrc*)
+			render_shared "$f" | bash -n /dev/stdin || {
+				note shell "render(shared_home)+bash -n: $f"
+				fail=1
+			}
+			;;
+		*)
+			render_shared "$f" | zsh -n /dev/stdin || {
+				note shell "render(shared_home)+zsh -n: $f"
 				fail=1
 			}
 			;;

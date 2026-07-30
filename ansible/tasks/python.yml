@@ -8,11 +8,17 @@
   changed_when: false
   failed_when: false
 
+# Redirect uv's outputs to the (possibly per-arch) dirs. Without these, uv writes
+# the `uv`/`python3` shims to $XDG_BIN_HOME (~/.local/bin) and the interpreter ELF
+# + tool venvs to ~/.local/share/uv — both shared paths that collide across arches
+# on a shared-$HOME host. See group_vars/all.yml for local_bin/local_share.
 - name: Install uv (user-local, no sudo) when missing
   ansible.builtin.shell: set -o pipefail; curl -LsSf https://astral.sh/uv/install.sh | sh  # noqa: command-instead-of-module
   args:
     executable: /bin/bash
     creates: "{{ local_bin }}/uv"
+  environment:
+    XDG_BIN_HOME: "{{ local_bin }}"
   when: _uv.rc != 0
 
 - name: Install the default Python interpreter via uv — {{ python_version }}
@@ -21,6 +27,9 @@
     creates: "{{ local_bin }}/python3"
   environment:
     PATH: "{{ local_bin }}:{{ ansible_facts['env']['PATH'] }}"
+    XDG_BIN_HOME: "{{ local_bin }}"
+    UV_PYTHON_INSTALL_DIR: "{{ local_share }}/uv/python"
+    UV_TOOL_DIR: "{{ local_share }}/uv/tools"
 
 # pre-commit is a Python tool (no static binary for ubi) — install it via uv.
 - name: Install pre-commit as a uv tool
@@ -29,3 +38,6 @@
     creates: "{{ local_bin }}/pre-commit"
   environment:
     PATH: "{{ local_bin }}:{{ ansible_facts['env']['PATH'] }}"
+    XDG_BIN_HOME: "{{ local_bin }}"
+    UV_PYTHON_INSTALL_DIR: "{{ local_share }}/uv/python"
+    UV_TOOL_DIR: "{{ local_share }}/uv/tools"

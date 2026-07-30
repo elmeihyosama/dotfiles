@@ -24,6 +24,7 @@
       sourceDir = "{{ playbook_dir | dirname }}"
       [data]
           allow_sudo = {{ allow_sudo | lower }}
+          shared_home = {{ shared_home | default(false) | lower }}
           git_name = "{{ git_name }}"
           git_email = "{{ git_email }}"
 

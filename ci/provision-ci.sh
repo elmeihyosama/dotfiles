@@ -47,7 +47,7 @@ git config --global --add safe.directory "$PWD"
 export GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
 write_local() { # $1 = allow_sudo value
-	printf '%s\n' '---' 'git_name: ci' 'git_email: ci@example.com' "allow_sudo: $1" >ansible/local.yml
+	printf '%s\n' '---' 'git_name: ci' 'git_email: ci@example.com' "allow_sudo: $1" 'shared_home: false' >ansible/local.yml
 }
 
 # Assert a captured playbook run changed nothing (idempotence). The PLAY RECAP is

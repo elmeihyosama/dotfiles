@@ -1,5 +1,11 @@
 ---
-local_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+# On a shared-$HOME multi-arch host (shared_home=true) arch-specific ELF binaries
+# and runtimes must not collide, so bin/share dirs are suffixed with the machine
+# architecture (x86_64 / aarch64 — ansible_facts.architecture == `uname -m`, which
+# matches the user's existing ~/.local/bin-<arch> dirs). Default single-arch hosts
+# keep the plain paths untouched.
+local_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin{{ ('-' + ansible_facts['architecture']) if (shared_home | default(false)) else '' }}"
+local_share: "{{ ansible_facts['env']['HOME'] }}/.local/share{{ ('-' + ansible_facts['architecture']) if (shared_home | default(false)) else '' }}"
 
 # pinned versions
 ubi_version: "latest"          # bootstrap script pulls the latest ubi release
