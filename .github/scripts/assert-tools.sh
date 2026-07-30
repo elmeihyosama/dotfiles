@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # Assert every canonical tool binary resolves, runs, and meets its version floor.
-# Usage: ci/assert-tools.sh [path/to/group_vars/all.yml]
+# Usage: .github/scripts/assert-tools.sh [path/to/group_vars/all.yml]
 # Reads the tool list + overrides from group_vars so there is one source of truth.
 set -eu
 

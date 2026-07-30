@@ -5,31 +5,31 @@ repos:
     hooks:
       - id: lint-shell
         name: shell (shellcheck/shfmt + render-aware zsh -n)
-        entry: ci/lint.sh shell
+        entry: .github/scripts/lint.sh shell
         language: system
         pass_filenames: false
         files: '(\.(sh|zsh)(\.tmpl)?$|^home/dot_(zshenv|zshrc|bashrc|bash_profile)\.tmpl$)'
       - id: lint-lua
         name: lua (stylua --check)
-        entry: ci/lint.sh lua
+        entry: .github/scripts/lint.sh lua
         language: system
         pass_filenames: false
         files: '\.lua(\.tmpl)?$'
       - id: lint-config
         name: config (render templates + parse yaml/toml/json)
-        entry: ci/lint.sh config
+        entry: .github/scripts/lint.sh config
         language: system
         pass_filenames: false
         files: '(\.tmpl|\.ya?ml|\.toml|\.json)$'
       - id: lint-ansible
         name: ansible (ansible-lint + syntax-check)
-        entry: ci/lint.sh ansible
+        entry: .github/scripts/lint.sh ansible
         language: system
         pass_filenames: false
         files: '^ansible/'
       - id: lint-editorconfig
         name: editorconfig (editorconfig-checker)
-        entry: ci/lint.sh editorconfig
+        entry: .github/scripts/lint.sh editorconfig
         language: system
         pass_filenames: false
       - id: secret-scan

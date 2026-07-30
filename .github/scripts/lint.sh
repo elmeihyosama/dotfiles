@@ -3,9 +3,9 @@
 # templates) and zsh-aware (shellcheck is bash-only; zsh is checked with `zsh -n`).
 set -uo pipefail
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO" || exit 1
-FIXTURE="ci/fixture.toml"
+FIXTURE=".github/scripts/fixture.toml"
 fail=0
 note() { printf '[lint:%s] %s\n' "$1" "$2" >&2; }
 
@@ -24,8 +24,8 @@ render_shared() { chezmoi execute-template --source "$REPO" --config "$SHARED_FI
 
 # Bash files; zsh handled separately.
 bash_files() {
-	printf '%s\n' install.sh ci/lint.sh
-	git ls-files '*.sh' | grep -v '^ci/lint.sh$'
+	printf '%s\n' install.sh .github/scripts/lint.sh
+	git ls-files '*.sh' | grep -v '^\.github/scripts/lint\.sh$'
 }
 
 lint_shell() {
@@ -226,7 +226,7 @@ main() {
 		lint_editorconfig
 		;;
 	*)
-		echo "usage: ci/lint.sh {shell|ansible|lua|config|editorconfig|all}" >&2
+		echo "usage: .github/scripts/lint.sh {shell|ansible|lua|config|editorconfig|all}" >&2
 		exit 2
 		;;
 	esac
