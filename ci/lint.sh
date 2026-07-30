@@ -40,15 +40,6 @@ lint_shell() {
 			fail=1
 		}
 	done < <(git ls-files '*.zsh')
-	# Non-template zsh-content files whose filename lacks a .zsh infix.
-	# shellcheck disable=SC2043  # single entry today; loop kept for easy extension
-	for f in home/dot_zshenv; do
-		[ -f "$f" ] || continue
-		zsh -n "$f" || {
-			note shell "zsh -n: $f"
-			fail=1
-		}
-	done
 	# zsh templates: render then zsh -n
 	while IFS= read -r f; do
 		[ -f "$f" ] || continue
@@ -79,7 +70,7 @@ lint_shell() {
 		rm -f "$rendered"
 	done < <(git ls-files '*.sh.tmpl')
 	# Shell-content templates whose filename lacks a .zsh/.sh infix.
-	for f in home/dot_zshrc.tmpl home/dot_bashrc.tmpl home/dot_bash_profile.tmpl; do
+	for f in home/dot_zshenv.tmpl home/dot_zshrc.tmpl home/dot_bashrc.tmpl home/dot_bash_profile.tmpl; do
 		[ -f "$f" ] || continue
 		case "$f" in
 		*bashrc* | *bash_profile*)

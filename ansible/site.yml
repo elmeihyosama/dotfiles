@@ -20,9 +20,19 @@
         allow_sudo: "{{ (_sudo_probe.rc | default(1)) == 0 }}"
       when: allow_sudo is not defined
 
+    - name: Default shared_home off when unset
+      ansible.builtin.set_fact:
+        shared_home: false
+      when: shared_home is not defined
+
     - name: Show effective install strategy
       ansible.builtin.debug:
-        msg: "os_family={{ ansible_facts.os_family }} pkg_mgr={{ ansible_facts.pkg_mgr | default('n/a') }} allow_sudo={{ allow_sudo }}"
+        msg: >-
+          os_family={{ ansible_facts.os_family }}
+          pkg_mgr={{ ansible_facts.pkg_mgr | default('n/a') }}
+          allow_sudo={{ allow_sudo }}
+          shared_home={{ shared_home }}
+          local_bin={{ local_bin }}
 
   tasks:
     - name: Packages

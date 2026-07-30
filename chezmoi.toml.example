@@ -1,6 +1,7 @@
 # Copy to ~/.config/chezmoi/chezmoi.toml on each machine. NEVER commit the real file.
 [data]
     allow_sudo = true            # set false on no-sudo machines (enables the .bashrc → zsh shim)
+    shared_home = false          # true only on shared-$HOME multi-arch hosts (per-arch PATH + mise dir)
     git_name = "Your Name"
     git_email = "you@example.com"
     # theme = "rose-pine-moon"   # uncomment to override the repo default

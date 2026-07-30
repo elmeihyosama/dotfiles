@@ -4,7 +4,7 @@ add_newline = true
 palette = "base16"
 
 format = """
-[╭─ ](rail)$hostname$directory$git_branch$git_status$jobs$nodejs$python$rust$golang$docker_context$kubernetes$fill$cmd_duration$time
+[╭─](rail)$hostname$directory$git_branch$git_status$jobs$nodejs$python$rust$golang$docker_context$kubernetes$fill$cmd_duration$time
 [╰─](rail)$character"""
 
 [palettes.base16]
@@ -32,8 +32,8 @@ magenta = "{{ $p.base0E }}"
 
 [hostname]
 ssh_only = true
-ssh_symbol = "󰣀 "
-style = "bold err"
+ssh_symbol = " "
+style = "bold orange"
 format = "[$ssh_symbol$hostname]($style) "
 
 [fill]

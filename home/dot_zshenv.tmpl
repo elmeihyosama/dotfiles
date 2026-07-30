@@ -1,7 +1,14 @@
 # Runs for every zsh (incl. non-interactive). Keep MINIMAL — only ensure mise
 # shims resolve project runtimes in non-interactive/child contexts (interactive
 # shells get the richer dynamic `mise activate` in conf.d/49-mise.zsh).
+{{ if .shared_home -}}
+# Shared-$HOME multi-arch host: mise's data dir is per-arch (see 00-env.zsh),
+# so its shims live under ~/.local/share-$(uname -m). $(uname -m) resolves per
+# login host, keeping one rendered file correct on every arch.
+_mise_shims="$HOME/.local/share-$(uname -m)/mise/shims"
+{{ else -}}
 _mise_shims="${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims"
+{{ end -}}
 if [[ -d $_mise_shims && ":$PATH:" != *":$_mise_shims:"* ]]; then
   export PATH="$_mise_shims:$PATH"
 fi
