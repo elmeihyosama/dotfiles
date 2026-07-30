@@ -1,0 +1,46 @@
+% keybinds, zsh, keys
+
+# History search TUI (atuin)
+Ctrl-R
+
+# Prefix-search history from the current line (atuin)
+Up
+
+# Prefix-search forward through history
+Down
+
+# Fuzzy file picker → insert the path (fzf)
+Ctrl-T
+
+# Fuzzy cd into a subdirectory (fzf)
+Alt-C
+
+# Fuzzy cd — alternate binding (fzf)
+Ctrl-O
+
+# Sessionizer — fuzzy project → zellij session
+Ctrl-F
+
+# Suspend the foreground job; resume it when the line is empty
+Ctrl-Z
+
+# Edit the current command line in nvim
+Ctrl-X Ctrl-E
+
+# Accept the autosuggestion
+Ctrl-Space
+
+# Jump to beginning of line
+Ctrl-A
+
+# Jump to end of line
+Ctrl-E
+
+# Delete the previous word
+Ctrl-W
+
+# Move one word right / left
+Ctrl-Right / Ctrl-Left
+
+# Enter vi NORMAL mode
+Esc

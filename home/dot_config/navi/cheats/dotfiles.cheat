@@ -1,0 +1,64 @@
+% dotfiles, custom, shell
+
+# Switch the base16 theme — fuzzy picker with live preview (machine-local, no git diff)
+theme
+
+# Switch to a specific theme by slug
+theme <slug>
+
+# Toggle the themed terminal background image (on|off|toggle)
+wallpaper toggle
+
+# Sessionizer — fuzzy-pick a project and open/attach a zellij session
+sz
+
+# List sessionizer candidate project paths (no fzf)
+sz --list
+
+# mkdir -p a directory then cd into it
+take <dir>
+
+# Jump to a frecent directory (zoxide)
+z <query>
+
+# Interactive zoxide directory picker
+zi
+
+# Yazi file manager; cds the shell to yazi's last dir on exit
+y
+
+# fastfetch splash (ssh-aware config)
+ff
+
+# git-absorb: fold staged hunks into the commit that introduced them, then rebase
+gab
+
+# Fuzzy stage hunks/files (forgit)
+fga
+
+# Fuzzy diff a file or commit (forgit)
+fgd
+
+# Fuzzy git log browser (forgit)
+flog
+
+# Fuzzy checkout a branch (forgit)
+fcb
+
+# Fuzzy restore/discard a file (forgit)
+fcf
+
+# Fuzzy stash picker (forgit)
+fst
+
+# GitHub PR/issue dashboard
+ghd
+
+# Disk usage by filesystem (duf)
+dfh
+
+# Disk usage by directory (dust)
+duh
+
+# System monitor (btop)
+bt
