@@ -77,7 +77,7 @@ if [ "$MODE" = "sudo" ]; then
 	if command -v setcap >/dev/null 2>&1 && command -v btop >/dev/null 2>&1; then
 		setcap -r "$(command -v btop)" 2>/dev/null || true
 	fi
-	./ci/assert-tools.sh ansible/group_vars/all.yml
+	./.github/scripts/assert-tools.sh ansible/group_vars/all.yml
 	# Second run must be a no-op (idempotence).
 	(cd ansible && ansible-playbook site.yml --tags packages) >/tmp/run2.log 2>&1 || {
 		cat /tmp/run2.log
@@ -93,7 +93,7 @@ else
 	write_local false
 	chown -R tester "$PWD"
 	su tester -c "cd '$PWD/ansible' && GITHUB_TOKEN='${GITHUB_TOKEN:-}' ANSIBLE_COLLECTIONS_PATH='$COLLECTIONS_PATH' ansible-playbook site.yml --tags packages"
-	su tester -c "cd '$PWD' && ./ci/assert-tools.sh ansible/group_vars/all.yml"
+	su tester -c "cd '$PWD' && ./.github/scripts/assert-tools.sh ansible/group_vars/all.yml"
 	# Second run must be a no-op (idempotence), same invocation as the first.
 	su tester -c "cd '$PWD/ansible' && GITHUB_TOKEN='${GITHUB_TOKEN:-}' ANSIBLE_COLLECTIONS_PATH='$COLLECTIONS_PATH' ansible-playbook site.yml --tags packages" >/tmp/run2.log 2>&1 || {
 		cat /tmp/run2.log
