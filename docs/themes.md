@@ -25,7 +25,8 @@ the active theme restyles everything at once.
 - **Manual:** set the slug in one of the places above, then `chezmoi apply`.
 
 New shells and new ghostty windows pick the theme up automatically; existing
-**ghostty windows, zellij sessions, and nvim** need a reload/restart.
+**ghostty windows, zellij sessions, nvim, and running TUIs (btop, lazydocker,
+lazygit, yazi)** need a reload/restart.
 
 ### cmux
 
