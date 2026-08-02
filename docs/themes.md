@@ -5,8 +5,8 @@ scheme from [`tinted-theming/schemes`](https://github.com/tinted-theming/schemes
 (~326 palettes). Each lives in `home/.chezmoidata/themes/<slug>.toml` as a
 `[themes.<slug>]` table of `base00`–`base0F`. Every themed app config
 (ghostty, starship, zellij, yazi, bat, lazygit, lazydocker, btop, fzf,
-git-delta, gh-dash, cava, nvim) renders from those 16 colors, so switching
-the active theme restyles everything at once.
+git-delta, gh-dash, cava, nvim, vivid/LS_COLORS) renders from those 16
+colors, so switching the active theme restyles everything at once.
 
 > **Note:** documentation lives here under `docs/`, not inside
 > `home/.chezmoidata/themes/`. chezmoi parses *every* file in a `.chezmoidata`
