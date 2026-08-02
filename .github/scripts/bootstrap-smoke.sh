@@ -20,10 +20,13 @@ export GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
 # In CI the mounted checkout sits at a detached HEAD; cloning that yields no
 # checkout. Pin a branch and point HEAD at it so install.sh's plain
-# `git clone` of /repo gets this exact tree.
+# `git clone` of /repo gets this exact tree. Skip when HEAD is already on a
+# branch (retry attempts reuse the same checkout, local runs mount a clone).
 git config --global --add safe.directory /repo
-git -C /repo branch -f _bootstrap-smoke HEAD
-git -C /repo symbolic-ref HEAD refs/heads/_bootstrap-smoke
+if ! git -C /repo symbolic-ref -q HEAD >/dev/null; then
+	git -C /repo branch -f _bootstrap-smoke HEAD
+	git -C /repo symbolic-ref HEAD refs/heads/_bootstrap-smoke
+fi
 
 # Run a COPY of install.sh from outside any checkout so it takes the
 # self-clone + exec path, exactly like `sh -c "$(curl ...)"` on a fresh box.
