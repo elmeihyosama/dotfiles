@@ -84,6 +84,12 @@ ensure_ansible() {
 				UV_TOOL_DIR="$_lshare/uv/tools" \
 				"$_uv" tool install ansible-core
 			export PATH="$_lbin:$HOME/.local/bin:$PATH"
+			# Minimal hosts may lack a system python3 entirely; ansible MODULES
+			# run on the target interpreter (not ansible-core's own venv), so
+			# point them at the uv-managed python backing that venv.
+			if ! have python3; then
+				export ANSIBLE_PYTHON_INTERPRETER="$_lshare/uv/tools/ansible-core/bin/python"
+			fi
 		fi
 		;;
 	*)
