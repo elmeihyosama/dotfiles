@@ -28,13 +28,36 @@
         mode: "0644"
         # sha256 of JetBrainsMono.zip @ nerd_font_version — bump both together.
         checksum: "sha256:6596922aabaf8876bb657c36a47009ac68c388662db45d4ac05c2536c2f07ade"
+    - name: Check for unzip (unarchive needs it for .zip archives)
+      ansible.builtin.command: command -v unzip
+      register: _unzip
+      changed_when: false
+      failed_when: false
     - name: Unpack the .ttf files into the font dir
       ansible.builtin.unarchive:
         src: "/tmp/{{ nerd_font }}.zip"
         dest: "{{ font_dir }}"
         remote_src: true
         include: "*.ttf"
+      when: _unzip.rc == 0
+    # Minimal / no-sudo hosts may have no unzip at all (and can't install it);
+    # python is guaranteed — it's the interpreter these modules run on.
+    - name: Unpack via python zipfile when unzip is absent  # noqa command-instead-of-shell risky-shell-pipe
+      ansible.builtin.shell: |
+        set -eu
+        tmp="$(mktemp -d)"
+        "{{ ansible_facts.python.executable }}" -m zipfile -e "/tmp/{{ nerd_font }}.zip" "$tmp"
+        find "$tmp" -name '*.ttf' -exec mv {} "{{ font_dir }}/" \;
+        rm -rf "$tmp"
+      changed_when: true
+      when: _unzip.rc != 0
+    - name: Check for fc-cache (fontconfig may be absent on minimal hosts)
+      ansible.builtin.command: command -v fc-cache
+      register: _fccache
+      changed_when: false
+      failed_when: false
+      when: ansible_facts.os_family != 'Darwin'
     - name: Refresh font cache (Linux)
       ansible.builtin.command: fc-cache -f "{{ font_dir }}"
       changed_when: true
-      when: ansible_facts.os_family != 'Darwin'
+      when: ansible_facts.os_family != 'Darwin' and (_fccache.rc | default(1)) == 0
