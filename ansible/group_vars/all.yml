@@ -52,6 +52,8 @@ tools:
   - xh
   - jless
   - watchexec
+  - age
+  - age-keygen
 
 # owner/repo for the ubi no-sudo fallback
 ubi_tool_repos:
@@ -89,6 +91,8 @@ ubi_tool_repos:
   xh: ducaale/xh
   jless: PaulJuliusMartinez/jless
   watchexec: watchexec/watchexec
+  age: FiloSottile/age
+  age-keygen: FiloSottile/age
 
 # tools whose extracted binary name differs from the canonical name (for ubi --exe)
 ubi_exe_overrides:
@@ -97,6 +101,7 @@ ubi_exe_overrides:
   gh: gh        # repo is cli/cli, but the binary inside the archive is `gh`
   neovim: nvim  # GitHub release extracts a binary named nvim
   editorconfig-checker: ec  # release archive ships ec-<os>-<arch>; binary we invoke is `ec`
+  age-keygen: age-keygen  # same archive as `age`; pick the keygen binary out of it
 
 # Force a specific ubi release asset when a tool ships multiple (e.g. glibc vs
 # musl). yazi's gnu binary needs a very new glibc; the musl static build runs
@@ -118,7 +123,8 @@ ubi_matching_regex_overrides:
 # Homebrew formula names that differ from canonical (canonical name is used when
 # a tool is absent here). Empty today — the default homebrew-core `dust` formula
 # is correct, so no override is needed.
-brew_formula_overrides: {}
+brew_formula_overrides:
+  age-keygen: age  # one formula ships both binaries; installing twice is a no-op
 
 # Homebrew installs a binary under a non-canonical name; symlink the canonical
 # command into ~/.local/bin. Keyed canonical-command -> Homebrew binary name.
@@ -131,9 +137,12 @@ brew_bin_renames:
 native_pkg_overrides:
   apt:
     fd: fd-find
+    age-keygen: age  # one package ships both binaries
   dnf:
     fd: fd-find
-  pacman: {}
+    age-keygen: age
+  pacman:
+    age-keygen: age
 
 # Native package that installs the binary under a non-canonical name; we
 # symlink the canonical name to it in ~/.local/bin. Keyed by manager, then tool.
