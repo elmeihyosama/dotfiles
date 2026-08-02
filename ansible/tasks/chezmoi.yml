@@ -1,6 +1,9 @@
 ---
-- name: Locate chezmoi
-  ansible.builtin.command: command -v chezmoi
+# shell, not command: `command -v` is a shell builtin — there is no /usr/bin/command
+# on Linux, so the command module can never resolve it there (macOS ships one,
+# which masked this).
+- name: Locate chezmoi  # noqa command-instead-of-shell
+  ansible.builtin.shell: command -v chezmoi
   register: _chezmoi
   changed_when: false
   failed_when: false

@@ -1,6 +1,8 @@
 ---
-- name: Resolve zsh path
-  ansible.builtin.command: command -v zsh
+# shell, not command: `command -v` is a shell builtin with no Linux binary
+# equivalent (see the identical note in chezmoi.yml).
+- name: Resolve zsh path  # noqa command-instead-of-shell
+  ansible.builtin.shell: command -v zsh
   register: _zsh
   changed_when: false
   failed_when: false
