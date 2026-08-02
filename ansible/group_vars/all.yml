@@ -50,6 +50,7 @@ tools:
   - hyperfine
   - xh
   - jless
+  - watchexec
 
 # owner/repo for the ubi no-sudo fallback
 ubi_tool_repos:
@@ -85,6 +86,7 @@ ubi_tool_repos:
   hyperfine: sharkdp/hyperfine
   xh: ducaale/xh
   jless: PaulJuliusMartinez/jless
+  watchexec: watchexec/watchexec
 
 # tools whose extracted binary name differs from the canonical name (for ubi --exe)
 ubi_exe_overrides:
