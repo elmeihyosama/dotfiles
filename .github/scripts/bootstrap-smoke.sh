@@ -66,6 +66,7 @@ if [ "$MODE" = "sudo" ]; then
 		cat /tmp/run2.log
 		exit 1
 	}
+	cat /tmp/run2.log
 	assert_idempotent /tmp/run2.log
 else
 	# Genuine unprivileged user, no sudoers entry -> install.sh's uv fallback.
@@ -90,5 +91,6 @@ else
 		cat /tmp/run2.log
 		exit 1
 	}
+	cat /tmp/run2.log
 	assert_idempotent /tmp/run2.log
 fi
