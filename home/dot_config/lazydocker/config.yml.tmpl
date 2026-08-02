@@ -1,0 +1,8 @@
+{{- $p := index .themes .theme -}}
+gui:
+  theme:
+    activeBorderColor: ["{{ index $p .design.accent2 }}", bold]
+    inactiveBorderColor: ["{{ $p.base03 }}"]
+    selectedLineBgColor: ["{{ $p.base02 }}"]
+    optionsTextColor: ["{{ $p.base0C }}"]
+    defaultFgColor: ["{{ $p.base05 }}"]
