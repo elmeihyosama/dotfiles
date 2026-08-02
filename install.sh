@@ -197,6 +197,13 @@ ensure_ansible
 _lbin="$(local_bin_dir)"
 export PATH="$_lbin:$HOME/.local/bin:$PATH"
 
+# The no-sudo path installs bare ansible-core, which ships no collections —
+# and the playbook fails at PARSE time without community.general (module
+# resolution happens before any skip logic). Idempotent: already-installed
+# collections are skipped. Native ansible bundles ship them, but a re-check
+# is cheap and covers partial installs.
+ansible-galaxy collection install -r "$self_dir/ansible/requirements.yml" >/dev/null
+
 # Run from ansible/ so its ansible.cfg is loaded (ansible reads it from cwd).
 (cd "$self_dir/ansible" && ansible-playbook site.yml "$@")
 
