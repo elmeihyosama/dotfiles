@@ -5,11 +5,13 @@
   changed_when: false
   failed_when: false
 
+# user_shell (the passwd entry), not the SHELL env var: SHELL only changes on
+# a fresh login, so keying on it re-runs chsh every run in the same session.
 - name: Set login shell to zsh (only with sudo; no-sudo machines use the .bashrc shim)
   when:
     - allow_sudo | default(false)
     - _zsh.rc == 0
-    - ansible_facts['env']['SHELL'] | default('') != _zsh.stdout
+    - ansible_facts['user_shell'] | default('') != _zsh.stdout
   block:
     - name: Ensure zsh is listed in /etc/shells
       become: true
