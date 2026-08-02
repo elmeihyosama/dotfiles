@@ -9,6 +9,9 @@ theme <slug>
 # Toggle the themed terminal background image (on|off|toggle)
 wallpaper toggle
 
+# Health-check this machine's provisioning (tools, font, drift, theme)
+doctor
+
 # Sessionizer — fuzzy-pick a project and open/attach a zellij session
 sz
 
