@@ -70,7 +70,10 @@ if [ "$MODE" = "sudo" ]; then
 else
 	# Genuine unprivileged user, no sudoers entry -> install.sh's uv fallback.
 	useradd -m tester
+	# Both paths: git's dubious-ownership check resolves a non-bare source
+	# repo to its .git dir when cloning from a local path.
 	su tester -c "git config --global --add safe.directory /repo"
+	su tester -c "git config --global --add safe.directory /repo/.git"
 	su tester -c "git config --global user.name ci-smoke"
 	su tester -c "git config --global user.email ci-smoke@example.com"
 	su tester -c "GITHUB_TOKEN='$GITHUB_TOKEN' DOTFILES_REPO=/repo DOTFILES_DIR=\$HOME/dotfiles sh /tmp/install.sh"
