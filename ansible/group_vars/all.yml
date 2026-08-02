@@ -170,3 +170,4 @@ brew_unavailable:
 # package manager (sudo Linux); SKIPPED on no-sudo Linux. Non-critical eye-candy.
 ubi_unavailable:
   - cava # karlstav/cava releases ship only cava-<v>.tar.gz (source) + a Windows .msi
+  - jless # linux binary dynamically links libxcb (clipboard) — unusable on minimal/no-sudo hosts; macOS gets it via brew
