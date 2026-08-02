@@ -75,7 +75,10 @@ ensure_ansible() {
 				have uv || _need_uv=1
 			fi
 			if [ "${_need_uv:-0}" = 1 ]; then
-				curl -LsSf https://astral.sh/uv/install.sh | XDG_BIN_HOME="$_lbin" sh
+				# UV_NO_MODIFY_PATH: the installer must not append PATH lines to the
+				# shell rc files — chezmoi owns those, and the edits show up as
+				# drift that every chezmoi apply reverts.
+				curl -LsSf https://astral.sh/uv/install.sh | XDG_BIN_HOME="$_lbin" UV_NO_MODIFY_PATH=1 sh
 				export PATH="$_lbin:$HOME/.local/bin:$PATH"
 				_uv="$_lbin/uv"
 			fi
@@ -198,10 +201,13 @@ done
 
 # local_vars first: it resolves SHARED_HOME, which ensure_ansible needs to place
 # uv's binaries/venvs in the correct (possibly arch-suffixed) local dirs.
+# PATH before ensure_ansible: a prior uv-path install lives in ~/.local/bin, and
+# probing for ansible-playbook without it on PATH re-runs the whole uv install
+# on every invocation.
 ensure_local_vars
-ensure_ansible
 _lbin="$(local_bin_dir)"
 export PATH="$_lbin:$HOME/.local/bin:$PATH"
+ensure_ansible
 
 # The no-sudo path installs bare ansible-core, which ships no collections —
 # and the playbook fails at PARSE time without community.general (module
