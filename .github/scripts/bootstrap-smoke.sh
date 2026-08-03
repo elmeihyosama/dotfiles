@@ -22,7 +22,11 @@ export GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 # checkout. Pin a branch and point HEAD at it so install.sh's plain
 # `git clone` of /repo gets this exact tree. Skip when HEAD is already on a
 # branch (retry attempts reuse the same checkout, local runs mount a clone).
+# Both paths: git resolves a non-bare source repo to its .git dir when cloning
+# from a local path, and on CI runners /repo belongs to the runner uid, not
+# container root (Docker Desktop's uid mapping masks this locally).
 git config --global --add safe.directory /repo
+git config --global --add safe.directory /repo/.git
 if ! git -C /repo symbolic-ref -q HEAD >/dev/null; then
 	git -C /repo branch -f _bootstrap-smoke HEAD
 	git -C /repo symbolic-ref HEAD refs/heads/_bootstrap-smoke
