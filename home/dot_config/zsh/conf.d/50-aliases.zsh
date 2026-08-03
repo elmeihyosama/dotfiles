@@ -44,6 +44,9 @@ command -v zoxide >/dev/null 2>&1 && alias zz="zoxide query --interactive"
 # gh-dash GitHub PR/issue dashboard (guarded)
 command -v gh-dash >/dev/null 2>&1 && alias ghd="gh-dash"
 
+# lazydocker container TUI (guarded)
+command -v lazydocker >/dev/null 2>&1 && alias lzd="lazydocker"
+
 # sz — fuzzy project → zellij session (sessionizer). Resolves the repo script
 # via chezmoi like the `theme` function does.
 sz() {
