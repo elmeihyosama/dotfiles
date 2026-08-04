@@ -17,6 +17,7 @@ zjstatus_sha256: "1ccedece1ded62cf3e209be690cdd39ca6fb9e8228ed71a951f6507f995666
 
 # Canonical tool list (installed on every machine).
 tools:
+  - chezmoi
   - atuin
   - sheldon
   - zellij
@@ -54,6 +55,7 @@ tools:
 
 # owner/repo for the ubi no-sudo fallback
 ubi_tool_repos:
+  chezmoi: twpayne/chezmoi
   atuin: atuinsh/atuin
   sheldon: rossmacarthur/sheldon
   zellij: zellij-org/zellij

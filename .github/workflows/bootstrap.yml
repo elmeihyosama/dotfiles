@@ -1,0 +1,57 @@
+name: Bootstrap
+on:
+  pull_request:
+    paths:
+      - 'install.sh'
+      - 'ansible/**'
+      - '.github/scripts/bootstrap-smoke.sh'
+      - '.github/scripts/assert-tools.sh'
+      - '.github/workflows/bootstrap.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'install.sh'
+      - 'ansible/**'
+      - '.github/scripts/bootstrap-smoke.sh'
+      - '.github/scripts/assert-tools.sh'
+      - '.github/workflows/bootstrap.yml'
+
+# Read-only ephemeral token, passed into the container only to raise ubi's
+# GitHub API rate limit (same rationale as provision.yml).
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    # The provision matrix covers per-distro package installs; this job covers
+    # the entry point itself (install.sh end-to-end), so one distro suffices.
+    name: ubuntu (${{ matrix.mode }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [sudo, nosudo]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Bootstrap (${{ matrix.mode }})
+        run: |
+          # Same 3-retry pattern as provision.yml: absorb transient network
+          # blips; install.sh and the playbook are idempotent, so a retry only
+          # redoes what actually failed.
+          for attempt in 1 2 3; do
+            echo "::group::bootstrap attempt $attempt"
+            if docker run --rm \
+              -e MODE='${{ matrix.mode }}' \
+              -e GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
+              -v "$PWD:/repo" -w /repo \
+              mirror.gcr.io/library/ubuntu:24.04 \
+              sh .github/scripts/bootstrap-smoke.sh; then
+              echo "::endgroup::"; exit 0
+            fi
+            echo "::endgroup::"
+            echo "attempt $attempt failed" >&2
+            [ "$attempt" -lt 3 ] && sleep 15
+          done
+          exit 1
