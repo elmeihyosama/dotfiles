@@ -28,3 +28,19 @@
   loop_control:
     label: "{{ item.item.key }}"
   when: _casks_brew.rc == 0 and not (item.stat.exists | default(true))
+
+# The CLI is only added to PATH by the editor's in-app "install command"
+# action; shim it directly so the antigravity-extensions chezmoi script works
+# headlessly. Stat-guarded: if a future app version moves/renames the CLI the
+# shim just doesn't materialise instead of dangling.
+- name: Check for the Antigravity CLI inside the app bundle
+  ansible.builtin.stat:
+    path: "/Applications/Antigravity.app/Contents/Resources/app/bin/antigravity"
+  register: _antigravity_cli
+
+- name: Shim the Antigravity CLI into the user bin dir
+  ansible.builtin.file:
+    src: "/Applications/Antigravity.app/Contents/Resources/app/bin/antigravity"
+    dest: "{{ local_bin }}/antigravity"
+    state: link
+  when: _antigravity_cli.stat.exists

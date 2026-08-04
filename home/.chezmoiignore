@@ -5,3 +5,12 @@
 # chezmoi (avoids "changed since chezmoi last wrote it" apply conflicts).
 .config/nvim/lazy-lock.json
 .config/nvim/lazyvim.json
+
+# Antigravity user config lives at a different path per OS; each OS applies
+# only its own copy (both render .chezmoitemplates/antigravity-settings.json).
+{{ if ne .chezmoi.os "darwin" }}
+Library
+{{ end }}
+{{ if eq .chezmoi.os "darwin" }}
+.config/Antigravity/User
+{{ end }}

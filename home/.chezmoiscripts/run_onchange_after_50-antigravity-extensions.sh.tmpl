@@ -1,0 +1,17 @@
+#!/bin/sh
+# Install missing Antigravity extensions from the managed list. Re-runs
+# whenever the list changes (content hash below rides the template). No-op
+# when the `antigravity` CLI is absent (Linux boxes without it, pre-shim
+# macOS). Per-extension failures are non-fatal: the list was exported from
+# VS Code and forks install from Open VSX, which lacks some MS-licensed
+# extensions — those get skipped, not aborted on.
+# extensions.txt sha256: {{ include "dot_config/Antigravity/extensions.txt" | sha256sum }}
+set -eu
+command -v antigravity >/dev/null 2>&1 || exit 0
+installed="$(antigravity --list-extensions | tr '[:upper:]' '[:lower:]')"
+while IFS= read -r ext; do
+	case "$ext" in '' | '#'*) continue ;; esac
+	if ! printf '%s\n' "$installed" | grep -qix "$ext"; then
+		antigravity --install-extension "$ext" || echo "skip (unavailable): $ext"
+	fi
+done <"$HOME/.config/Antigravity/extensions.txt"
