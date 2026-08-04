@@ -26,18 +26,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Installs are guarded on the binary already existing so a lint-tools
+          # cache hit (see setup-lint) skips their api.github.com lookups too.
           - area: shell
             install: |
-              ubi --project koalaman/shellcheck --in "$HOME/.local/bin"
-              ubi --project mvdan/sh --in "$HOME/.local/bin" --exe shfmt
+              command -v shellcheck >/dev/null || ubi --project koalaman/shellcheck --in "$HOME/.local/bin"
+              command -v shfmt >/dev/null || ubi --project mvdan/sh --in "$HOME/.local/bin" --exe shfmt
             run: ./.github/scripts/lint.sh shell
           - area: lua
             install: |
               sudo apt-get install -y -qq luajit
-              ubi --project JohnnyMorganz/StyLua --in "$HOME/.local/bin" --exe stylua
+              command -v stylua >/dev/null || ubi --project JohnnyMorganz/StyLua --in "$HOME/.local/bin" --exe stylua
             run: ./.github/scripts/lint.sh lua
           - area: config
-            install: ubi --project mikefarah/yq --in "$HOME/.local/bin"
+            install: command -v yq >/dev/null || ubi --project mikefarah/yq --in "$HOME/.local/bin"
             run: ./.github/scripts/lint.sh config
           - area: ansible
             install: |
@@ -45,10 +47,10 @@ jobs:
               ansible-galaxy collection install -r ansible/requirements.yml
             run: ./.github/scripts/lint.sh ansible
           - area: editorconfig
-            install: ubi --project editorconfig-checker/editorconfig-checker --in "$HOME/.local/bin" --exe ec
+            install: command -v ec >/dev/null || ubi --project editorconfig-checker/editorconfig-checker --in "$HOME/.local/bin" --exe ec
             run: ./.github/scripts/lint.sh editorconfig
           - area: secret-scan
-            install: ubi --project gitleaks/gitleaks --in "$HOME/.local/bin"
+            install: command -v gitleaks >/dev/null || ubi --project gitleaks/gitleaks --in "$HOME/.local/bin"
             run: gitleaks git --no-banner --redact .
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +61,8 @@ jobs:
           fetch-depth: ${{ matrix.area == 'secret-scan' && '0' || '1' }}
           persist-credentials: false
       - uses: ./.github/actions/setup-lint
+        with:
+          cache-key: ${{ matrix.area }}
       - name: Install ${{ matrix.area }} tools
         shell: bash
         run: ${{ matrix.install }}
