@@ -1,0 +1,18 @@
+{
+    "workbench.colorTheme": "Dark+",
+    "workbench.editor.enablePreview": false,
+    "editor.minimap.enabled": false,
+    "diffEditor.ignoreTrimWhitespace": false,
+    "go.toolsManagement.autoUpdate": true,
+    "workbench.activityBar.compact": true,
+    "yaml.disableSchemaDetection": [
+        "**/.github/workflows/*.yml",
+        "**/.github/workflows/*.yaml",
+        "**/.gitea/workflows/*.yml",
+        "**/.gitea/workflows/*.yaml",
+        "**/.forgejo/workflows/*.yml",
+        "**/.forgejo/workflows/*.yaml"
+    ],
+    "redhat.telemetry.enabled": false,
+    "docker.extension.enableComposeLanguageServer": false
+}

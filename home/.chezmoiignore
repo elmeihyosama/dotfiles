@@ -5,3 +5,10 @@
 # chezmoi (avoids "changed since chezmoi last wrote it" apply conflicts).
 .config/nvim/lazy-lock.json
 .config/nvim/lazyvim.json
+
+# Antigravity IDE settings are managed for macOS only (the Linux fork config
+# dir is unverified until a Linux GUI machine exists); the extensions list in
+# .config/antigravity-ide applies everywhere.
+{{ if ne .chezmoi.os "darwin" }}
+Library
+{{ end }}
