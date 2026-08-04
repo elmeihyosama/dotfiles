@@ -7,6 +7,13 @@
   vars_files:
     - "{{ playbook_dir }}/local.yml"
 
+  handlers:
+    - name: Restart macOS UI services
+      ansible.builtin.command: "killall {{ item }}"
+      loop: [Finder, SystemUIServer]
+      failed_when: false
+      changed_when: true
+
   pre_tasks:
     - name: Detect passwordless sudo when allow_sudo is unset
       ansible.builtin.command: sudo -n true
@@ -42,6 +49,11 @@
     - name: GUI apps (macOS casks)
       ansible.builtin.import_tasks: tasks/casks.yml
       tags: [casks]
+      when: ansible_facts.os_family == 'Darwin'
+
+    - name: MacOS defaults
+      ansible.builtin.import_tasks: tasks/macos.yml
+      tags: [macos]
       when: ansible_facts.os_family == 'Darwin'
 
     - name: Zellij plugins

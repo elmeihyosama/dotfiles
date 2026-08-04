@@ -193,3 +193,14 @@ macos_casks:
   cmux: cmux.app
   raycast: Raycast.app
   antigravity: Antigravity.app
+
+# macOS `defaults` writes applied by tasks/macos.yml (Darwin only). Deliberately
+# conservative — Dock and other taste-heavy prefs stay unmanaged. Remove a line
+# to stop managing it; revert one locally with `defaults delete <domain> <key>`.
+macos_defaults:
+  - { domain: NSGlobalDomain, key: KeyRepeat, type: int, value: 2 } # fastest key repeat
+  - { domain: NSGlobalDomain, key: InitialKeyRepeat, type: int, value: 15 } # short delay before repeat starts
+  - { domain: NSGlobalDomain, key: ApplePressAndHoldEnabled, type: bool, value: false } # hold = repeat, not the accent picker (vim)
+  - { domain: NSGlobalDomain, key: AppleShowAllExtensions, type: bool, value: true }
+  - { domain: com.apple.finder, key: ShowPathbar, type: bool, value: true }
+  - { domain: com.apple.screencapture, key: location, type: string, value: "{{ ansible_facts['env']['HOME'] }}/Pictures/Screenshots" }

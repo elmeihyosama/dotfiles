@@ -1,0 +1,23 @@
+---
+# macOS user defaults — the list (and per-key rationale) lives in
+# group_vars/all.yml as `macos_defaults`. The key-repeat keys change typing
+# feel the first time they apply on a machine that used the OS defaults.
+- name: Ensure the screenshot directory exists
+  ansible.builtin.file:
+    path: "{{ ansible_facts['env']['HOME'] }}/Pictures/Screenshots"
+    state: directory
+    mode: "0755"
+
+# Finder/SystemUIServer cache their prefs; the handler (site.yml) bounces
+# them only when something actually changed, so a converged rerun is a
+# visual no-op.
+- name: Apply macOS defaults
+  community.general.osx_defaults:
+    domain: "{{ item.domain }}"
+    key: "{{ item.key }}"
+    type: "{{ item.type }}"
+    value: "{{ item.value }}"
+  loop: "{{ macos_defaults }}"
+  loop_control:
+    label: "{{ item.domain }}:{{ item.key }}"
+  notify: Restart macOS UI services
