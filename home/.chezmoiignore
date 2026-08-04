@@ -6,11 +6,9 @@
 .config/nvim/lazy-lock.json
 .config/nvim/lazyvim.json
 
-# Antigravity user config lives at a different path per OS; each OS applies
-# only its own copy (both render .chezmoitemplates/antigravity-settings.json).
+# Antigravity IDE settings are managed for macOS only (the Linux fork config
+# dir is unverified until a Linux GUI machine exists); the extensions list in
+# .config/antigravity-ide applies everywhere.
 {{ if ne .chezmoi.os "darwin" }}
 Library
-{{ end }}
-{{ if eq .chezmoi.os "darwin" }}
-.config/Antigravity/User
 {{ end }}

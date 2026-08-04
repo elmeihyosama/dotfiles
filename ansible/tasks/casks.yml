@@ -29,18 +29,25 @@
     label: "{{ item.item.key }}"
   when: _casks_brew.rc == 0 and not (item.stat.exists | default(true))
 
-# The CLI is only added to PATH by the editor's in-app "install command"
-# action; shim it directly so the antigravity-extensions chezmoi script works
-# headlessly. Stat-guarded: if a future app version moves/renames the CLI the
-# shim just doesn't materialise instead of dangling.
-- name: Check for the Antigravity CLI inside the app bundle
+# Shim the editor CLI into the user bin dir so the antigravity-extensions
+# chezmoi script works headlessly and regardless of install method (a brew
+# cask install links it into brew's bin, a manual .dmg install links nothing).
+# Stat-guarded: if a future app version moves/renames the CLI the shim is
+# removed instead of left dangling.
+- name: Check for the Antigravity IDE CLI inside the app bundle
   ansible.builtin.stat:
-    path: "/Applications/Antigravity.app/Contents/Resources/app/bin/antigravity"
+    path: "/Applications/Antigravity IDE.app/Contents/Resources/app/bin/antigravity-ide"
   register: _antigravity_cli
 
-- name: Shim the Antigravity CLI into the user bin dir
+- name: Shim the Antigravity IDE CLI into the user bin dir
   ansible.builtin.file:
-    src: "/Applications/Antigravity.app/Contents/Resources/app/bin/antigravity"
-    dest: "{{ local_bin }}/antigravity"
+    src: "/Applications/Antigravity IDE.app/Contents/Resources/app/bin/antigravity-ide"
+    dest: "{{ local_bin }}/antigravity-ide"
     state: link
   when: _antigravity_cli.stat.exists
+
+- name: Remove a stale Antigravity IDE CLI shim
+  ansible.builtin.file:
+    path: "{{ local_bin }}/antigravity-ide"
+    state: absent
+  when: not _antigravity_cli.stat.exists
