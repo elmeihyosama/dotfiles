@@ -61,7 +61,7 @@ WSL is supported and treated as Linux.
 | Path | Purpose |
 | --- | --- |
 | `home/` | chezmoi source tree (`.chezmoiroot` → `home`) |
-| `ansible/` | Provisioning: tools, fonts, plugins, then `chezmoi apply` |
+| `ansible/` | Provisioning: tools, GUI apps (macOS casks), fonts, plugins, then `chezmoi apply` |
 | `.github/` | CI workflows + shared lint/provision scripts (used by CI and pre-commit) |
 | `install.sh` | Fresh-machine entry point (clone + provision) |
 

@@ -39,6 +39,11 @@
       ansible.builtin.import_tasks: tasks/packages.yml
       tags: [packages]
 
+    - name: GUI apps (macOS casks)
+      ansible.builtin.import_tasks: tasks/casks.yml
+      tags: [casks]
+      when: ansible_facts.os_family == 'Darwin'
+
     - name: Zellij plugins
       ansible.builtin.import_tasks: tasks/zjstatus.yml
       tags: [zjstatus]

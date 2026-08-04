@@ -1,0 +1,30 @@
+---
+# GUI apps via Homebrew casks. The import in site.yml is gated to macOS; the
+# brew check keeps a brew-less macOS box from failing (matches packages.yml).
+# shell, not command: `command -v` is a shell builtin (see chezmoi.yml).
+- name: Check for Homebrew  # noqa command-instead-of-shell
+  ansible.builtin.shell: command -v brew
+  register: _casks_brew
+  changed_when: false
+  failed_when: false
+
+- name: Check which cask apps already exist
+  ansible.builtin.stat:
+    path: "/Applications/{{ item.value }}"
+  register: _cask_apps
+  loop: "{{ macos_casks | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: _casks_brew.rc == 0
+
+# Guarded per-app on the bundle already existing: `brew install --cask`
+# refuses to install over a manually-installed app, and machines that predate
+# this task have them all installed by hand.
+- name: Install GUI apps via Homebrew cask
+  community.general.homebrew_cask:
+    name: "{{ item.item.key }}"
+    state: present
+  loop: "{{ _cask_apps.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+  when: _casks_brew.rc == 0 and not (item.stat.exists | default(true))
