@@ -13,5 +13,6 @@
 # Documentation:
 # @raycast.description Switch the base16 theme across the whole stack
 
-# Interactive zsh so conf.d loads and the `theme` function exists.
-exec zsh -ic "theme $1"
+# Interactive zsh so conf.d loads and the `theme` function exists. The slug
+# rides as a positional parameter, never interpolated into the command string.
+exec zsh -ic 'theme "$1"' -- "$1"
