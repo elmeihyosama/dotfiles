@@ -1,0 +1,14 @@
+# Managed by chezmoi — generic client defaults only. Machine-local and private
+# host blocks live in ~/.ssh/config.local (never committed; a pre-existing
+# ~/.ssh/config is preserved there by run_once_before_20-migrate-ssh-config).
+# The Include comes first so local host blocks win: ssh uses the FIRST value
+# it sees for each option.
+Include config.local
+
+Host *
+  AddKeysToAgent yes
+  ServerAliveInterval 60
+  ServerAliveCountMax 3
+{{- if eq .chezmoi.os "darwin" }}
+  UseKeychain yes
+{{- end }}
