@@ -1,5 +1,6 @@
 bazelbuild.vscode-bazel
 bradlc.vscode-tailwindcss
+catppuccin.catppuccin-vsc
 davidanson.vscode-markdownlint
 dbaeumer.vscode-eslint
 docker.docker
@@ -8,9 +9,20 @@ esbenp.prettier-vscode
 github.vscode-github-actions
 github.vscode-pull-request-github
 golang.go
+googlecloudtools.datacloud
+llvm-vs-code-extensions.vscode-clangd
+meta.pyrefly
 ms-azuretools.vscode-containers
 ms-azuretools.vscode-docker
 ms-playwright.playwright
+ms-python.debugpy
+ms-python.python
+ms-python.vscode-python-envs
+ms-toolsai.jupyter
+ms-toolsai.jupyter-keymap
+ms-toolsai.jupyter-renderers
+ms-toolsai.vscode-jupyter-cell-tags
+ms-toolsai.vscode-jupyter-slideshow
 ms-vscode-remote.remote-ssh
 ms-vscode-remote.remote-ssh-edit
 ms-vscode.cmake-tools
@@ -24,6 +36,7 @@ mtxr.sqltools-driver-pg
 openai.chatgpt
 redhat.vscode-yaml
 scootersoftware.bcompare-vscode
+shopify.ruby-lsp
 tamasfe.even-better-toml
 twxs.cmake
 vitest.explorer
