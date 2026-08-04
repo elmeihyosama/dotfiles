@@ -11,4 +11,5 @@
 # .config/antigravity-ide applies everywhere.
 {{ if ne .chezmoi.os "darwin" }}
 Library
+.config/raycast
 {{ end }}
