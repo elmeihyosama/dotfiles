@@ -1,7 +1,8 @@
 {{- $p := index .themes .theme -}}
 # Rendered from the active base16 palette ({{ .theme }}) by chezmoi; switch
 # with `theme <slug>`. Consumed by `vivid generate base16-active` (cached in
-# zsh/conf.d/42-lscolors.zsh). vivid colors are hex without the leading `#`.
+# zsh/conf.d/38-lscolors.zsh — before 40-fzf.zsh, which bakes LS_COLORS into
+# fzf-tab's list-colors zstyle at load time). Hex without the leading `#`.
 
 colors:
   base00: "{{ trimPrefix "#" $p.base00 }}"
