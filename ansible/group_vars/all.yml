@@ -184,3 +184,12 @@ brew_unavailable:
 ubi_unavailable:
   - cava # karlstav/cava releases ship only cava-<v>.tar.gz (source) + a Windows .msi
   - jless # linux binary dynamically links libxcb (clipboard) — unusable on minimal/no-sudo hosts; macOS gets it via brew
+
+# GUI apps installed via Homebrew cask on macOS (skipped on Linux). The value
+# is the app bundle name, used to detect a pre-existing manual install —
+# `brew install --cask` refuses to overwrite an app it did not install.
+macos_casks:
+  ghostty: Ghostty.app
+  cmux: cmux.app
+  raycast: Raycast.app
+  visual-studio-code: Visual Studio Code.app
