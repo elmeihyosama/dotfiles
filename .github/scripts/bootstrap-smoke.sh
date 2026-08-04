@@ -37,6 +37,12 @@ fi
 cp /repo/install.sh /tmp/install.sh
 
 assert_idempotent() { # $1 = log file
+	# A run that never reached ansible must not pass vacuously.
+	if ! grep -q '^PLAY RECAP' "$1"; then
+		echo "IDEMPOTENCE FAIL: second install.sh run produced no ansible recap:"
+		cat "$1"
+		exit 1
+	fi
 	if grep -qE 'changed=[1-9]' "$1"; then
 		echo "IDEMPOTENCE FAIL: second install.sh run reported changes:"
 		grep -E 'PLAY RECAP|changed=' "$1"

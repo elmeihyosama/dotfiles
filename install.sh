@@ -87,12 +87,6 @@ ensure_ansible() {
 				UV_TOOL_DIR="$_lshare/uv/tools" \
 				"$_uv" tool install ansible-core
 			export PATH="$_lbin:$HOME/.local/bin:$PATH"
-			# Minimal hosts may lack a system python3 entirely; ansible MODULES
-			# run on the target interpreter (not ansible-core's own venv), so
-			# point them at the uv-managed python backing that venv.
-			if ! have python3; then
-				export ANSIBLE_PYTHON_INTERPRETER="$_lshare/uv/tools/ansible-core/bin/python"
-			fi
 		fi
 		;;
 	*)
@@ -208,6 +202,15 @@ ensure_local_vars
 _lbin="$(local_bin_dir)"
 export PATH="$_lbin:$HOME/.local/bin:$PATH"
 ensure_ansible
+
+# Minimal hosts may lack a system python3 entirely; ansible MODULES run on the
+# target interpreter, not ansible-core's own venv. Point them at the uv-managed
+# python backing that venv — in the main flow (not only inside ensure_ansible)
+# so reruns that early-return past the uv install still get it.
+_uv_ansible_py="$(local_share_dir)/uv/tools/ansible-core/bin/python"
+if ! have python3 && [ -x "$_uv_ansible_py" ]; then
+	export ANSIBLE_PYTHON_INTERPRETER="$_uv_ansible_py"
+fi
 
 # The no-sudo path installs bare ansible-core, which ships no collections —
 # and the playbook fails at PARSE time without community.general (module
