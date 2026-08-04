@@ -1,17 +1,44 @@
 name: setup-lint
 description: Bootstrap zsh + ubi + chezmoi for lint jobs (mirrors the repo's no-sudo install).
+inputs:
+  cache-key:
+    description: >-
+      Discriminator for the tool cache (the lint matrix area). Each area
+      installs its own extra binaries into ~/.local/bin and the post-job cache
+      save captures whatever the job ended up with, so areas must not share a key.
+    required: false
+    default: shared
 runs:
   using: composite
   steps:
     - name: Install zsh
       shell: bash
       run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh ca-certificates
-    - name: Bootstrap ubi + chezmoi
+    - name: Compute cache month stamp
+      id: stamp
+      shell: bash
+      run: echo "month=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+    # Cache the ubi-installed binaries so repeat runs skip the api.github.com
+    # release lookups entirely — bursts of PR CI were exhausting the shared
+    # GITHUB_TOKEN rate budget (403s in this very step). Exact monthly key:
+    # a hit means zero API calls and no re-save; a new month misses once,
+    # reinstalls fresh tools, and saves. Staleness is bounded at one month,
+    # which matches the unpinned-latest policy these installs already have.
+    - name: Cache lint tools
+      uses: actions/cache@v4
+      with:
+        path: ~/.local/bin
+        key: lint-tools-${{ runner.os }}-${{ inputs.cache-key }}-${{ steps.stamp.outputs.month }}
+    - name: Bootstrap ubi + chezmoi (skipped when cached)
       shell: bash
       run: |
         mkdir -p "$HOME/.local/bin"
-        curl -fsLS https://raw.githubusercontent.com/houseabsolute/ubi/v0.10.0/bootstrap/bootstrap-ubi.sh | TARGET="$HOME/.local/bin" sh
-        "$HOME/.local/bin/ubi" --project twpayne/chezmoi --in "$HOME/.local/bin"
+        if [ ! -x "$HOME/.local/bin/ubi" ]; then
+          curl -fsLS https://raw.githubusercontent.com/houseabsolute/ubi/v0.10.0/bootstrap/bootstrap-ubi.sh | TARGET="$HOME/.local/bin" sh
+        fi
+        if [ ! -x "$HOME/.local/bin/chezmoi" ]; then
+          "$HOME/.local/bin/ubi" --project twpayne/chezmoi --in "$HOME/.local/bin"
+        fi
         echo "$HOME/.local/bin" >> "$GITHUB_PATH"
     - name: Mark workspace safe for git
       shell: bash
