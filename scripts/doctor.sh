@@ -71,6 +71,16 @@ else
 	bad "chezmoi not on PATH"
 fi
 
+# --- age secrets (checked only when encryption is enabled) -----------------
+if [ -f "$HOME/.config/chezmoi/chezmoi.toml" ] &&
+	grep -q '^encryption = "age"' "$HOME/.config/chezmoi/chezmoi.toml"; then
+	if [ -f "$HOME/.config/chezmoi/key.txt" ]; then
+		ok "age encryption enabled and identity key present"
+	else
+		bad "age encryption enabled but ~/.config/chezmoi/key.txt is missing (apply will fail on encrypted files)"
+	fi
+fi
+
 # --- Login shell -----------------------------------------------------------
 case "${SHELL:-}" in
 */zsh)

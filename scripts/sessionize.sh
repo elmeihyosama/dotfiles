@@ -134,7 +134,7 @@ main() {
 			echo "sessionize: cannot cd to '$path' (stale entry?)" >&2
 			exit 1
 		}
-		if ! zellij list-sessions -s 2>/dev/null | grep -qx "$name"; then
+		if ! zellij list-sessions -s 2>/dev/null | grep -qFx "$name"; then
 			zellij attach -b "$name" >/dev/null 2>&1 || true
 		fi
 		exec zellij action switch-session "$name" --cwd "$path" --layout glow

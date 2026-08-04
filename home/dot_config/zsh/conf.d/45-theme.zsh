@@ -69,6 +69,24 @@ theme() {
   fi
 }
 
+# Tab completion: `theme <Tab>` lists the vendored slugs, `wallpaper <Tab>`
+# its verbs. compinit is loaded earlier by 20-completion.zsh.
+_theme_slugs() {
+  local src
+  src=$(chezmoi source-path 2>/dev/null) || return
+  local -a themes
+  themes=(${src}/.chezmoidata/themes/*.toml(:t:r))
+  _describe 'theme' themes
+}
+compdef _theme_slugs theme
+
+_wallpaper_verbs() {
+  local -a actions
+  actions=(on off toggle)
+  _describe 'action' actions
+}
+compdef _wallpaper_verbs wallpaper
+
 # wallpaper — toggle the themed terminal background image (machine-local; no git
 # diff). Pairs with the active theme via .chezmoidata/wallpaper.toml.
 #   wallpaper on | off | toggle   (bare `wallpaper` = toggle)
