@@ -48,6 +48,7 @@ tools:
   - cava
   - vivid
   - hyperfine
+  - xh
 
 # owner/repo for the ubi no-sudo fallback
 ubi_tool_repos:
@@ -81,6 +82,7 @@ ubi_tool_repos:
   mise: jdx/mise
   vivid: sharkdp/vivid
   hyperfine: sharkdp/hyperfine
+  xh: ducaale/xh
 
 # tools whose extracted binary name differs from the canonical name (for ubi --exe)
 ubi_exe_overrides:
