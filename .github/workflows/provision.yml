@@ -62,7 +62,12 @@ jobs:
           # re-checks and only redoes what actually failed.
           for attempt in 1 2 3; do
             echo "::group::provision attempt $attempt"
-            if docker run --rm \
+            # timeout: a wedged attempt (hung image pull / stalled download)
+            # must fail into the retry loop instead of eating the whole job —
+            # healthy runs finish well under 10 minutes. timeout kills the
+            # docker CLIENT only, so also kill the orphaned container: it
+            # shares the /repo mount with the next attempt.
+            if timeout 900 docker run --rm \
               -e MODE='${{ matrix.mode }}' \
               -e GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
               -v "$PWD:/repo" -w /repo \
@@ -72,6 +77,7 @@ jobs:
             fi
             echo "::endgroup::"
             echo "attempt $attempt failed" >&2
+            docker ps -q | xargs -r docker kill >/dev/null 2>&1 || true
             [ "$attempt" -lt 3 ] && sleep 15
           done
           exit 1

@@ -42,7 +42,10 @@ jobs:
           # redoes what actually failed.
           for attempt in 1 2 3; do
             echo "::group::bootstrap attempt $attempt"
-            if docker run --rm \
+            # Same per-attempt bound + orphan-kill as provision.yml; bootstrap
+            # runs the full playbook (uv python, font, two passes), so the
+            # ceiling is higher than provision's.
+            if timeout 1500 docker run --rm \
               -e MODE='${{ matrix.mode }}' \
               -e GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
               -v "$PWD:/repo" -w /repo \
@@ -52,6 +55,7 @@ jobs:
             fi
             echo "::endgroup::"
             echo "attempt $attempt failed" >&2
+            docker ps -q | xargs -r docker kill >/dev/null 2>&1 || true
             [ "$attempt" -lt 3 ] && sleep 15
           done
           exit 1
