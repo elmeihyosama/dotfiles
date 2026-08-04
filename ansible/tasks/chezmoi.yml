@@ -25,6 +25,14 @@
     mode: "0600"
     content: |
       sourceDir = "{{ playbook_dir | dirname }}"
+      {% if age_recipient is defined %}
+      # Opt-in age encryption (see docs/secrets.md). The identity file is
+      # per-machine and never committed; sync it out-of-band.
+      encryption = "age"
+      [age]
+          identity = "~/.config/chezmoi/key.txt"
+          recipient = "{{ age_recipient }}"
+      {% endif %}
       [data]
           allow_sudo = {{ allow_sudo | lower }}
           shared_home = {{ shared_home | default(false) | lower }}

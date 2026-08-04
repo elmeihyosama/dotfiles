@@ -1,4 +1,8 @@
 # Copy to ~/.config/chezmoi/chezmoi.toml on each machine. NEVER commit the real file.
+# encryption = "age"           # opt-in secrets (see docs/secrets.md); or set
+# [age]                        # age_recipient in ansible/local.yml and let the
+#     identity = "~/.config/chezmoi/key.txt"   # playbook generate this block
+#     recipient = "age1..."
 [data]
     allow_sudo = true            # set false on no-sudo machines (enables the .bashrc → zsh shim)
     shared_home = false          # true only on shared-$HOME multi-arch hosts (per-arch PATH + mise dir)
