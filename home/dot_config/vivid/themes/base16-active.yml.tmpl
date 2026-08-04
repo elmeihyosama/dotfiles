@@ -1,0 +1,104 @@
+{{- $p := index .themes .theme -}}
+# Rendered from the active base16 palette ({{ .theme }}) by chezmoi; switch
+# with `theme <slug>`. Consumed by `vivid generate base16-active` (cached in
+# zsh/conf.d/38-lscolors.zsh — before 40-fzf.zsh, which bakes LS_COLORS into
+# fzf-tab's list-colors zstyle at load time). Hex without the leading `#`.
+
+colors:
+  base00: "{{ trimPrefix "#" $p.base00 }}"
+  base01: "{{ trimPrefix "#" $p.base01 }}"
+  base02: "{{ trimPrefix "#" $p.base02 }}"
+  base03: "{{ trimPrefix "#" $p.base03 }}"
+  base04: "{{ trimPrefix "#" $p.base04 }}"
+  base05: "{{ trimPrefix "#" $p.base05 }}"
+  base06: "{{ trimPrefix "#" $p.base06 }}"
+  base07: "{{ trimPrefix "#" $p.base07 }}"
+  base08: "{{ trimPrefix "#" $p.base08 }}"
+  base09: "{{ trimPrefix "#" $p.base09 }}"
+  base0A: "{{ trimPrefix "#" $p.base0A }}"
+  base0B: "{{ trimPrefix "#" $p.base0B }}"
+  base0C: "{{ trimPrefix "#" $p.base0C }}"
+  base0D: "{{ trimPrefix "#" $p.base0D }}"
+  base0E: "{{ trimPrefix "#" $p.base0E }}"
+  base0F: "{{ trimPrefix "#" $p.base0F }}"
+
+core:
+  normal_text:
+    foreground: base05
+  regular_file:
+    foreground: base05
+  reset_to_normal:
+    foreground: base05
+  directory:
+    foreground: base0D
+    font-style: bold
+  symlink:
+    foreground: base0C
+  multi_hard_link:
+    foreground: base0C
+  fifo:
+    foreground: base09
+  socket:
+    foreground: base09
+  door:
+    foreground: base09
+  block_device:
+    foreground: base09
+  character_device:
+    foreground: base09
+  broken_symlink:
+    foreground: base08
+  missing_symlink_target:
+    foreground: base08
+  setuid:
+    foreground: base08
+  setgid:
+    foreground: base09
+  file_with_capability:
+    foreground: base08
+  sticky_other_writable:
+    foreground: base0D
+  other_writable:
+    foreground: base0D
+  sticky:
+    foreground: base0D
+  executable_file:
+    foreground: base0B
+    font-style: bold
+
+text:
+  foreground: base05
+  special:
+    foreground: base0A
+  todo:
+    foreground: base0A
+    font-style: bold
+  licenses:
+    foreground: base04
+  configuration:
+    foreground: base0A
+
+markup:
+  foreground: base0A
+
+programming:
+  foreground: base05
+  source:
+    foreground: base0B
+  tooling:
+    foreground: base0C
+
+executable:
+  foreground: base0B
+
+media:
+  foreground: base0E
+
+office:
+  foreground: base09
+
+archives:
+  foreground: base08
+
+unimportant:
+  foreground: base03
