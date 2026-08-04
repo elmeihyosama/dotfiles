@@ -8,10 +8,13 @@
 # extensions.txt sha256: {{ include "dot_config/Antigravity/extensions.txt" | sha256sum }}
 set -eu
 command -v antigravity >/dev/null 2>&1 || exit 0
+ext_file="$HOME/.config/Antigravity/extensions.txt"
+[ -f "$ext_file" ] || exit 0
 installed="$(antigravity --list-extensions | tr '[:upper:]' '[:lower:]')"
 while IFS= read -r ext; do
 	case "$ext" in '' | '#'*) continue ;; esac
-	if ! printf '%s\n' "$installed" | grep -qix "$ext"; then
+	# -F: extension ids contain dots, which plain grep treats as wildcards.
+	if ! printf '%s\n' "$installed" | grep -qiFx "$ext"; then
 		antigravity --install-extension "$ext" || echo "skip (unavailable): $ext"
 	fi
-done <"$HOME/.config/Antigravity/extensions.txt"
+done <"$ext_file"
