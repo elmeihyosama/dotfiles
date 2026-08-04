@@ -64,6 +64,7 @@ gitignored per-project (add `mise.local.toml` to that project's
 3. `mise use <tool>@<version>` — pin/add a tool to the project config (add `-g` to write to the global config instead).
 4. `mise run <task>` (or `mise <task>`) — run a defined task.
 5. `mise tasks` — list available tasks.
+6. `mise watch <task>` — rerun a task on file changes. Delegates to `watchexec`, which the ansible toolchain provisions, so this works out of the box.
 
 ## Activation model
 
