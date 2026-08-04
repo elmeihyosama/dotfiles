@@ -192,4 +192,6 @@ macos_casks:
   ghostty: Ghostty.app
   cmux: cmux.app
   raycast: Raycast.app
-  antigravity: Antigravity.app
+  # antigravity-ide, not antigravity: the latter is Google's separate agent
+  # orchestration platform; the editor is the -ide cask (Antigravity IDE.app).
+  antigravity-ide: Antigravity IDE.app
