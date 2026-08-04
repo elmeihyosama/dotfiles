@@ -61,7 +61,12 @@ theme() {
   # cmux reads ~/.config/ghostty/config directly; repaint running sessions live.
   command -v cmux >/dev/null 2>&1 && cmux reload-config >/dev/null 2>&1
   echo "theme → ${slug}.  cmux repaints live; new shells, ghostty windows, zellij & nvim need a restart to fully apply."
-  exec zsh
+  # Reload only interactive terminals: from a headless caller (Raycast script
+  # commands, cron) exec'ing an interactive zsh would strand a shell waiting
+  # on stdin.
+  if [[ -t 0 && -t 1 ]]; then
+    exec zsh
+  fi
 }
 
 # wallpaper — toggle the themed terminal background image (machine-local; no git
