@@ -28,6 +28,21 @@ unset _arch
 export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
 {{- end }}
 
+# Toolchain bin dirs that live outside ~/.local (rustup/cargo, Go). Must join
+# PATH here rather than in machine-local 90-local: later conf.d modules guard
+# their init on `command -v` (35-atuin binds Up/^R only if atuin resolves), so
+# anything added after them is invisible to shell-init-time bindings.
+[[ -d "$HOME/.cargo/bin" ]] && export PATH="$HOME/.cargo/bin:$PATH"
+[[ -d "$HOME/.local/go/bin" ]] && export PATH="$HOME/.local/go/bin:$PATH"
+
+# Advertise zsh as the shell for everything spawned from here (zellij panes,
+# nvim :terminal, fzf, lazygit). The login shell itself is immutable on no-sudo
+# domain machines (/bin/bash, zsh absent from /etc/shells), so this export is
+# where "zsh is the default shell" is actually established. $commands[zsh] is
+# PATH-resolved — on shared-$HOME multi-arch hosts it lands on this arch's
+# ~/.local/bin-<arch>/zsh without any template branching.
+(( $+commands[zsh] )) && export SHELL="$commands[zsh]"
+
 # Locale
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
