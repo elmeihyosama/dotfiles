@@ -13,3 +13,10 @@
 Library
 .config/raycast
 {{ end }}
+
+# Personal git identity — only materialised when personal_git_email is set in
+# chezmoi [data] (from ansible/local.yml). Without it config.tmpl emits no
+# includeIf, so the file would be dead weight rendered with empty values.
+{{ if not (hasKey . "personal_git_email") }}
+.config/git/personal
+{{ end }}

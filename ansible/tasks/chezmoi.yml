@@ -19,6 +19,23 @@
     state: directory
     mode: "0755"
 
+# The `theme` and `wallpaper` zsh functions persist the user's per-machine
+# choice by writing into [data] of this very file. Ansible owns the file and
+# rewrites it from a fixed key set, so without reading those back first every
+# provisioning run silently reverts the active theme to the repo default.
+- name: Read existing chezmoi.toml (to preserve machine-local [data] choices)
+  ansible.builtin.slurp:
+    src: "{{ ansible_facts['env']['HOME'] }}/.config/chezmoi/chezmoi.toml"
+  register: _cz_existing
+  failed_when: false
+
+- name: Carry over theme / wallpaper_mode set by the `theme` and `wallpaper` commands
+  ansible.builtin.set_fact:
+    _kept_theme: "{{ (_existing | regex_search('(?m)^\\s*theme\\s*=\\s*\"([^\"]+)\"', '\\1') or ['']) | first }}"
+    _kept_wallpaper_mode: "{{ (_existing | regex_search('(?m)^\\s*wallpaper_mode\\s*=\\s*\"([^\"]+)\"', '\\1') or ['']) | first }}"
+  vars:
+    _existing: "{{ _cz_existing.content | default('') | b64decode }}"
+
 - name: Template chezmoi.toml from per-machine vars
   ansible.builtin.copy:
     dest: "{{ ansible_facts['env']['HOME'] }}/.config/chezmoi/chezmoi.toml"
@@ -34,6 +51,18 @@
           recipient = "{{ age_recipient }}"
       {% endif %}
       [data]
+      {% if personal_git_name is defined %}
+          personal_git_name = "{{ personal_git_name }}"
+      {% endif %}
+      {% if personal_git_email is defined %}
+          personal_git_email = "{{ personal_git_email }}"
+      {% endif %}
+      {% if _kept_theme %}
+          theme = "{{ _kept_theme }}"
+      {% endif %}
+      {% if _kept_wallpaper_mode %}
+          wallpaper_mode = "{{ _kept_wallpaper_mode }}"
+      {% endif %}
           allow_sudo = {{ allow_sudo | lower }}
           shared_home = {{ shared_home | default(false) | lower }}
           git_name = "{{ git_name }}"

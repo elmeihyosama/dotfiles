@@ -5,3 +5,7 @@
     shared_home = false
     git_name = "CI"
     git_email = "ci@example.com"
+    # Exercises the optional per-repo identity branch: config.tmpl's includeIf
+    # and dot_config/git/personal.tmpl only render when these are set.
+    personal_git_name = "ci-personal"
+    personal_git_email = "1+ci-personal@users.noreply.github.com"

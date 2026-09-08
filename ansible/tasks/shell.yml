@@ -1,4 +1,19 @@
 ---
+# zsh is deliberately NOT in `tools`: ubi cannot provide it (upstream ships no
+# static binary release), so no-sudo hosts can't install it and fall back to the
+# .bashrc shim. macOS ships zsh preinstalled. That leaves sudo-capable Linux,
+# where it has to come from the native package manager — without this, the
+# `command -v zsh` probe below fails on a fresh box and the whole login-shell
+# block skips silently, leaving the user on bash with no error.
+- name: Install zsh (sudo Linux only; macOS ships it, no-sudo hosts use the shim)
+  become: true
+  ansible.builtin.package:
+    name: zsh
+    state: present
+  when:
+    - ansible_facts.os_family != 'Darwin'
+    - allow_sudo | default(false)
+
 # shell, not command: `command -v` is a shell builtin with no Linux binary
 # equivalent (see the identical note in chezmoi.yml).
 - name: Resolve zsh path  # noqa command-instead-of-shell
@@ -23,8 +38,25 @@
         state: present
       failed_when: false
 
+    # become: chsh authenticates the *caller* through PAM and prompts for a
+    # password when run as an unprivileged user. Ansible has no TTY, so it dies
+    # with "PAM: Authentication failure" — and because the task tolerates
+    # failure, that was reported as `ok` and the shell silently stayed bash.
+    # Running as root skips PAM, but then the target user must be named
+    # explicitly or chsh would change root's own shell instead.
     - name: Change login shell to zsh for the current user
-      ansible.builtin.command: "chsh -s {{ _zsh.stdout }}"
+      become: true
+      ansible.builtin.command: "chsh -s {{ _zsh.stdout }} {{ ansible_facts['user_id'] }}"
       register: _chsh
       changed_when: _chsh.rc == 0
       failed_when: false
+
+    # Never let a chsh failure be silent again — the symptom (still on bash) is
+    # otherwise indistinguishable from a successful run.
+    - name: Warn when the login shell could not be changed
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: chsh failed (rc={{ _chsh.rc }}): {{ _chsh.stderr | default('') | trim }}.
+          Login shell is still {{ ansible_facts['user_shell'] | default('unknown') }}
+          — set it manually with: sudo chsh -s {{ _zsh.stdout }} {{ ansible_facts['user_id'] }}
+      when: _chsh.rc != 0

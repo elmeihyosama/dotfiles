@@ -52,3 +52,13 @@
 [diff]
     colorMoved = default
     algorithm = histogram
+{{ if hasKey . "personal_git_email" }}
+# Per-repo identity. The [user] block at the top is this machine's default (the
+# work identity on a work machine); the repos matched below use the personal one
+# instead. This MUST come after [user] — with includes, the last value wins.
+# `gitdir:` matches the directory and everything beneath it, and the trailing
+# slash is required for that. Values live in chezmoi [data] (ansible/local.yml,
+# git-ignored), so neither address is committed.
+[includeIf "gitdir:~/dotfiles/"]
+    path = ~/.config/git/personal
+{{- end }}
