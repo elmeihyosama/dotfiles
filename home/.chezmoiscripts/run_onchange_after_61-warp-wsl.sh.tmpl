@@ -51,31 +51,34 @@ cp -f "$src" "$themes_dir/base16-active.yaml"
 # Key/value/section travel through the environment rather than `awk -v`, which
 # would expand the backslashes of a Windows path as escape sequences.
 set_toml() {
-  tmp=$(mktemp) || return 1
-  TKEY=$1 TVAL=$2 TSEC=$3 awk '
-    BEGIN { key = ENVIRON["TKEY"]; val = ENVIRON["TVAL"]; sec = ENVIRON["TSEC"] }
-    function emit() { if (!done) { print key " = " val; done = 1 } }
-    # A section header closes the previous section: if it was ours and the key
-    # never showed up, add it here rather than leaking into the next section.
-    # Matched strictly so a `[` opening a multi-line array is not mistaken for
-    # one (Warp writes several, e.g. privacy.custom_secret_regex_list).
-    /^[[:space:]]*\[[A-Za-z0-9_.-]+\][[:space:]]*$/ {
-      if (insec) emit()
-      line = $0; sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line)
-      insec = (line == "[" sec "]")
-      print; next
-    }
-    insec && $0 ~ ("^[[:space:]]*#?[[:space:]]*" key "[[:space:]]*=") { emit(); next }
-    { print }
-    END {
-      if (insec) emit()
-      if (!done) { print ""; print "[" sec "]"; print key " = " val }
-    }
-  ' "$settings" > "$tmp" || { rm -f "$tmp"; return 1; }
-  # Copy rather than mv: the destination is on drvfs, and mv across the mount
-  # would drop the Windows-side file identity Warp's file watcher holds.
-  cat "$tmp" > "$settings"
-  rm -f "$tmp"
+	tmp=$(mktemp) || return 1
+	TKEY=$1 TVAL=$2 TSEC=$3 awk '
+		BEGIN { key = ENVIRON["TKEY"]; val = ENVIRON["TVAL"]; sec = ENVIRON["TSEC"] }
+		function emit() { if (!done) { print key " = " val; done = 1 } }
+		# A section header closes the previous section: if it was ours and the key
+		# never showed up, add it here rather than leaking into the next section.
+		# Matched strictly so a `[` opening a multi-line array is not mistaken for
+		# one (Warp writes several, e.g. privacy.custom_secret_regex_list).
+		/^[[:space:]]*\[[A-Za-z0-9_.-]+\][[:space:]]*$/ {
+			if (insec) emit()
+			line = $0; sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line)
+			insec = (line == "[" sec "]")
+			print; next
+		}
+		insec && $0 ~ ("^[[:space:]]*#?[[:space:]]*" key "[[:space:]]*=") { emit(); next }
+		{ print }
+		END {
+			if (insec) emit()
+			if (!done) { print ""; print "[" sec "]"; print key " = " val }
+		}
+	' "$settings" >"$tmp" || {
+		rm -f "$tmp"
+		return 1
+	}
+	# Copy rather than mv: the destination is on drvfs, and mv across the mount
+	# would drop the Windows-side file identity Warp's file watcher holds.
+	cat "$tmp" >"$settings"
+	rm -f "$tmp"
 }
 
 # Shell: the WSL variant takes the distro name as shown by `wsl -l`, which is
@@ -87,9 +90,14 @@ set_toml() {
 # for setting [setting=NewSessionShellOverride]", leaving the whole settings
 # file flagged as invalid. The schema is out of sync with the deserializer;
 # `wsl` was confirmed against a running Warp via data/logs/warp.log.
+# Keep the pre-edit file next to the original so a bad rewrite is recoverable.
+# Overwritten on every run: it is always "settings.toml before dotfiles last
+# touched it", never a stale first snapshot.
+cp -f "$settings" "$settings.dotfiles-bak"
+
 distro=${WSL_DISTRO_NAME:-}
 if [ -n "$distro" ]; then
-  set_toml new_session_shell_override "{ wsl = \"$distro\" }" session
+	set_toml new_session_shell_override "{ wsl = \"$distro\" }" session
 fi
 
 # Theme: a custom theme is referenced by display name *and* file path, and

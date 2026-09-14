@@ -52,11 +52,12 @@
       failed_when: false
 
     # Never let a chsh failure be silent again — the symptom (still on bash) is
-    # otherwise indistinguishable from a successful run.
+    # otherwise indistinguishable from a successful run. rc is absent when become
+    # itself failed (module never ran), hence the defaults.
     - name: Warn when the login shell could not be changed
       ansible.builtin.debug:
         msg: >-
-          WARNING: chsh failed (rc={{ _chsh.rc }}): {{ _chsh.stderr | default('') | trim }}.
+          WARNING: chsh failed (rc={{ _chsh.rc | default('n/a') }}): {{ _chsh.stderr | default(_chsh.msg | default('')) | trim }}.
           Login shell is still {{ ansible_facts['user_shell'] | default('unknown') }}
           — set it manually with: sudo chsh -s {{ _zsh.stdout }} {{ ansible_facts['user_id'] }}
-      when: _chsh.rc != 0
+      when: _chsh.rc | default(1) != 0

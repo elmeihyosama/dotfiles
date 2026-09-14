@@ -30,3 +30,30 @@ dest_dir="$(wslpath -u "$appdata_win")/alacritty"
 
 cp -f "$src" "$dest_dir/colors.toml"
 echo "alacritty: synced {{ .theme }} palette to $dest_dir/colors.toml"
+
+# Alacritty never loads colors.toml on its own. The Linux-side alacritty.toml
+# imports it by a ~/.config path that means nothing to the Windows binary, so a
+# Windows-side config that does not exist yet gets a minimal one (absolute
+# import, this distro as the shell); an existing one is the user's and is only
+# checked for the import, never rewritten.
+cfg="$dest_dir/alacritty.toml"
+if [ ! -f "$cfg" ]; then
+	distro=${WSL_DISTRO_NAME:-}
+	# printf, not echo: dash's echo interprets the \a and \c inside the Windows
+	# path (\alacritty, \colors) as BEL and end-of-output.
+	{
+		printf '%s\n' \
+			"# Created once by dotfiles (.chezmoiscripts/run_onchange_after_60-alacritty-wsl.sh);" \
+			"# yours to edit. Only colors.toml next to it is regenerated on theme switch." \
+			"[general]" \
+			"import = ['$appdata_win\\alacritty\\colors.toml']"
+		if [ -n "$distro" ]; then
+			printf '%s\n' "" "[terminal.shell]" 'program = "wsl.exe"' \
+				"args = [\"-d\", \"$distro\", \"--cd\", \"~\"]"
+		fi
+	} >"$cfg"
+	printf '%s\n' "alacritty: created $cfg (imports colors.toml${distro:+, opens $distro})"
+elif ! grep -q 'colors\.toml' "$cfg"; then
+	printf '%s\n' "alacritty: $cfg does not import colors.toml — add to it:" \
+		"  [general]" "  import = ['$appdata_win\\alacritty\\colors.toml']" >&2
+fi

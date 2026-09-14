@@ -4,7 +4,9 @@ export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 
-# PATH
+# PATH — unique entries: every prepend below (and again in nested shells) would
+# otherwise stack duplicates. `path` and PATH are tied, so this covers both.
+typeset -U path
 {{ if .shared_home -}}
 # Shared-$HOME multi-arch host: prefer this arch's binaries, keep plain
 # ~/.local/bin on PATH for arch-neutral scripts. $(uname -m) resolves per login

@@ -30,11 +30,12 @@ if command -v fzf >/dev/null 2>&1; then
   # 0.44) abort with "unknown option: --zsh" on EVERY shell start and leave the
   # widgets unbound. min_versions floors fzf so provisioning routes it to ubi,
   # but guard here too for hosts where fzf came from somewhere else.
-  if fzf --zsh >/dev/null 2>&1; then
-    eval "$(fzf --zsh)"
+  if _fzf_init=$(fzf --zsh 2>/dev/null); then
+    eval "$_fzf_init"
   else
     print -u2 "40-fzf.zsh: fzf $(fzf --version 2>/dev/null | awk '{print $1}') lacks --zsh (need >= 0.48); ^T/Alt-C/^O unbound."
   fi
+  unset _fzf_init
   if command -v atuin >/dev/null 2>&1; then
     bindkey -M viins "^R" atuin-search-viins
     bindkey -M vicmd "^R" atuin-search-vicmd

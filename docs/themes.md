@@ -51,15 +51,24 @@ else:
 | `.chezmoiscripts/run_onchange_after_60-alacritty-wsl.sh` | `~/.config/alacritty/colors.toml` → `%APPDATA%\alacritty\` |
 | `.chezmoiscripts/run_onchange_after_61-warp-wsl.sh` | `~/.local/share/warp-terminal/themes/base16-active.yaml` → `%APPDATA%\warp\Warp\data\themes\` |
 
-Both no-op off WSL and when the Windows-side app isn't installed. The Warp
-script also rewrites two keys in `%LOCALAPPDATA%\warp\Warp\config\settings.toml`:
+Both no-op off WSL and when the Windows-side app isn't installed (for
+Alacritty, "installed" means `%APPDATA%\alacritty\` exists — create it to opt
+in). They are `run_onchange`, so they fire on the *next palette change*: an app
+installed after the last switch is picked up by re-running `theme <current>`.
+
+Alacritty never loads `colors.toml` by itself. The Linux-side
+`~/.config/alacritty/alacritty.toml` (managed) imports it; on the Windows side
+the script writes a minimal `alacritty.toml` (absolute import + this distro as
+the shell) only if none exists, and otherwise just warns when yours lacks the
+import. The Warp script also rewrites two keys in `%LOCALAPPDATA%\warp\Warp\config\settings.toml`:
 `[appearance.themes].theme`, pointing Warp at the copied palette, and
 `[session].new_session_shell_override`, so new Warp sessions open
 `$WSL_DISTRO_NAME` instead of PowerShell. Warp watches that file and
 hot-reloads, so neither needs a restart — but tabs already open keep the shell
 they started with.
 
-Two Warp gotchas worth knowing:
+The pre-edit `settings.toml` is kept next to it as `settings.toml.dotfiles-bak`
+(refreshed on every run). Two Warp gotchas worth knowing:
 
 - **The bundled schema lies about the shell key.** `resources/settings_schema.json`
   in the Warp install documents the WSL variant as `w_s_l`; Warp's own parser
