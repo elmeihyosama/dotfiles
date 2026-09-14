@@ -1,0 +1,6 @@
+{{- /* Personal git identity, pulled in by config.tmpl's includeIf rules for
+repos that should not use this machine's default identity. Rendered only when
+personal_git_email is set in chezmoi [data] — see .chezmoiignore. */ -}}
+[user]
+    name = {{ .personal_git_name }}
+    email = {{ .personal_git_email }}

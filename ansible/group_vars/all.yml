@@ -162,6 +162,12 @@ native_bin_renames:
 # accept whatever the repo ships.
 min_versions:
   neovim: "0.9.0"
+  # conf.d/40-fzf.zsh calls `fzf --zsh` for the shell integration (^T/^R/Alt-C).
+  # That flag landed in fzf 0.48; Ubuntu 24.04 apt still ships 0.44, which fails
+  # with "unknown option: --zsh" on every shell start and leaves the widgets
+  # unbound. Floor it so the native check rejects the stale package and ubi
+  # installs a current static binary instead.
+  fzf: "0.48.0"
   # yq is also in force_ubi, so the native/ubi partition never consults this
   # floor for it — kept only because .github/scripts/assert-tools.sh re-reads min_versions to
   # verify the INSTALLED yq is 4.x (Debian apt ships the incompatible Python yq 3.x).

@@ -1,0 +1,32 @@
+#!/bin/sh
+# Sync the rendered Alacritty palette to the Windows side of a WSL install.
+#
+# Alacritty on Windows reads %APPDATA%\alacritty\, which is outside chezmoi's
+# tree ($HOME on the Linux side), so `chezmoi apply` alone can never repaint it
+# and `theme` would leave the terminal's background and all 16 ANSI slots on the
+# previous palette while every TUI around it changed.
+#
+# run_onchange re-runs whenever the rendered text below changes; the palette is
+# embedded so a theme switch (or an edit to the palette itself) retriggers it.
+# theme: {{ .theme }}
+# palette: {{ (index .themes .theme) | toJson }}
+set -eu
+
+# WSL only — a no-op everywhere else.
+grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null || exit 0
+command -v wslpath >/dev/null 2>&1 || exit 0
+
+src="$HOME/.config/alacritty/colors.toml"
+[ -f "$src" ] || exit 0
+
+# cmd.exe warns and falls back to C:\Windows when its cwd is a Linux path, so
+# run it from /mnt/c. Output is CRLF-terminated.
+appdata_win=$(cd /mnt/c 2>/dev/null && cmd.exe /c "echo %APPDATA%" 2>/dev/null | tr -d '\r\n') || exit 0
+[ -n "$appdata_win" ] || exit 0
+
+dest_dir="$(wslpath -u "$appdata_win")/alacritty"
+# Absent means Alacritty isn't set up on the Windows side — nothing to paint.
+[ -d "$dest_dir" ] || exit 0
+
+cp -f "$src" "$dest_dir/colors.toml"
+echo "alacritty: synced {{ .theme }} palette to $dest_dir/colors.toml"

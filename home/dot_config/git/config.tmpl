@@ -52,8 +52,22 @@
 [diff]
     colorMoved = default
     algorithm = histogram
-
 # Machine-local settings (safe.directory entries, work identities) live in
 # config.local, which chezmoi does not manage. Absent file is silently ignored.
+# Deliberately BEFORE the includeIf block below: with includes the last value
+# wins, so a repo-specific identity must outrank a machine-wide one.
 [include]
     path = ~/.config/git/config.local
+{{ if hasKey . "personal_git_email" }}
+# Per-repo identity. The [user] block at the top is this machine's default (the
+# work identity on a work machine); the repos matched below use the personal one
+# instead. This MUST come after [user] and [include] — with includes, the last
+# value wins. `gitdir:` matches the directory and everything beneath it, and the
+# trailing slash is required for that. Addresses live in chezmoi [data]
+# (ansible/local.yml, git-ignored), so neither is committed; the directory list
+# defaults from home/.chezmoidata/git.toml and is overridable the same way.
+{{- range .personal_git_dirs }}
+[includeIf "gitdir:{{ . }}"]
+    path = ~/.config/git/personal
+{{- end }}
+{{- end }}
