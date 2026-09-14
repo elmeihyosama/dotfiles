@@ -106,8 +106,13 @@ ubi_exe_overrides:
   ripgrep: rg
   gh: gh        # repo is cli/cli, but the binary inside the archive is `gh`
   neovim: nvim  # GitHub release extracts a binary named nvim
-  editorconfig-checker: ec  # release archive ships ec-<os>-<arch>; binary we invoke is `ec`
+  editorconfig-checker: ec  # canonical command (Arch/brew rename to it too); see ubi_archive_exe_overrides
   age-keygen: age-keygen  # same archive as `age`; pick the keygen binary out of it
+
+# File name INSIDE the release archive when it differs from the installed name
+# above: ubi extracts it with --exe and installs it as --rename-exe.
+ubi_archive_exe_overrides:
+  editorconfig-checker: editorconfig-checker # v4 renamed the binary from `ec`
 
 # Force a specific ubi release asset when a tool ships multiple (e.g. glibc vs
 # musl). yazi's gnu binary needs a very new glibc; the musl static build runs
