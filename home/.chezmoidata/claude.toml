@@ -1,0 +1,6 @@
+# Claude Code accounts, one config dir each (CLAUDE_CONFIG_DIR holds settings,
+# history, plugins AND credentials): log in once per profile, then switch with
+# `claude-profile <name>` — no logout. The first entry is the default and keeps
+# plain ~/.claude; the rest live in ~/.claude-<name>. Override per-machine in
+# chezmoi.toml [data] (survives re-provisioning).
+claude_profiles = ["personal", "work"]
