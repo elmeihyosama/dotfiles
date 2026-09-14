@@ -22,6 +22,14 @@ themes {
 }
 
 keybinds {
+    // Rename from a blank name. The default tmux-mode `,` binding keeps the
+    // current name ("Tab #2") in the buffer, so typing appended to it.
+    tab {
+        bind "r" { SwitchToMode "RenameTab"; TabNameInput 0; }
+    }
+    tmux {
+        bind "," { SwitchToMode "RenameTab"; TabNameInput 0; }
+    }
     session {
         // Ctrl-o then f → fuzzy project→session switcher in a floating pane.
         bind "f" {

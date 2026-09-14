@@ -19,6 +19,40 @@
     state: directory
     mode: "0755"
 
+# `theme`/`wallpaper` and hand-written per-machine overrides (atuin_sync,
+# sessionize_roots, ...) live in [data] of this file. Ansible rewrites it from
+# a fixed key set, so read the existing [data] back first or they are lost.
+- name: Read existing chezmoi.toml (to preserve machine-local [data] overrides)
+  ansible.builtin.slurp:
+    src: "{{ ansible_facts['env']['HOME'] }}/.config/chezmoi/chezmoi.toml"
+  register: _cz_existing
+  failed_when: false
+
+# Raw `key = value` lines, so quoting and types survive. Keys Ansible writes
+# are dropped (duplicate key = TOML error); comments and multi-line values are
+# not carried.
+- name: Carry over [data] keys Ansible does not own
+  ansible.builtin.set_fact:
+    _kept_data_lines: >-
+      {{ _data_block | regex_findall('(?m)^[ \t]*([A-Za-z0-9_]+[ \t]*=.*?)[ \t]*$')
+        | reject('match', '^(' ~ (_owned_keys | join('|')) ~ ')[ \t]*=')
+        | list }}
+  vars:
+    _existing: "{{ _cz_existing.content | default('') | b64decode }}"
+    # regex_findall: a '\1' argument to regex_search unescapes differently
+    # across ansible-core releases.
+    _data_block: >-
+      {{ _existing | regex_findall('(?ms)^\[data\][ \t]*\n(.*?)(?=^\[|\Z)')
+        | default([''], true) | first }}
+    _owned_keys:
+      - allow_sudo
+      - shared_home
+      - git_name
+      - git_email
+      - personal_git_name
+      - personal_git_email
+      - personal_git_dirs
+
 - name: Template chezmoi.toml from per-machine vars
   ansible.builtin.copy:
     dest: "{{ ansible_facts['env']['HOME'] }}/.config/chezmoi/chezmoi.toml"
@@ -34,6 +68,18 @@
           recipient = "{{ age_recipient }}"
       {% endif %}
       [data]
+      {% for line in _kept_data_lines %}
+          {{ line }}
+      {% endfor %}
+      {% if personal_git_name is defined %}
+          personal_git_name = "{{ personal_git_name }}"
+      {% endif %}
+      {% if personal_git_email is defined %}
+          personal_git_email = "{{ personal_git_email }}"
+      {% endif %}
+      {% if personal_git_dirs is defined %}
+          personal_git_dirs = {{ personal_git_dirs | to_json }}
+      {% endif %}
           allow_sudo = {{ allow_sudo | lower }}
           shared_home = {{ shared_home | default(false) | lower }}
           git_name = "{{ git_name }}"

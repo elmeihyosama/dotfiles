@@ -61,10 +61,34 @@ USD=$(printf '\xef\x85\x95')
 STY=$(printf '\xef\x87\xbc')
 MODEL=$(printf '\xf3\xb0\x9b\x84')
 EFFORT=$(printf '\xef\x83\xa7')
+RESET_GLYPH=$(printf '\xe2\x86\xbb') # ↻ (plain Unicode, not Nerd Font)
 DIV="${DIM} │ ${RST}"
 
+# Countdown to a Unix-epoch reset time: "3d4h" / "2h15m" / "7m" / "now".
+# Pure bash arithmetic, so no GNU `date -d` vs BSD `date -r` split.
+fmt_reset() {
+	local secs d h m
+	[ -n "$1" ] || return 0
+	case $1 in *[!0-9]*) return 0 ;; esac # not epoch seconds: skip, don't error
+	secs=$(($1 - $(date +%s)))
+	if [ "$secs" -le 0 ]; then
+		printf 'now'
+		return
+	fi
+	d=$((secs / 86400))
+	h=$((secs % 86400 / 3600))
+	m=$((secs % 3600 / 60))
+	if [ "$d" -gt 0 ]; then
+		printf '%dd%dh' "$d" "$h"
+	elif [ "$h" -gt 0 ]; then
+		printf '%dh%dm' "$h" "$m"
+	else
+		printf '%dm' "$m"
+	fi
+}
+
 # One jq pass for every field (cheaper than a process per field).
-IFS=$'\037' read -r cwd model ostyle cost effort ctx h5 d7 rl < <(
+IFS=$'\037' read -r cwd model ostyle cost effort ctx h5 d7 h5r d7r rl < <(
 	printf '%s' "$input" | jq -r '[
 		(.workspace.current_dir // .cwd // ""),
 		(.model.display_name // ""),
@@ -74,6 +98,8 @@ IFS=$'\037' read -r cwd model ostyle cost effort ctx h5 d7 rl < <(
 		(.context_window.used_percentage // ""),
 		(.rate_limits.five_hour.used_percentage // ""),
 		(.rate_limits.seven_day.used_percentage // ""),
+		(.rate_limits.five_hour.resets_at // ""),
+		(.rate_limits.seven_day.resets_at // ""),
 		(if .rate_limits != null then "1" else "" end)
 	] | map(tostring) | join("\u001f")' 2>/dev/null
 )
@@ -82,7 +108,7 @@ model=${model% (*} # drop the model's "(… context)" suffix
 
 pcwd=$(pretty_cwd "$cwd")
 [ -z "$pcwd" ] && pcwd="$cwd"
-branch=$( (cd "$cwd" 2>/dev/null && git rev-parse --abbrev-ref HEAD 2>/dev/null))
+branch=$( (cd "$cwd" 2>/dev/null && git rev-parse --abbrev-ref HEAD 2>/dev/null) )
 dirty=""
 [ -n "$branch" ] && (cd "$cwd" 2>/dev/null && [ -n "$(git status --porcelain 2>/dev/null | head -1)" ]) && dirty=" ${GOLD}?${RST}"
 
@@ -96,8 +122,11 @@ segs+=("${FOAM}${pcwd}${RST}")
 if [ -n "$rl" ]; then
 	segs+=("${GOLD}[personal]${RST}")
 	usage=""
-	[ -n "$h5" ] && usage="5h ${h5%.*}%"
-	[ -n "$d7" ] && usage="${usage:+$usage · }7d ${d7%.*}%"
+	# Each window: "<pct>%" plus "↻<countdown>" when resets_at is present.
+	h5r=$(fmt_reset "$h5r")
+	d7r=$(fmt_reset "$d7r")
+	[ -n "$h5" ] && usage="5h ${h5%.*}%${h5r:+ ${RESET_GLYPH} $h5r}"
+	[ -n "$d7" ] && usage="${usage:+$usage · }7d ${d7%.*}%${d7r:+ ${RESET_GLYPH} $d7r}"
 	[ -n "$usage" ] && segs+=("${FOAM}${CLK}${RST} ${SUBTLE}${usage}${RST}")
 else
 	segs+=("${LOVE}[enterprise]${RST}")

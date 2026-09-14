@@ -1,0 +1,87 @@
+#!/bin/sh
+# Point Warp (a Windows app on WSL) at this distro and the rendered base16
+# palette. Both of its config locations sit outside chezmoi's tree, so
+# `chezmoi apply` alone never reaches them:
+#   %APPDATA%\warp\Warp\data\themes\               custom themes
+#   %LOCALAPPDATA%\warp\Warp\config\settings.toml   shell override + theme
+# Warp hot-reloads settings.toml (already-open tabs keep their shell).
+#
+# run_onchange: the palette is embedded so a theme switch retriggers this.
+# theme: {{ .theme }}
+# palette: {{ (index .themes .theme) | toJson }}
+set -eu
+
+# WSL only — a no-op everywhere else.
+grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null || exit 0
+command -v wslpath >/dev/null 2>&1 || exit 0
+
+src="$HOME/.local/share/warp-terminal/themes/base16-active.yaml"
+[ -f "$src" ] || exit 0
+
+# cmd.exe warns and falls back to C:\Windows when its cwd is a Linux path, so
+# run it from /mnt/c. Output is CRLF-terminated.
+appdata_win=$(cd /mnt/c 2>/dev/null && cmd.exe /c "echo %APPDATA%" 2>/dev/null | tr -d '\r\n') || exit 0
+localappdata_win=$(cd /mnt/c 2>/dev/null && cmd.exe /c "echo %LOCALAPPDATA%" 2>/dev/null | tr -d '\r\n') || exit 0
+[ -n "$appdata_win" ] && [ -n "$localappdata_win" ] || exit 0
+
+settings="$(wslpath -u "$localappdata_win")/warp/Warp/config/settings.toml"
+# Absent means Warp isn't installed on the Windows side — nothing to configure.
+[ -f "$settings" ] || exit 0
+
+themes_dir="$(wslpath -u "$appdata_win")/warp/Warp/data/themes"
+mkdir -p "$themes_dir"
+cp -f "$src" "$themes_dir/base16-active.yaml"
+
+# set_toml KEY VALUE SECTION — set `KEY = VALUE` (VALUE is raw TOML) inside
+# [SECTION], replacing an existing or commented key and appending the section
+# when missing. Values travel via ENVIRON, not `awk -v`, which would expand the
+# backslashes of a Windows path.
+set_toml() {
+	tmp=$(mktemp) || return 1
+	TKEY=$1 TVAL=$2 TSEC=$3 awk '
+		BEGIN { key = ENVIRON["TKEY"]; val = ENVIRON["TVAL"]; sec = ENVIRON["TSEC"] }
+		function emit() { if (!done) { print key " = " val; done = 1 } }
+		# A section header closes the previous section: if it was ours and the key
+		# never showed up, add it here rather than leaking into the next section.
+		# Matched strictly so a `[` opening a multi-line array is not mistaken for
+		# one (Warp writes several, e.g. privacy.custom_secret_regex_list).
+		/^[[:space:]]*\[[A-Za-z0-9_.-]+\][[:space:]]*$/ {
+			if (insec) emit()
+			line = $0; sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line)
+			insec = (line == "[" sec "]")
+			print; next
+		}
+		insec && $0 ~ ("^[[:space:]]*#?[[:space:]]*" key "[[:space:]]*=") { emit(); next }
+		{ print }
+		END {
+			if (insec) emit()
+			if (!done) { print ""; print "[" sec "]"; print key " = " val }
+		}
+	' "$settings" >"$tmp" || {
+		rm -f "$tmp"
+		return 1
+	}
+	# Copy rather than mv: the destination is on drvfs, and mv across the mount
+	# would drop the Windows-side file identity Warp's file watcher holds.
+	cat "$tmp" >"$settings"
+	rm -f "$tmp"
+}
+
+# The WSL variant takes the distro name (`wsl -l`), which WSL exports as
+# WSL_DISTRO_NAME. The key is `wsl`: Warp's bundled settings_schema.json says
+# `w_s_l`, but the parser rejects that and flags the whole file invalid.
+# Pre-edit copy, refreshed every run, so a bad rewrite is recoverable.
+cp -f "$settings" "$settings.dotfiles-bak"
+
+distro=${WSL_DISTRO_NAME:-}
+if [ -n "$distro" ]; then
+	set_toml new_session_shell_override "{ wsl = \"$distro\" }" session
+fi
+
+# Theme: a custom theme is referenced by display name *and* file path, and
+# system_theme would override it with Warp's built-in light/dark pair.
+theme_path="$appdata_win\\warp\\Warp\\data\\themes\\base16-active.yaml"
+set_toml theme "{ custom = { name = \"{{ .theme }}\", path = '$theme_path' } }" appearance.themes
+set_toml system_theme false appearance.themes
+
+echo "warp: opens $distro; synced {{ .theme }} palette to $themes_dir/base16-active.yaml"

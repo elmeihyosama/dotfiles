@@ -4,7 +4,9 @@ export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 
-# PATH
+# PATH — unique entries: every prepend below (and again in nested shells) would
+# otherwise stack duplicates. `path` and PATH are tied, so this covers both.
+typeset -U path
 {{ if .shared_home -}}
 # Shared-$HOME multi-arch host: prefer this arch's binaries, keep plain
 # ~/.local/bin on PATH for arch-neutral scripts. $(uname -m) resolves per login
@@ -27,6 +29,17 @@ unset _arch
 {{- else -}}
 export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
 {{- end }}
+
+# Toolchain bin dirs outside ~/.local. Here, not in 90-local: later modules
+# guard their init on `command -v` (35-atuin binds ^R only if atuin resolves).
+[[ -d "$HOME/.cargo/bin" ]] && export PATH="$HOME/.cargo/bin:$PATH"
+[[ -d "$HOME/.local/go/bin" ]] && export PATH="$HOME/.local/go/bin:$PATH"
+
+# Advertise zsh to everything spawned from here (zellij, nvim :terminal, fzf,
+# lazygit): on locked-down hosts the login shell stays /bin/bash, so this is
+# where zsh becomes the default. $commands[zsh] is PATH-resolved, so shared-$HOME
+# hosts get this arch's binary without template branching.
+(( $+commands[zsh] )) && export SHELL="$commands[zsh]"
 
 # Locale
 export LANG=en_US.UTF-8

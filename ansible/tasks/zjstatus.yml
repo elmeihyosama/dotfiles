@@ -1,15 +1,43 @@
 ---
-# zjstatus — zellij status-bar plugin. A single wasm file in the user home:
-# identical on sudo and no-sudo hosts.
+# zjstatus — zellij status-bar plugin, one wasm file in the user home. The
+# release is chosen from the INSTALLED zellij minor (zellij-tile ABI): see
+# zjstatus_by_zellij_minor in group_vars/all.yml.
 - name: Ensure zellij plugin directory
   ansible.builtin.file:
     path: "{{ ansible_facts['env']['HOME'] }}/.config/zellij/plugins"
     state: directory
     mode: "0755"
 
-- name: Install zjstatus {{ zjstatus_version }}
+# shell: ubi's local_bin is not on Ansible's PATH.
+- name: Read the installed zellij version  # noqa command-instead-of-shell
+  ansible.builtin.shell: 'PATH="{{ local_bin }}:$PATH" zellij --version'
+  register: _zellij_v
+  changed_when: false
+  failed_when: false
+
+- name: Fail clearly if zellij is missing
+  ansible.builtin.fail:
+    msg: "zellij not found — the packages task must run before zjstatus."
+  when: _zellij_v.rc != 0
+
+# "zellij 0.43.1" -> "0.43". regex_findall: no version-sensitive '\1' argument.
+- name: Derive the zellij minor (major.minor) from `zellij --version`
+  ansible.builtin.set_fact:
+    _zellij_minor: >-
+      {{ _zellij_v.stdout | regex_findall('([0-9]+\.[0-9]+)\.[0-9]+') | default(['?'], true) | first }}
+
+- name: Fail clearly when no zjstatus release is mapped for this zellij
+  ansible.builtin.fail:
+    msg: >-
+      {{ _zellij_v.stdout | trim }} has no entry in zjstatus_by_zellij_minor
+      (ansible/group_vars/all.yml). Add one — check the zellij-tile dependency in
+      the zjstatus tag's Cargo.toml and pin the wasm's sha256 — then re-run.
+  when: _zellij_minor not in zjstatus_by_zellij_minor
+
+# get_url checks the existing dest's checksum, so a plugin from another minor is replaced.
+- name: Install zjstatus for zellij {{ _zellij_minor }}
   ansible.builtin.get_url:
-    url: "https://github.com/dj95/zjstatus/releases/download/{{ zjstatus_version }}/zjstatus.wasm"
+    url: "https://github.com/dj95/zjstatus/releases/download/{{ zjstatus_by_zellij_minor[_zellij_minor].version }}/zjstatus.wasm"
     dest: "{{ ansible_facts['env']['HOME'] }}/.config/zellij/plugins/zjstatus.wasm"
-    checksum: "sha256:{{ zjstatus_sha256 }}"
+    checksum: "sha256:{{ zjstatus_by_zellij_minor[_zellij_minor].sha256 }}"
     mode: "0644"

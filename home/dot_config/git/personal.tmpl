@@ -1,0 +1,5 @@
+{{- /* Personal identity for the includeIf rules in config.tmpl; rendered only
+when personal_git_email is set (see .chezmoiignore). */ -}}
+[user]
+    name = {{ if hasKey . "personal_git_name" }}{{ .personal_git_name }}{{ else }}{{ .git_name }}{{ end }}
+    email = {{ .personal_git_email }}

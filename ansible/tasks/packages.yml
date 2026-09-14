@@ -52,7 +52,9 @@
   ansible.builtin.command:
     cmd: >
       {{ local_bin }}/ubi --project {{ ubi_tool_repos[item] }} --in {{ local_bin }}
-      {% if item in ubi_exe_overrides %}--exe {{ ubi_exe_overrides[item] }}{% endif %}
+      {% if item in ubi_archive_exe_overrides %}
+      --exe {{ ubi_archive_exe_overrides[item] }} --rename-exe {{ ubi_exe_overrides[item] | default(item) }}
+      {% elif item in ubi_exe_overrides %}--exe {{ ubi_exe_overrides[item] }}{% endif %}
       {% if item in ubi_matching_regex_overrides %}--matching-regex '{{ ubi_matching_regex_overrides[item] }}'{% endif %}
       {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
     creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
@@ -127,7 +129,9 @@
   ansible.builtin.command:
     cmd: >
       {{ local_bin }}/ubi --project {{ ubi_tool_repos[item] }} --in {{ local_bin }}
-      {% if item in ubi_exe_overrides %}--exe {{ ubi_exe_overrides[item] }}{% endif %}
+      {% if item in ubi_archive_exe_overrides %}
+      --exe {{ ubi_archive_exe_overrides[item] }} --rename-exe {{ ubi_exe_overrides[item] | default(item) }}
+      {% elif item in ubi_exe_overrides %}--exe {{ ubi_exe_overrides[item] }}{% endif %}
       {% if item in ubi_matching_regex_overrides %}--matching-regex '{{ ubi_matching_regex_overrides[item] }}'{% endif %}
       {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
     creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
@@ -271,7 +275,9 @@
   ansible.builtin.command:
     cmd: >
       {{ local_bin }}/ubi --project {{ ubi_tool_repos[item] }} --in {{ local_bin }}
-      {% if item in ubi_exe_overrides %}--exe {{ ubi_exe_overrides[item] }}{% endif %}
+      {% if item in ubi_archive_exe_overrides %}
+      --exe {{ ubi_archive_exe_overrides[item] }} --rename-exe {{ ubi_exe_overrides[item] | default(item) }}
+      {% elif item in ubi_exe_overrides %}--exe {{ ubi_exe_overrides[item] }}{% endif %}
       {% if item in ubi_matching_regex_overrides %}--matching-regex '{{ ubi_matching_regex_overrides[item] }}'{% endif %}
       {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
     creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"

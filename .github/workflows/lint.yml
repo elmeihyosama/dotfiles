@@ -47,7 +47,8 @@ jobs:
               ansible-galaxy collection install -r ansible/requirements.yml
             run: ./.github/scripts/lint.sh ansible
           - area: editorconfig
-            install: command -v ec >/dev/null || ubi --project editorconfig-checker/editorconfig-checker --in "$HOME/.local/bin" --exe ec
+            # v4 renamed the binary in the archive; keep invoking it as `ec`.
+            install: command -v ec >/dev/null || ubi --project editorconfig-checker/editorconfig-checker --in "$HOME/.local/bin" --exe editorconfig-checker --rename-exe ec
             run: ./.github/scripts/lint.sh editorconfig
           - area: secret-scan
             install: command -v gitleaks >/dev/null || ubi --project gitleaks/gitleaks --in "$HOME/.local/bin"

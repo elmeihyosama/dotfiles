@@ -73,7 +73,7 @@ WSL is supported and treated as Linux.
 | Terminal · Prompt · Multiplexer | Ghostty · Starship · zellij |
 | Editor | Neovim ([LazyVim]) |
 | Files & CLI | yazi, bat, ripgrep, fzf, navi, git-delta, lazygit |
-| Claude Code | Themed statusline (cwd · git · model · context · usage/cost) |
+| Claude Code | Themed statusline (cwd · git · model · context · usage + reset countdown / cost) |
 | Theme | base16 — 300+ palettes, `theme` switcher (Rosé Pine Moon default) |
 
 ## How it works
