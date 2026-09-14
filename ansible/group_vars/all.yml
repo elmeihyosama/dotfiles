@@ -20,6 +20,7 @@ zjstatus_by_zellij_minor:
   "0.42": { version: "v0.21.0", sha256: "a7a2539c0ca29b44f74e42731a1122b737372693e8bcbe64ee36fc82ffa82c3e" }
   "0.43": { version: "v0.22.0", sha256: "4de426d20b1cbf861272e927aeeb5b49d92c17f0e2bb9d173f85bf7f0154dd53" }
   "0.44": { version: "v0.24.0", sha256: "1ccedece1ded62cf3e209be690cdd39ca6fb9e8228ed71a951f6507f9956669b" }
+  "0.45": { version: "v0.25.0", sha256: "282ceab219e56e1908c9fac33907241fe6c3e1ef7d85faab3e5f438cef87b8fe" }
 
 # Canonical tool list (installed on every machine).
 tools:

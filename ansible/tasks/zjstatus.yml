@@ -29,7 +29,7 @@
 - name: Fail clearly when no zjstatus release is mapped for this zellij
   ansible.builtin.fail:
     msg: >-
-      zellij {{ _zellij_v.stdout | trim }} has no entry in zjstatus_by_zellij_minor
+      {{ _zellij_v.stdout | trim }} has no entry in zjstatus_by_zellij_minor
       (ansible/group_vars/all.yml). Add one — check the zellij-tile dependency in
       the zjstatus tag's Cargo.toml and pin the wasm's sha256 — then re-run.
   when: _zellij_minor not in zjstatus_by_zellij_minor
