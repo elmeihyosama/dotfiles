@@ -30,19 +30,15 @@ unset _arch
 export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
 {{- end }}
 
-# Toolchain bin dirs that live outside ~/.local (rustup/cargo, Go). Must join
-# PATH here rather than in machine-local 90-local: later conf.d modules guard
-# their init on `command -v` (35-atuin binds Up/^R only if atuin resolves), so
-# anything added after them is invisible to shell-init-time bindings.
+# Toolchain bin dirs outside ~/.local. Here, not in 90-local: later modules
+# guard their init on `command -v` (35-atuin binds ^R only if atuin resolves).
 [[ -d "$HOME/.cargo/bin" ]] && export PATH="$HOME/.cargo/bin:$PATH"
 [[ -d "$HOME/.local/go/bin" ]] && export PATH="$HOME/.local/go/bin:$PATH"
 
-# Advertise zsh as the shell for everything spawned from here (zellij panes,
-# nvim :terminal, fzf, lazygit). The login shell itself is immutable on no-sudo
-# domain machines (/bin/bash, zsh absent from /etc/shells), so this export is
-# where "zsh is the default shell" is actually established. $commands[zsh] is
-# PATH-resolved — on shared-$HOME multi-arch hosts it lands on this arch's
-# ~/.local/bin-<arch>/zsh without any template branching.
+# Advertise zsh to everything spawned from here (zellij, nvim :terminal, fzf,
+# lazygit): on locked-down hosts the login shell stays /bin/bash, so this is
+# where zsh becomes the default. $commands[zsh] is PATH-resolved, so shared-$HOME
+# hosts get this arch's binary without template branching.
 (( $+commands[zsh] )) && export SHELL="$commands[zsh]"
 
 # Locale

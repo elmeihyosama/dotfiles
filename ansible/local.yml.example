@@ -2,16 +2,13 @@
 # Copy to ansible/local.yml (git-ignored) and edit per machine.
 git_name: "Your Name"
 git_email: "you@example.com"
-# Optional personal identity for repos that must NOT use the default above
-# (e.g. a work machine whose git_email is the work address). When both are set,
-# ~/.config/git/config gains an includeIf pointing at ~/.config/git/personal;
-# see the gitdir rules at the bottom of home/dot_config/git/config.tmpl.
-# Prefer GitHub's noreply form (<id>+<user>@users.noreply.github.com) so the
-# real address stays out of public commit history.
+# Optional identity for repos that must NOT use the default above (e.g. when
+# git_email is not your personal address). Both set → an includeIf in
+# ~/.config/git/config. Prefer GitHub's noreply form.
 # personal_git_name: "yourhandle"
 # personal_git_email: "12345678+yourhandle@users.noreply.github.com"
-# Directories (trailing slash = everything beneath) whose repos use that
-# identity. Default: home/.chezmoidata/git.toml (["~/dotfiles/"]).
+# Directories (trailing slash = everything beneath) that use it.
+# Default: home/.chezmoidata/git.toml (["~/dotfiles/"]).
 # personal_git_dirs: ["~/dotfiles/", "~/personal/"]
 # allow_sudo: false     # uncomment to force; otherwise auto-detected via `sudo -n true`.
 #                       # Drives install strategy (native vs user-local) and whether

@@ -26,10 +26,8 @@ fi
 # ^R is handed back to atuin (loaded in 35-atuin, before this file) — fzf keeps
 # ^T (files) and Alt-C (cd). 40 loads after 35, so re-assert atuin's ^R here.
 if command -v fzf >/dev/null 2>&1; then
-  # `fzf --zsh` needs fzf >= 0.48. Older distro packages (Ubuntu 24.04 ships
-  # 0.44) abort with "unknown option: --zsh" on EVERY shell start and leave the
-  # widgets unbound. min_versions floors fzf so provisioning routes it to ubi,
-  # but guard here too for hosts where fzf came from somewhere else.
+  # `fzf --zsh` needs >= 0.48 (Ubuntu 24.04 apt ships 0.44 and errors on every
+  # shell start). min_versions routes fzf to ubi; guard for other sources too.
   if _fzf_init=$(fzf --zsh 2>/dev/null); then
     eval "$_fzf_init"
   else
@@ -43,8 +41,7 @@ if command -v fzf >/dev/null 2>&1; then
 fi
 
 # Also map Ctrl-O to the cd widget (both keymaps — vi-mode; matches the rest)
-# Guarded: without the integration above the widget does not exist, and bindkey
-# would silently bind ^O to nothing.
+# Guarded: without the integration above the widget does not exist.
 if (( ${+widgets[fzf-cd-widget]} )); then
   bindkey -M viins '^O' fzf-cd-widget
   bindkey -M vicmd '^O' fzf-cd-widget

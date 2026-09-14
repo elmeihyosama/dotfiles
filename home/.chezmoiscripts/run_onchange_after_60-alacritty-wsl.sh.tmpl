@@ -1,13 +1,9 @@
 #!/bin/sh
-# Sync the rendered Alacritty palette to the Windows side of a WSL install.
+# Sync the rendered Alacritty palette to the Windows side of a WSL install:
+# Alacritty on Windows reads %APPDATA%\alacritty\, outside chezmoi's tree, so
+# `theme` could never repaint it.
 #
-# Alacritty on Windows reads %APPDATA%\alacritty\, which is outside chezmoi's
-# tree ($HOME on the Linux side), so `chezmoi apply` alone can never repaint it
-# and `theme` would leave the terminal's background and all 16 ANSI slots on the
-# previous palette while every TUI around it changed.
-#
-# run_onchange re-runs whenever the rendered text below changes; the palette is
-# embedded so a theme switch (or an edit to the palette itself) retriggers it.
+# run_onchange: the palette is embedded so a theme switch retriggers this.
 # theme: {{ .theme }}
 # palette: {{ (index .themes .theme) | toJson }}
 set -eu
@@ -31,16 +27,13 @@ dest_dir="$(wslpath -u "$appdata_win")/alacritty"
 cp -f "$src" "$dest_dir/colors.toml"
 echo "alacritty: synced {{ .theme }} palette to $dest_dir/colors.toml"
 
-# Alacritty never loads colors.toml on its own. The Linux-side alacritty.toml
-# imports it by a ~/.config path that means nothing to the Windows binary, so a
-# Windows-side config that does not exist yet gets a minimal one (absolute
-# import, this distro as the shell); an existing one is the user's and is only
-# checked for the import, never rewritten.
+# Alacritty never loads colors.toml on its own. Create a minimal Windows-side
+# alacritty.toml (absolute import + this distro as shell) only if none exists;
+# an existing one is the user's — only check it for the import.
 cfg="$dest_dir/alacritty.toml"
 if [ ! -f "$cfg" ]; then
 	distro=${WSL_DISTRO_NAME:-}
-	# printf, not echo: dash's echo interprets the \a and \c inside the Windows
-	# path (\alacritty, \colors) as BEL and end-of-output.
+	# printf, not echo: dash's echo would treat \a and \c in the path as escapes.
 	{
 		printf '%s\n' \
 			"# Created once by dotfiles (.chezmoiscripts/run_onchange_after_60-alacritty-wsl.sh);" \

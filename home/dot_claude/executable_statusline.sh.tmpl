@@ -69,6 +69,7 @@ DIV="${DIM} │ ${RST}"
 fmt_reset() {
 	local secs d h m
 	[ -n "$1" ] || return 0
+	case $1 in *[!0-9]*) return 0 ;; esac # not epoch seconds: skip, don't error
 	secs=$(($1 - $(date +%s)))
 	if [ "$secs" -le 0 ]; then
 		printf 'now'

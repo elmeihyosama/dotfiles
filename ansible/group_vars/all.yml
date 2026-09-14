@@ -12,13 +12,10 @@ ubi_version: "latest"          # bootstrap script pulls the latest ubi release
 nerd_font: "JetBrainsMono"
 nerd_font_version: "v3.2.1"
 python_version: "3.13"         # uv-managed default python
-# zjstatus (zellij status-bar plugin) MUST be built against the same zellij-tile
-# minor as the installed zellij, or every session loading it wedges the server
-# at 100% CPU with "Unrecognized plugin command". zellij itself is unpinned
-# (ubi latest / native package), so a single zjstatus pin breaks the moment
-# either side moves: tasks/zjstatus.yml reads `zellij --version` and picks the
-# matching entry here, failing clearly for a zellij minor with no entry. To add
-# one: check `zellij-tile` in the tag's Cargo.toml, then pin the wasm's sha256.
+# zjstatus must match the installed zellij minor (zellij-tile ABI) or the
+# server wedges at 100% CPU ("Unrecognized plugin command"). zellij is unpinned,
+# so tasks/zjstatus.yml picks the entry for `zellij --version`. To add one:
+# check zellij-tile in the tag's Cargo.toml and pin the wasm's sha256.
 zjstatus_by_zellij_minor:
   "0.42": { version: "v0.21.0", sha256: "a7a2539c0ca29b44f74e42731a1122b737372693e8bcbe64ee36fc82ffa82c3e" }
   "0.43": { version: "v0.22.0", sha256: "4de426d20b1cbf861272e927aeeb5b49d92c17f0e2bb9d173f85bf7f0154dd53" }
@@ -129,9 +126,8 @@ ubi_match_overrides:
 # (above) pick musl vs gnu within that filtered set.
 ubi_matching_regex_overrides:
   atuin: '^atuin-[a-z0-9_]+-unknown-linux-(gnu|musl)\.tar\.gz$'
-  # watchexec ships .deb/.rpm/.tar.xz per target (plus .b3/.sha256/.sha512
-  # sidecars), all containing "musl" — pin to the plain tarball, then let
-  # `--matching musl` (above) pick libc within it.
+  # watchexec ships .deb/.rpm/.tar.xz plus checksum sidecars per target, all
+  # containing "musl" — pin the tarball, let `--matching musl` pick libc.
   watchexec: '^watchexec-[0-9.]+-[a-z0-9_]+-unknown-linux-(gnu|musl)\.tar\.xz$'
 
 # Homebrew formula names that differ from canonical (canonical name is used when
@@ -172,13 +168,8 @@ native_bin_renames:
 # accept whatever the repo ships.
 min_versions:
   neovim: "0.9.0"
-  # conf.d/40-fzf.zsh calls `fzf --zsh` for the shell integration (^T/^R/Alt-C).
-  # That flag landed in fzf 0.48; Ubuntu 24.04 apt still ships 0.44, which fails
-  # with "unknown option: --zsh" on every shell start and leaves the widgets
-  # unbound. Floor it so the native check rejects the stale package and ubi
-  # installs a current static binary instead. Note a floor routes the tool to
-  # ubi on EVERY sudo-Linux host (see the partition in tasks/packages.yml), not
-  # only where the native package is stale.
+  # conf.d/40-fzf.zsh needs `fzf --zsh` (0.48+); Ubuntu 24.04 apt ships 0.44.
+  # A floor routes the tool to ubi on every sudo-Linux host (tasks/packages.yml).
   fzf: "0.48.0"
   # yq is also in force_ubi, so the native/ubi partition never consults this
   # floor for it — kept only because .github/scripts/assert-tools.sh re-reads min_versions to

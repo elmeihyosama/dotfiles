@@ -19,21 +19,18 @@
     state: directory
     mode: "0755"
 
-# The `theme` and `wallpaper` zsh functions persist per-machine choices by
-# writing into [data] of this very file, and home/.chezmoidata/*.toml invite
-# hand-written per-machine overrides there too (atuin_sync, sessionize_roots,
-# personal_git_dirs, ...). Ansible owns the file and rewrites it from a fixed
-# key set, so without reading the existing [data] back first every provisioning
-# run silently reverts all of them to the repo defaults.
+# `theme`/`wallpaper` and hand-written per-machine overrides (atuin_sync,
+# sessionize_roots, ...) live in [data] of this file. Ansible rewrites it from
+# a fixed key set, so read the existing [data] back first or they are lost.
 - name: Read existing chezmoi.toml (to preserve machine-local [data] overrides)
   ansible.builtin.slurp:
     src: "{{ ansible_facts['env']['HOME'] }}/.config/chezmoi/chezmoi.toml"
   register: _cz_existing
   failed_when: false
 
-# Kept as raw `key = value` lines so quoting and TOML types survive untouched.
-# Keys Ansible writes itself are dropped (a duplicate key is a TOML error);
-# comments and multi-line values are not carried (one key per line).
+# Raw `key = value` lines, so quoting and types survive. Keys Ansible writes
+# are dropped (duplicate key = TOML error); comments and multi-line values are
+# not carried.
 - name: Carry over [data] keys Ansible does not own
   ansible.builtin.set_fact:
     _kept_data_lines: >-
@@ -42,9 +39,8 @@
         | list }}
   vars:
     _existing: "{{ _cz_existing.content | default('') | b64decode }}"
-    # regex_findall, not regex_search with a '\1' backreference argument: how
-    # Jinja string literals unescape a backslash differs across ansible-core
-    # releases, and a capture group needs no such argument.
+    # regex_findall: a '\1' argument to regex_search unescapes differently
+    # across ansible-core releases.
     _data_block: >-
       {{ _existing | regex_findall('(?ms)^\[data\][ \t]*\n(.*?)(?=^\[|\Z)')
         | default([''], true) | first }}

@@ -1,10 +1,7 @@
 ---
-# zsh is deliberately NOT in `tools`: ubi cannot provide it (upstream ships no
-# static binary release), so no-sudo hosts can't install it and fall back to the
-# .bashrc shim. macOS ships zsh preinstalled. That leaves sudo-capable Linux,
-# where it has to come from the native package manager — without this, the
-# `command -v zsh` probe below fails on a fresh box and the whole login-shell
-# block skips silently, leaving the user on bash with no error.
+# zsh is not in `tools`: ubi has no static build, so no-sudo hosts use the
+# .bashrc shim, and macOS ships it. Sudo Linux needs the native package, or the
+# `command -v zsh` probe below fails and the login-shell block skips silently.
 - name: Install zsh (sudo Linux only; macOS ships it, no-sudo hosts use the shim)
   become: true
   ansible.builtin.package:
@@ -38,12 +35,9 @@
         state: present
       failed_when: false
 
-    # become: chsh authenticates the *caller* through PAM and prompts for a
-    # password when run as an unprivileged user. Ansible has no TTY, so it dies
-    # with "PAM: Authentication failure" — and because the task tolerates
-    # failure, that was reported as `ok` and the shell silently stayed bash.
-    # Running as root skips PAM, but then the target user must be named
-    # explicitly or chsh would change root's own shell instead.
+    # become: chsh authenticates the caller via PAM and prompts for a password;
+    # with no TTY it failed — and, tolerated, reported `ok` with bash still the
+    # shell. As root there is no prompt, but the target user must be named.
     - name: Change login shell to zsh for the current user
       become: true
       ansible.builtin.command: "chsh -s {{ _zsh.stdout }} {{ ansible_facts['user_id'] }}"
@@ -51,9 +45,8 @@
       changed_when: _chsh.rc == 0
       failed_when: false
 
-    # Never let a chsh failure be silent again — the symptom (still on bash) is
-    # otherwise indistinguishable from a successful run. rc is absent when become
-    # itself failed (module never ran), hence the defaults.
+    # A silent chsh failure is indistinguishable from success. rc is absent
+    # when become itself failed, hence the defaults.
     - name: Warn when the login shell could not be changed
       ansible.builtin.debug:
         msg: >-

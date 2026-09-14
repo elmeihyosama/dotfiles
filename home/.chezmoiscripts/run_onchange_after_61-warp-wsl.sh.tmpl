@@ -1,24 +1,12 @@
 #!/bin/sh
-# Point Warp at this WSL distro and the rendered base16 palette.
+# Point Warp (a Windows app on WSL) at this distro and the rendered base16
+# palette. Both of its config locations sit outside chezmoi's tree, so
+# `chezmoi apply` alone never reaches them:
+#   %APPDATA%\warp\Warp\data\themes\               custom themes
+#   %LOCALAPPDATA%\warp\Warp\config\settings.toml   shell override + theme
+# Warp hot-reloads settings.toml (already-open tabs keep their shell).
 #
-# Warp on a WSL box is a *Windows* app, so both of its config locations sit
-# outside chezmoi's tree ($HOME on the Linux side) and `chezmoi apply` alone can
-# never reach them:
-#
-#   %APPDATA%\warp\Warp\data\themes\      custom themes
-#   %LOCALAPPDATA%\warp\Warp\config\settings.toml
-#
-# This script copies the rendered theme across and rewrites the two settings
-# that matter, the same way 60-alacritty-wsl.sh does for Alacritty:
-#
-#   [session].new_session_shell_override  open WSL, not PowerShell
-#   [appearance.themes].theme             use our palette, not a built-in
-#
-# Warp watches settings.toml and hot-reloads it, so a running Warp picks both up
-# without a restart (already-open tabs keep their old shell).
-#
-# run_onchange re-runs whenever the rendered text below changes; the palette is
-# embedded so a theme switch (or an edit to the palette itself) retriggers it.
+# run_onchange: the palette is embedded so a theme switch retriggers this.
 # theme: {{ .theme }}
 # palette: {{ (index .themes .theme) | toJson }}
 set -eu
@@ -44,12 +32,10 @@ themes_dir="$(wslpath -u "$appdata_win")/warp/Warp/data/themes"
 mkdir -p "$themes_dir"
 cp -f "$src" "$themes_dir/base16-active.yaml"
 
-# set_toml KEY VALUE SECTION — set `KEY = VALUE` inside [SECTION] of
-# settings.toml, replacing an existing (or commented-out) key and appending the
-# section when it is missing. VALUE is written verbatim, so callers pass TOML.
-#
-# Key/value/section travel through the environment rather than `awk -v`, which
-# would expand the backslashes of a Windows path as escape sequences.
+# set_toml KEY VALUE SECTION — set `KEY = VALUE` (VALUE is raw TOML) inside
+# [SECTION], replacing an existing or commented key and appending the section
+# when missing. Values travel via ENVIRON, not `awk -v`, which would expand the
+# backslashes of a Windows path.
 set_toml() {
 	tmp=$(mktemp) || return 1
 	TKEY=$1 TVAL=$2 TSEC=$3 awk '
@@ -81,18 +67,10 @@ set_toml() {
 	rm -f "$tmp"
 }
 
-# Shell: the WSL variant takes the distro name as shown by `wsl -l`, which is
-# what WSL itself exports as WSL_DISTRO_NAME in every session.
-#
-# The key is `wsl`. Do NOT trust resources/settings_schema.json in the Warp
-# install here — it documents this variant as `w_s_l` (schemars' snake_case of
-# `WSL`), and Warp's own parser rejects that with "Failed to parse file value
-# for setting [setting=NewSessionShellOverride]", leaving the whole settings
-# file flagged as invalid. The schema is out of sync with the deserializer;
-# `wsl` was confirmed against a running Warp via data/logs/warp.log.
-# Keep the pre-edit file next to the original so a bad rewrite is recoverable.
-# Overwritten on every run: it is always "settings.toml before dotfiles last
-# touched it", never a stale first snapshot.
+# The WSL variant takes the distro name (`wsl -l`), which WSL exports as
+# WSL_DISTRO_NAME. The key is `wsl`: Warp's bundled settings_schema.json says
+# `w_s_l`, but the parser rejects that and flags the whole file invalid.
+# Pre-edit copy, refreshed every run, so a bad rewrite is recoverable.
 cp -f "$settings" "$settings.dotfiles-bak"
 
 distro=${WSL_DISTRO_NAME:-}

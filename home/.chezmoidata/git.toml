@@ -1,8 +1,4 @@
-# Directories whose repos use the personal git identity (~/.config/git/personal)
-# instead of this machine's default [user]. Only consulted when
-# personal_git_email is set in ~/.config/chezmoi/chezmoi.toml [data]
-# (ansible/local.yml). Each entry becomes an `includeIf "gitdir:<dir>"` rule in
-# ~/.config/git/config: `gitdir:` matches the directory and everything beneath
-# it, and the trailing slash is required for that. Override per-machine in
-# chezmoi.toml [data] (or personal_git_dirs in ansible/local.yml).
+# Directories whose repos use the personal identity (~/.config/git/personal)
+# via includeIf; only consulted when personal_git_email is set. Trailing slash
+# = everything beneath. Override in chezmoi.toml [data] or ansible/local.yml.
 personal_git_dirs = ["~/dotfiles/"]
