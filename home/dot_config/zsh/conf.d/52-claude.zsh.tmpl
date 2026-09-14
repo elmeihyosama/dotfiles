@@ -1,0 +1,35 @@
+{{- /* One Claude Code account per config dir (CLAUDE_CONFIG_DIR). Profiles come
+from home/.chezmoidata/claude.toml: the first is the default (plain ~/.claude),
+the rest live in ~/.claude-<name>. The statusline is wired into every one by
+.chezmoiscripts/run_onchange_after_30-claude-statusline.sh. */ -}}
+typeset -ga _claude_profiles=({{ range .claude_profiles }}{{ . }} {{ end }})
+typeset -gA _claude_profile_dirs=(
+{{- range $i, $p := .claude_profiles }}
+  {{ $p }} "$HOME/{{ if $i }}.claude-{{ $p }}{{ else }}.claude{{ end }}"
+{{- end }}
+)
+
+# claude-profile [NAME] — switch this shell's Claude Code account (exports
+# CLAUDE_CONFIG_DIR); with no argument, print the active one.
+claude-profile() {
+  emulate -L zsh
+  local p cur=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
+  if (( ! $# )); then
+    for p in $_claude_profiles; do
+      [[ $_claude_profile_dirs[$p] == "$cur" ]] && { print -r -- "$p  ($cur)"; return 0; }
+    done
+    print -r -- "custom  ($cur)"; return 0
+  fi
+  if [[ -z $_claude_profile_dirs[$1] ]]; then
+    print -u2 "claude-profile: unknown profile '$1' (have: $_claude_profiles)"; return 1
+  fi
+  export CLAUDE_CONFIG_DIR=$_claude_profile_dirs[$1]
+  print -r -- "claude → $1"
+}
+_claude_profile_names() { _describe 'profile' _claude_profiles }
+compdef _claude_profile_names claude-profile
+
+{{ range .claude_profiles -}}
+# claude-{{ . }} — one session as this account; the shell's profile is untouched.
+claude-{{ . }}() { CLAUDE_CONFIG_DIR=$_claude_profile_dirs[{{ . }}] command claude "$@"; }
+{{ end -}}

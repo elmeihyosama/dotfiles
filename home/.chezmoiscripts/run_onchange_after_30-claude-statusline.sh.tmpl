@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Wire the Claude Code statusline into settings.json of every account profile
+# (home/.chezmoidata/claude.toml: the first uses plain ~/.claude, the rest
+# ~/.claude-<name>). settings.json also holds machine-local keys (permissions,
+# plugins), so jq-merge only the statusLine rather than overwrite it.
+# run_onchange: re-runs when the rendered script changes; the merge is idempotent.
+set -euo pipefail
+for dir in {{ range $i, $p := .claude_profiles }}{{ if $i }} "$HOME/.claude-{{ $p }}"{{ else }}"$HOME/.claude"{{ end }}{{ end }}; do
+	settings="$dir/settings.json"
+	mkdir -p "$dir"
+	[ -f "$settings" ] || printf '{}\n' >"$settings"
+	tmp="$(mktemp)"
+	jq --arg cmd "$HOME/.claude/statusline.sh" \
+		'.statusLine = {type: "command", command: $cmd}' "$settings" >"$tmp"
+	mv "$tmp" "$settings"
+done
