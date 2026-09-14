@@ -52,3 +52,8 @@
 [diff]
     colorMoved = default
     algorithm = histogram
+
+# Machine-local settings (safe.directory entries, work identities) live in
+# config.local, which chezmoi does not manage. Absent file is silently ignored.
+[include]
+    path = ~/.config/git/config.local

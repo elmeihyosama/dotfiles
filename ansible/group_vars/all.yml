@@ -12,8 +12,12 @@ ubi_version: "latest"          # bootstrap script pulls the latest ubi release
 nerd_font: "JetBrainsMono"
 nerd_font_version: "v3.2.1"
 python_version: "3.13"         # uv-managed default python
-zjstatus_version: "v0.24.0"    # zellij status-bar plugin; bump manually + re-pin sha256
-zjstatus_sha256: "1ccedece1ded62cf3e209be690cdd39ca6fb9e8228ed71a951f6507f9956669b"
+# zjstatus MUST be built against the same zellij-tile minor as the installed
+# zellij, or every session loading it wedges the server at 100% CPU with
+# "Unrecognized plugin command" (v0.24.0 = zellij-tile 0.44.x vs zellij 0.43.1).
+# Check `zellij-tile` in the tag's Cargo.toml before bumping; re-pin sha256.
+zjstatus_version: "v0.22.0"    # zellij status-bar plugin; pairs with zellij 0.43.x
+zjstatus_sha256: "4de426d20b1cbf861272e927aeeb5b49d92c17f0e2bb9d173f85bf7f0154dd53"
 
 # Canonical tool list (installed on every machine).
 tools:
