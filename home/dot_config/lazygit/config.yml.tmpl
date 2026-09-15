@@ -15,6 +15,17 @@ gui:
     unstagedChangesColor: ["{{ index $p .design.err }}"]
     defaultFgColor: ["{{ $p.base05 }}"]
 git:
+  # lazygit rewrites this file on startup when it finds an older schema, which
+  # shows up as chezmoi drift, and hosts run different versions (ubi never
+  # upgrades). All three schemas are kept: each version reads its own, ignores
+  # the keys it does not know, and skips the migration because the newer key
+  # is present. <= 0.55: paging; 0.56-0.63: pagers; >= 0.64: diffRenderers.
   paging:
     colorArg: always
     pager: delta --paging=never
+  pagers:
+    - colorArg: always
+      pager: delta --paging=never
+  diffRenderers:
+    - colorArg: always
+      command: delta --paging=never
