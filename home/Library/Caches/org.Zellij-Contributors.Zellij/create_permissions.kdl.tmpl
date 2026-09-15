@@ -1,0 +1,11 @@
+{{- /* Pre-approve the zjstatus plugin's permissions so a fresh machine never
+shows zellij's "plugin requests permissions" prompt. create_: written once,
+then zellij owns the file (it appends grants for other plugins). Key = the
+plugin path used in layouts/glow.kdl; the list = what zjstatus requests
+(src/bin/zjstatus.rs). Location = zellij's cache dir: ~/.cache/zellij on
+Linux, ~/Library/Caches/org.Zellij-Contributors.Zellij on macOS. */ -}}
+"{{ .chezmoi.homeDir }}/.config/zellij/plugins/zjstatus.wasm" {
+    ReadApplicationState
+    ChangeApplicationState
+    RunCommands
+}

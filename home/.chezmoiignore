@@ -19,3 +19,9 @@ Library
 {{ if not (hasKey . "personal_git_email") }}
 .config/git/personal
 {{ end }}
+
+# zellij's plugin-permission cache lives under ~/Library/Caches on macOS; the
+# Linux twin (and Library/ off macOS, above) is ignored so only one renders.
+{{ if eq .chezmoi.os "darwin" }}
+.cache/zellij
+{{ end }}
