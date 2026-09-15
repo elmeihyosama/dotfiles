@@ -58,7 +58,7 @@
       {% if item in ubi_matching_regex_overrides %}--matching-regex '{{ ubi_matching_regex_overrides[item] }}'{% endif %}
       {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
     creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
-  loop: "{{ tools | difference(ubi_unavailable | default([])) }}"
+  loop: "{{ tools | difference(ubi_unavailable | default([])) | difference(ubi_extract_all | default({}) | list) }}"
   register: _ubi_installs
   # A tool with no release asset for this OS/arch (e.g. git-absorb ships no
   # aarch64 Linux build) must not abort provisioning of everything else — skip
@@ -135,7 +135,7 @@
       {% if item in ubi_matching_regex_overrides %}--matching-regex '{{ ubi_matching_regex_overrides[item] }}'{% endif %}
       {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
     creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
-  loop: "{{ tools | intersect(brew_unavailable | default([])) }}"
+  loop: "{{ tools | intersect(brew_unavailable | default([])) | difference(ubi_extract_all | default({}) | list) }}"
   when: ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
 
 # ---- Native path: decision engine (Linux, sudo) -------------------------
@@ -281,7 +281,7 @@
       {% if item in ubi_matching_regex_overrides %}--matching-regex '{{ ubi_matching_regex_overrides[item] }}'{% endif %}
       {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
     creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
-  loop: "{{ ubi_tools | default([]) }}"
+  loop: "{{ ubi_tools | default([]) | difference(ubi_extract_all | default({}) | list) }}"
   when: _native_path and (ubi_tools | default([]) | length > 0)
 
 # ---- Native path: Arch pacman -------------------------------------------
@@ -299,3 +299,46 @@
     name: "{{ _native_pkgs }}"
     state: present
   when: _native_path and _pkgmgr == 'dnf' and (_native_pkgs | default([])) | length > 0
+
+# ---- Tools whose archive is a tree, not a bare binary --------------------
+# ubi's default extraction takes ONLY the executable, which breaks any tool that
+# loads its own files relative to itself (neovim -> share/nvim/runtime). Those
+# tools are listed in ubi_extract_all and handled here instead: unpacked whole
+# into {{ local_opt }}/<tool>, then symlinked onto PATH. Runs last so the facts
+# set by both the fallback and native paths are available.
+- name: Select tree-style tools this host installs via ubi
+  ansible.builtin.set_fact:
+    _tree_tools: "{{ (ubi_extract_all | default({}) | list) | intersect(_ubi_set) }}"
+  vars:
+    # Whichever set this host's install path actually routes through ubi.
+    _ubi_set: >-
+      {{ (ubi_tools | default([])) if (_native_path | default(false) | bool)
+         else ((tools | intersect(brew_unavailable | default([])))
+               if (ansible_facts.os_family == 'Darwin' and not (use_ubi_fallback | default(false) | bool))
+               else (tools | difference(ubi_unavailable | default([])))) }}
+
+- name: Ensure the unpack root exists
+  ansible.builtin.file:
+    path: "{{ local_opt }}"
+    state: directory
+    mode: "0755"
+  when: _tree_tools | default([]) | length > 0
+
+- name: Unpack tree-style tools whole into their own prefix
+  ansible.builtin.command:
+    cmd: >
+      {{ local_bin }}/ubi --project {{ ubi_tool_repos[item] }}
+      --in {{ local_opt }}/{{ item }} --extract-all
+      {% if item in ubi_matching_regex_overrides %}--matching-regex '{{ ubi_matching_regex_overrides[item] }}'{% endif %}
+      {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
+    creates: "{{ local_opt }}/{{ item }}/{{ ubi_extract_all[item] }}"
+  loop: "{{ _tree_tools | default([]) }}"
+
+# A symlink, not a copy: neovim resolves it to find ../share/nvim/runtime.
+- name: Link tree-style tool executables onto PATH
+  ansible.builtin.file:
+    src: "{{ local_opt }}/{{ item }}/{{ ubi_extract_all[item] }}"
+    dest: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
+    state: link
+    force: true
+  loop: "{{ _tree_tools | default([]) }}"

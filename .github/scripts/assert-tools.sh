@@ -41,6 +41,19 @@ for tool in $(yq '.tools[]' "$VARS"); do
 		continue
 	fi
 
+	# `--version` is answered by the binary alone, so it cannot see a missing
+	# install tree (a neovim without share/nvim/runtime passes it and is still
+	# unusable). Tools with a smoke test must also exit 0 AND stay silent —
+	# nvim prints E484 on a broken runtime but still exits 0, so check output.
+	smoke="$(yq ".tool_smoke_tests.\"$tool\" // \"\"" "$VARS")"
+	if [ -n "$smoke" ]; then
+		if ! sout="$(sh -c "$smoke" 2>&1)" || [ -n "$sout" ]; then
+			echo "FAIL: $tool -> smoke test failed: $(printf '%s' "$sout" | head -n1)"
+			fail=1
+			continue
+		fi
+	fi
+
 	floor="$(yq ".min_versions.\"$tool\" // \"\"" "$VARS")"
 	if [ -n "$floor" ]; then
 		have="$("$bin" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"

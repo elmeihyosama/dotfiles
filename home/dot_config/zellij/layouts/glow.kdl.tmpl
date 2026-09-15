@@ -19,7 +19,7 @@ into /var/db/timezone/zoneinfo/, Linux into /usr/share/zoneinfo/. */ -}}
 {{- $tzlink := trim (output "sh" "-c" "readlink /etc/localtime || echo UTC") -}}
 {{- $tz := regexReplaceAll `^.*zoneinfo(?:\.default)?/` $tzlink "" -}}
 {{- if not $tz }}{{ $tz = "UTC" }}{{ end -}}
-// Glow layout: top zjstatus bar (session pill, numbered pill tabs, muted
+// Glow layout: top zjstatus bar (session pill, name-only pill tabs, muted
 // date/time) with pane frames off. Escape hatch: `zellij -l split` for the
 // stock two-pane layout with the compact bar.
 layout {
@@ -35,8 +35,8 @@ layout {
                 datetime_format   "%b %d · %H:%M"
                 datetime_timezone "{{ $tz }}"
 
-                tab_normal    "#[fg={{ $overlay }},bg={{ $bar }}]#[fg={{ $subtle }},bg={{ $overlay }}] {index} {name} #[fg={{ $overlay }},bg={{ $bar }}] "
-                tab_active    "#[fg={{ $accent }},bg={{ $bar }}]#[fg={{ $onaccent }},bg={{ $accent }},bold] {index} {name} #[fg={{ $accent }},bg={{ $bar }}] "
+                tab_normal    "#[fg={{ $overlay }},bg={{ $bar }}]#[fg={{ $subtle }},bg={{ $overlay }}] {name} #[fg={{ $overlay }},bg={{ $bar }}] "
+                tab_active    "#[fg={{ $accent }},bg={{ $bar }}]#[fg={{ $onaccent }},bg={{ $accent }},bold] {name} #[fg={{ $accent }},bg={{ $bar }}] "
 
                 // NOTE: `{session}` is its own top-level widget (src/widgets/session.rs) — it
                 // is NOT a substitution variable inside mode_* strings (only `{name}`, the mode

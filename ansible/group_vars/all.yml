@@ -6,6 +6,7 @@
 # keep the plain paths untouched.
 local_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin{{ ('-' + ansible_facts['architecture']) if (shared_home | default(false)) else '' }}"
 local_share: "{{ ansible_facts['env']['HOME'] }}/.local/share{{ ('-' + ansible_facts['architecture']) if (shared_home | default(false)) else '' }}"
+local_opt: "{{ ansible_facts['env']['HOME'] }}/.local/opt{{ ('-' + ansible_facts['architecture']) if (shared_home | default(false)) else '' }}"
 
 # pinned versions
 ubi_version: "latest"          # bootstrap script pulls the latest ubi release
@@ -106,9 +107,28 @@ ubi_exe_overrides:
   git-delta: delta
   ripgrep: rg
   gh: gh        # repo is cli/cli, but the binary inside the archive is `gh`
-  neovim: nvim  # GitHub release extracts a binary named nvim
+  neovim: nvim  # canonical command for the neovim project; see ubi_extract_all
   editorconfig-checker: ec  # canonical command (Arch/brew rename to it too); see ubi_archive_exe_overrides
   age-keygen: age-keygen  # same archive as `age`; pick the keygen binary out of it
+
+# Tools whose release archive is a TREE, not a standalone binary: the program
+# locates its own files RELATIVE TO THE EXECUTABLE, so ubi's default single-exe
+# extraction silently cripples it. neovim ships bin/nvim + share/nvim/runtime
+# (~2200 files); with only the binary it still answers `--version` but dies on
+# any real use ("module 'vim.uri' not found", "E484 .../syntax/syntax.vim").
+# These are unpacked whole into {{ local_opt }}/<tool> with --extract-all and
+# the executable symlinked into {{ local_bin }} — nvim resolves the symlink, so
+# it finds ../share/nvim/runtime. Value = executable path inside the archive
+# (ubi --extract-all strips the archive's shared top-level directory).
+ubi_extract_all:
+  neovim: bin/nvim
+
+# Post-install smoke test, run by .github/scripts/assert-tools.sh on top of the
+# `--version` check. `--version` is answered by the binary alone, which is why a
+# runtime-less neovim passed every assertion while being unusable. A tool listed
+# here must exit 0 AND print nothing (nvim prints E484 but still exits 0).
+tool_smoke_tests:
+  neovim: nvim --clean --headless -c qa
 
 # File name INSIDE the release archive when it differs from the installed name
 # above: ubi extracts it with --exe and installs it as --rename-exe.
