@@ -55,7 +55,7 @@ if [ "$MODE" = "sudo" ]; then
 	# Root with working sudo -> install.sh's apt path for ansible itself.
 	git config --global user.name ci-smoke
 	git config --global user.email ci-smoke@example.com
-	DOTFILES_REPO=/repo DOTFILES_DIR="$HOME/dotfiles" sh /tmp/install.sh
+	DOTFILES_REPO=/repo DOTFILES_DIR="$HOME/workspace/dotfiles" sh /tmp/install.sh
 	export PATH="$HOME/.local/bin:$PATH"
 	# Distro btop packages may carry cap_perfmon, which a container's bounding
 	# set can't grant — exec fails with EPERM. Container-only artifact; strip it
@@ -63,7 +63,7 @@ if [ "$MODE" = "sudo" ]; then
 	if command -v setcap >/dev/null 2>&1 && command -v btop >/dev/null 2>&1; then
 		setcap -r "$(command -v btop)" 2>/dev/null || true
 	fi
-	(cd "$HOME/dotfiles" && ./.github/scripts/assert-tools.sh ansible/group_vars/all.yml)
+	(cd "$HOME/workspace/dotfiles" && ./.github/scripts/assert-tools.sh ansible/group_vars/all.yml)
 	test -f "$HOME/.zshrc" || {
 		echo "FAIL: chezmoi did not apply (~/.zshrc missing)"
 		exit 1
@@ -72,7 +72,7 @@ if [ "$MODE" = "sudo" ]; then
 		echo "FAIL: Nerd Font not installed"
 		exit 1
 	}
-	sh "$HOME/dotfiles/install.sh" >/tmp/run2.log 2>&1 || {
+	sh "$HOME/workspace/dotfiles/install.sh" >/tmp/run2.log 2>&1 || {
 		cat /tmp/run2.log
 		exit 1
 	}
@@ -87,8 +87,8 @@ else
 	su tester -c "git config --global --add safe.directory /repo/.git"
 	su tester -c "git config --global user.name ci-smoke"
 	su tester -c "git config --global user.email ci-smoke@example.com"
-	su tester -c "GITHUB_TOKEN='$GITHUB_TOKEN' DOTFILES_REPO=/repo DOTFILES_DIR=\$HOME/dotfiles sh /tmp/install.sh"
-	su tester -c "cd \$HOME/dotfiles && PATH=\$HOME/.local/bin:\$PATH ./.github/scripts/assert-tools.sh ansible/group_vars/all.yml"
+	su tester -c "GITHUB_TOKEN='$GITHUB_TOKEN' DOTFILES_REPO=/repo DOTFILES_DIR=\$HOME/workspace/dotfiles sh /tmp/install.sh"
+	su tester -c "cd \$HOME/workspace/dotfiles && PATH=\$HOME/.local/bin:\$PATH ./.github/scripts/assert-tools.sh ansible/group_vars/all.yml"
 	su tester -c "test -f \$HOME/.zshrc" || {
 		echo "FAIL: chezmoi did not apply (~/.zshrc missing)"
 		exit 1
@@ -97,7 +97,7 @@ else
 		echo "FAIL: Nerd Font not installed"
 		exit 1
 	}
-	su tester -c "GITHUB_TOKEN='$GITHUB_TOKEN' sh \$HOME/dotfiles/install.sh" >/tmp/run2.log 2>&1 || {
+	su tester -c "GITHUB_TOKEN='$GITHUB_TOKEN' sh \$HOME/workspace/dotfiles/install.sh" >/tmp/run2.log 2>&1 || {
 		cat /tmp/run2.log
 		exit 1
 	}

@@ -8,8 +8,8 @@ git_email: "you@example.com"
 # personal_git_name: "yourhandle"
 # personal_git_email: "12345678+yourhandle@users.noreply.github.com"
 # Directories (trailing slash = everything beneath) that use it.
-# Default: home/.chezmoidata/git.toml (["~/dotfiles/"]).
-# personal_git_dirs: ["~/dotfiles/", "~/personal/"]
+# Default: home/.chezmoidata/git.toml (["~/workspace/dotfiles/"]).
+# personal_git_dirs: ["~/workspace/dotfiles/", "~/personal/"]
 # allow_sudo: false     # uncomment to force; otherwise auto-detected via `sudo -n true`.
 #                       # Drives install strategy (native vs user-local) and whether
 #                       # the login shell is switched to zsh or a .bashrc shim is used.
