@@ -14,7 +14,7 @@
 set -eu
 
 REPO_URL="${DOTFILES_REPO:-https://github.com/elmeihyosama/dotfiles.git}"
-DEST="${DOTFILES_DIR:-$HOME/dotfiles}"
+DEST="${DOTFILES_DIR:-$HOME/workspace/dotfiles}"
 
 # Set to "true" on hosts that share one $HOME across CPU arches (e.g. a mounted
 # home reachable from both x86_64 and aarch64 login nodes). ensure_local_vars
