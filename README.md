@@ -14,7 +14,7 @@ machine with a single command and works even without `sudo`.
 curl -fsSL https://elmeihyosama.github.io/dotfiles/install.sh | sh
 ```
 
-One command — clones to `~/dotfiles`, prompts for your details, and provisions. Served from the project's [landing page](https://elmeihyosama.github.io/dotfiles/).
+One command — clones to `~/workspace/dotfiles`, prompts for your details, and provisions. Served from the project's [landing page](https://elmeihyosama.github.io/dotfiles/).
 
 It installs Ansible (Homebrew, apt/pacman, or [uv] on no-sudo hosts), prompts
 once for `git_name`, `git_email`, and whether to use sudo, then runs the
@@ -29,8 +29,8 @@ with `./install.sh --reconfigure`.
 ### Manual clone
 
 ```bash
-git clone https://github.com/elmeihyosama/dotfiles ~/dotfiles
-cd ~/dotfiles
+git clone https://github.com/elmeihyosama/dotfiles ~/workspace/dotfiles
+cd ~/workspace/dotfiles
 ./install.sh
 ```
 

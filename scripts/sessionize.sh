@@ -8,7 +8,7 @@
 #   sessionize.sh --table    print collision-aware "NAME<TAB>PATH" for all candidates
 set -eu
 
-: "${SESSIONIZE_ROOTS:=$HOME/workspace $HOME/workspaces $HOME/projects $HOME/dotfiles}"
+: "${SESSIONIZE_ROOTS:=$HOME/workspace $HOME/workspaces $HOME/projects}"
 
 # Fold a string into a zellij-legal name fragment: zellij rejects '.' '/' and
 # whitespace, so map junk to '-', strip leading dots, trim dashes.

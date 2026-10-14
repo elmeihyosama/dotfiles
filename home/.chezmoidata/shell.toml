@@ -6,4 +6,4 @@ atuin_sync = false
 
 # Roots the sessionizer scans for projects (space-separated). Per-machine
 # override in ~/.config/chezmoi/chezmoi.toml. Nonexistent roots are skipped.
-sessionize_roots = "~/workspace ~/workspaces ~/projects ~/dotfiles"
+sessionize_roots = "~/workspace ~/workspaces ~/projects"
