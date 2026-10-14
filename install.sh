@@ -85,7 +85,7 @@ ensure_ansible() {
 			XDG_BIN_HOME="$_lbin" \
 				UV_PYTHON_INSTALL_DIR="$_lshare/uv/python" \
 				UV_TOOL_DIR="$_lshare/uv/tools" \
-				"$_uv" tool install ansible-core
+				"$_uv" tool install --python 3.13 ansible-core
 			export PATH="$_lbin:$HOME/.local/bin:$PATH"
 		fi
 		;;
