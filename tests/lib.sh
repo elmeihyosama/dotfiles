@@ -54,6 +54,12 @@ assert_not_contains() {
 	esac
 }
 
+# Forcing .chezmoi.os: chezmoi execute-template has no data/os override
+# (.chezmoi.* is built in and --override-data does not exist), so when
+# TESTS_CHEZMOI_OS is set (darwin|linux) render_tmpl rewrites the literal
+# `.chezmoi.os` in a temp copy of the template to that string before rendering.
+# Test-only: the real templates and real machines are never touched.
+#
 # render_tmpl FILE [KEY=VALUE ...]: render a chezmoi template with the CI
 # fixture plus extra [data] keys. true/false stay TOML bools, anything else is
 # a TOML string. The temp config keeps a .toml name (chezmoi infers the format
@@ -86,7 +92,12 @@ render_tmpl() {
 			print
 			if ($0 ~ /^\[data\][ \t]*$/) printf "%s", add
 		}' "$TESTS_FIXTURE" >"$cfg"
-	chezmoi execute-template --source "$TESTS_REPO" --config "$cfg" <"$file"
+	local src="$file"
+	if [ -n "${TESTS_CHEZMOI_OS:-}" ]; then
+		src="$cfg_dir/forced-os.tmpl"
+		sed "s/\\.chezmoi\\.os/\"$TESTS_CHEZMOI_OS\"/g" "$file" >"$src"
+	fi
+	chezmoi execute-template --source "$TESTS_REPO" --config "$cfg" <"$src"
 	local rc=$?
 	rm -rf "$cfg_dir"
 	return "$rc"

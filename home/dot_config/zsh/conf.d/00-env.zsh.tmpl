@@ -42,8 +42,20 @@ export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
 (( $+commands[zsh] )) && export SHELL="$commands[zsh]"
 
 # Locale
+{{ if eq .chezmoi.os "linux" -}}
+# Minimal Linux hosts/containers often lack en_US.UTF-8; forcing a missing
+# locale breaks perl/git/tmux warnings, so fall back to the always-present C.UTF-8.
+if locale -a 2>/dev/null | grep -qiE '^en_US\.utf-?8$'; then
+  export LANG=en_US.UTF-8
+  export LC_ALL=en_US.UTF-8
+else
+  export LANG=C.UTF-8
+  export LC_ALL=C.UTF-8
+fi
+{{- else -}}
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
+{{- end }}
 
 # Editor
 export EDITOR=nvim
@@ -85,10 +97,16 @@ SESSIONIZE_ROOTS="{{ .sessionize_roots }}"; export SESSIONIZE_ROOTS="${SESSIONIZ
 
 # Default apps
 export TERMINAL="ghostty"
-export BROWSER="firefox"
+# BROWSER only where a browser can open: not over ssh{{ if eq .chezmoi.os "linux" }}, and on Linux only
+# with a display (headless hosts would otherwise point tools at a dead firefox){{ end }}.
+if [[ -z "$SSH_CONNECTION" && -z "$SSH_TTY" ]]{{ if eq .chezmoi.os "linux" }} && [[ -n "$WAYLAND_DISPLAY" || -n "$DISPLAY" ]]{{ end }}; then
+  export BROWSER="firefox"
+fi
 {{ if eq .chezmoi.os "linux" -}}
-# Wayland (Linux only)
-export QT_QPA_PLATFORM=wayland
-export XDG_SESSION_TYPE=wayland
-export MOZ_ENABLE_WAYLAND=1
+# Wayland (Linux only, and only inside a Wayland session)
+if [[ -n "$WAYLAND_DISPLAY" ]]; then
+  export QT_QPA_PLATFORM=wayland
+  export XDG_SESSION_TYPE=wayland
+  export MOZ_ENABLE_WAYLAND=1
+fi
 {{- end }}
