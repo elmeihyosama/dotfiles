@@ -219,6 +219,14 @@ lint_test() {
 	}
 }
 
+# mise.lock must carry a checksum for every tool on every locked platform.
+lint_lock() {
+	.github/scripts/check-lock.sh mise.lock .github/scripts/lock-exceptions.txt || {
+		note lock "check-lock.sh mise.lock"
+		fail=1
+	}
+}
+
 main() {
 	case "${1:-all}" in
 	shell) lint_shell ;;
@@ -227,6 +235,7 @@ main() {
 	config) lint_config ;;
 	editorconfig) lint_editorconfig ;;
 	test) lint_test ;;
+	lock) lint_lock ;;
 	all)
 		lint_shell
 		lint_ansible
@@ -234,9 +243,10 @@ main() {
 		lint_config
 		lint_editorconfig
 		lint_test
+		lint_lock
 		;;
 	*)
-		echo "usage: .github/scripts/lint.sh {shell|ansible|lua|config|editorconfig|test|all}" >&2
+		echo "usage: .github/scripts/lint.sh {shell|ansible|lua|config|editorconfig|test|lock|all}" >&2
 		exit 2
 		;;
 	esac
