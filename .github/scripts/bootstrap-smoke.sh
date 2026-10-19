@@ -33,7 +33,7 @@ if ! git -C /repo symbolic-ref -q HEAD >/dev/null; then
 fi
 
 # Run a COPY of install.sh from outside any checkout so it takes the
-# self-clone + exec path, exactly like `sh -c "$(curl ...)"` on a fresh box.
+# self-clone + exec path, exactly like `curl ... | sh` on a fresh box.
 cp /repo/install.sh /tmp/install.sh
 
 assert_idempotent() { # $1 = log file
