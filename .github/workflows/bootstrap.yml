@@ -26,13 +26,13 @@ jobs:
     # The provision matrix covers per-distro package installs; this job covers
     # the entry point itself (install.sh end-to-end), so one distro suffices.
     name: ubuntu (${{ matrix.mode }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         mode: [sudo, nosudo]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Bootstrap (${{ matrix.mode }})

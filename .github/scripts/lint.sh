@@ -227,6 +227,26 @@ lint_lock() {
 	}
 }
 
+# Static analysis of the workflows/actions. --offline skips zizmor's online
+# audits (they need a token); set ZIZMOR_ONLINE=1 with GH_TOKEN to enable them.
+lint_zizmor() {
+	local args=(--offline)
+	if [ "${ZIZMOR_ONLINE:-}" = 1 ] && [ -n "${GH_TOKEN:-}" ]; then
+		args=()
+	fi
+	zizmor ${args[@]+"${args[@]}"} .github/ || {
+		note zizmor "zizmor .github/"
+		fail=1
+	}
+}
+
+lint_actionlint() {
+	actionlint || {
+		note actionlint "actionlint"
+		fail=1
+	}
+}
+
 main() {
 	case "${1:-all}" in
 	shell) lint_shell ;;
@@ -236,6 +256,8 @@ main() {
 	editorconfig) lint_editorconfig ;;
 	test) lint_test ;;
 	lock) lint_lock ;;
+	zizmor) lint_zizmor ;;
+	actionlint) lint_actionlint ;;
 	all)
 		lint_shell
 		lint_ansible
@@ -244,9 +266,11 @@ main() {
 		lint_editorconfig
 		lint_test
 		lint_lock
+		lint_zizmor
+		lint_actionlint
 		;;
 	*)
-		echo "usage: .github/scripts/lint.sh {shell|ansible|lua|config|editorconfig|test|lock|all}" >&2
+		echo "usage: .github/scripts/lint.sh {shell|ansible|lua|config|editorconfig|test|lock|zizmor|actionlint|all}" >&2
 		exit 2
 		;;
 	esac
