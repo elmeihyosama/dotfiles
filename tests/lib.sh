@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Shared helpers for tests/*.test.sh. Source it; do not execute it.
 #
+# Tests must not set their own EXIT trap: it would replace ours and drop both
+# the temp-dir cleanup and the failure -> exit-code conversion (chain it instead).
+#
 # Assertions record a failure and keep going so one run reports every problem;
 # the EXIT trap turns the recorded failure into a non-zero exit status.
 
@@ -11,7 +14,7 @@ _tests_tmpdirs=()
 
 _tests_cleanup() {
 	local status=$? d
-	for d in "${_tests_tmpdirs[@]}"; do
+	for d in ${_tests_tmpdirs[@]+"${_tests_tmpdirs[@]}"}; do
 		rm -rf "$d"
 	done
 	if [ "$TESTS_FAILED" -ne 0 ] && [ "$status" -eq 0 ]; then
@@ -106,11 +109,18 @@ mk_home() {
 # run_zsh_env SCRIPT [ENV=VAL ...]: render SCRIPT (a template), source it in
 # `zsh -f` (no user rc files) and print the resulting environment.
 run_zsh_env() {
-	local script="$1" rendered
+	local script="$1" rendered rc
 	shift
+	# Callers use $(...), so a registry append here would die in the subshell;
+	# clean up locally instead.
 	rendered="$(mktemp)"
-	_tests_tmpdirs+=("$rendered")
-	render_tmpl "$script" >"$rendered" || return 1
+	if ! render_tmpl "$script" >"$rendered"; then
+		rm -f "$rendered"
+		return 1
+	fi
 	# shellcheck disable=SC2016  # $1 is expanded by zsh, not bash
 	env "$@" zsh -f -c 'source "$1" && env' _ "$rendered"
+	rc=$?
+	rm -f "$rendered"
+	return "$rc"
 }
