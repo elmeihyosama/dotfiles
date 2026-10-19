@@ -55,3 +55,17 @@ assert_eq 0 "$rc" "wildcard exception covers all platforms"
 run_check "$dir/ok.lock" "$dir/exc.txt"
 assert_eq 1 "$rc" "stale exception fails"
 assert_contains "$out" "STALE-EXCEPTION aqua:x/y linux-arm64" "names the stale exception"
+
+# malformed_exception_lines_are_rejected: a missing reason or platform is a
+# usage error (exit 2) that names the offending line, not a silent allow.
+printf 'aqua:x/y linux-arm64\n' >"$dir/noreason.txt"
+run_check "$dir/missing.lock" "$dir/noreason.txt"
+assert_eq 2 "$rc" "exception without a reason is rejected"
+assert_contains "$out" "noreason.txt:1" "names the line lacking a reason"
+printf '# ok\naqua:x/y  # reason only\n' >"$dir/noplat.txt"
+run_check "$dir/missing.lock" "$dir/noplat.txt"
+assert_eq 2 "$rc" "exception without a platform is rejected"
+assert_contains "$out" "noplat.txt:2" "names the line lacking a platform"
+printf 'aqua:x/y linux-arm64  #   \n' >"$dir/emptyreason.txt"
+run_check "$dir/missing.lock" "$dir/emptyreason.txt"
+assert_eq 2 "$rc" "exception with an empty reason is rejected"
