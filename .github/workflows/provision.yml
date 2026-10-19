@@ -25,7 +25,7 @@ jobs:
     # Short, stable check name ("debian (sudo)", "rocky10 (nosudo)", …) instead
     # of the full image URL; the image itself rides in matrix.image below.
     name: ${{ matrix.distro }} (${{ matrix.mode }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -42,15 +42,15 @@ jobs:
           - distro: ubuntu
             image: mirror.gcr.io/library/ubuntu:24.04
           - distro: arch
-            image: mirror.gcr.io/library/archlinux:latest
+            image: mirror.gcr.io/library/archlinux:base-20261004.0.606936
           - distro: fedora
-            image: mirror.gcr.io/library/fedora:latest
+            image: mirror.gcr.io/library/fedora:44
           - distro: rocky9
             image: quay.io/rockylinux/rockylinux:9
           - distro: rocky10
             image: quay.io/rockylinux/rockylinux:10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Provision (${{ matrix.image }} / ${{ matrix.mode }})
