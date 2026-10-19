@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # Smoke-test the fresh-machine bootstrap: run install.sh end-to-end in a clean
-# Ubuntu container — the surface the provision matrix does not cover. This
+# Ubuntu or Fedora container — the surface the provision matrix does not cover. This
 # exercises the self-clone (curl | sh) path, promptless local.yml generation,
 # ensure_ansible (native apt under sudo, uv -> ansible-core without), the FULL
 # playbook (every tag, not just packages), and second-run idempotence.
@@ -10,10 +10,18 @@ set -eu
 MODE="${MODE:?set MODE=sudo|nosudo}"
 
 # Base deps a stock cloud image ships; deliberately NOT python or ansible —
-# install.sh must provide those itself.
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y -qq git curl ca-certificates sudo >/dev/null
+# install.sh must provide those itself. apt (Ubuntu) or dnf (Fedora), whichever
+# the image has; install.sh then takes the matching native-ansible branch.
+if command -v apt-get >/dev/null 2>&1; then
+	export DEBIAN_FRONTEND=noninteractive
+	apt-get update -qq
+	apt-get install -y -qq git curl ca-certificates sudo >/dev/null
+elif command -v dnf >/dev/null 2>&1; then
+	dnf install -y -q git curl ca-certificates sudo >/dev/null
+else
+	echo "no supported package manager (need apt-get or dnf)"
+	exit 1
+fi
 
 # ubi reads GITHUB_TOKEN to raise its API rate limit; empty is fine.
 export GITHUB_TOKEN="${GITHUB_TOKEN:-}"
@@ -35,21 +43,6 @@ fi
 # Run a COPY of install.sh from outside any checkout so it takes the
 # self-clone + exec path, exactly like `curl ... | sh` on a fresh box.
 cp /repo/install.sh /tmp/install.sh
-
-assert_idempotent() { # $1 = log file
-	# A run that never reached ansible must not pass vacuously.
-	if ! grep -q '^PLAY RECAP' "$1"; then
-		echo "IDEMPOTENCE FAIL: second install.sh run produced no ansible recap:"
-		cat "$1"
-		exit 1
-	fi
-	if grep -qE 'changed=[1-9]' "$1"; then
-		echo "IDEMPOTENCE FAIL: second install.sh run reported changes:"
-		grep -E 'PLAY RECAP|changed=' "$1"
-		exit 1
-	fi
-	echo "IDEMPOTENT: second run reported changed=0"
-}
 
 if [ "$MODE" = "sudo" ]; then
 	# Root with working sudo -> install.sh's apt path for ansible itself.
@@ -77,7 +70,7 @@ if [ "$MODE" = "sudo" ]; then
 		exit 1
 	}
 	cat /tmp/run2.log
-	assert_idempotent /tmp/run2.log
+	sh /repo/.github/scripts/assert-idempotent.sh /tmp/run2.log
 else
 	# Genuine unprivileged user, no sudoers entry -> install.sh's uv fallback.
 	useradd -m tester
@@ -102,5 +95,5 @@ else
 		exit 1
 	}
 	cat /tmp/run2.log
-	assert_idempotent /tmp/run2.log
+	sh /repo/.github/scripts/assert-idempotent.sh /tmp/run2.log
 fi

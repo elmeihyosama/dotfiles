@@ -68,3 +68,37 @@ assert_contains "$dep" "prefix: ci" "dependabot commit prefix is ci"
 # no_latest: comments excepted (runner labels and container tags included)
 latest="$(grep -nE '\blatest\b' "${gh_files[@]}" | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' | sed -E 's/[[:space:]]+#.*$//' | grep -E '\blatest\b' || true)"
 assert_eq "" "$latest" "no 'latest' under .github/ outside comments"
+
+# images_pinned_by_digest: every container image a workflow pulls (matrix
+# `image:` entries and any registry reference) is `name:tag@sha256:<64 hex>`.
+imgs="$(grep -hnE '(^[[:space:]]*-?[[:space:]]*image:|(mirror\.gcr\.io|quay\.io|docker\.io)/)' .github/workflows/*.yml)"
+assert_contains "$imgs" "image:" "workflows declare container images"
+unpinned="$(printf '%s\n' "$imgs" | grep -vE '^[0-9]+:[[:space:]]*#' | grep -vE '[a-z0-9./_-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}' || true)"
+assert_eq "" "$unpinned" "every container image is pinned by tag@sha256 digest"
+
+# bootstrap_covers_fedora: the bootstrap matrix exercises install.sh's dnf path.
+boot="$(cat .github/workflows/bootstrap.yml)"
+# shellcheck disable=SC2016 # literal GitHub expression, not shell
+assert_contains "$boot" 'name: ${{ matrix.distro }} (${{ matrix.mode }})' "bootstrap job name is distro (mode)"
+assert_contains "$boot" "distro: [ubuntu, fedora]" "bootstrap matrix covers ubuntu and fedora"
+
+# macos_job: real playbook on a macOS runner, casks skipped, idempotence shared.
+prov="$(cat .github/workflows/provision.yml)"
+assert_contains "$prov" "runs-on: macos-26" "provision has a macOS job on a versioned runner"
+assert_contains "$prov" "ansible-playbook site.yml --skip-tags casks" "macOS job skips casks"
+assert_contains "$prov" "mise install --locked" "macOS job installs ansible from the locked repo toolchain"
+assert_contains "$prov" ".github/scripts/assert-idempotent.sh" "macOS job checks second-run idempotence"
+assert_contains "$(cat .github/scripts/bootstrap-smoke.sh)" "assert-idempotent.sh" "bootstrap-smoke uses the shared idempotence check"
+
+# assert_idempotent_script: passes a converged recap, fails changes or no recap.
+ai=.github/scripts/assert-idempotent.sh
+log="$fx/run2.log"
+printf 'PLAY RECAP ***\nlocalhost : ok=5 changed=0 unreachable=0 failed=0\n' >"$log"
+sh "$ai" "$log" >/dev/null 2>&1
+assert_eq "0" "$?" "assert-idempotent passes a changed=0 recap"
+printf 'PLAY RECAP ***\nlocalhost : ok=5 changed=2 unreachable=0 failed=0\n' >"$log"
+sh "$ai" "$log" >/dev/null 2>&1
+assert_eq "1" "$?" "assert-idempotent fails a changed=2 recap"
+printf 'no ansible here\n' >"$log"
+sh "$ai" "$log" >/dev/null 2>&1
+assert_eq "1" "$?" "assert-idempotent fails a log with no PLAY RECAP"
