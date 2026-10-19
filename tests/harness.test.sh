@@ -28,3 +28,20 @@ if command -v zsh >/dev/null 2>&1; then
 	assert_contains "$out" "HARNESS_PROBE=CI" "run_zsh_env sources the rendered script"
 	assert_contains "$out" "FOO=bar" "run_zsh_env passes extra env"
 fi
+
+# run.sh selects by test NAME as an extended regex (fake dir: no recursion).
+fake="$(mktemp -d)"
+for n in alpha beta gamma; do
+	printf '#!/usr/bin/env bash\necho ran-%s\n' "$n" >"$fake/$n.test.sh"
+done
+out="$(TESTS_DIR="$fake" bash "$TESTS_REPO/tests/run.sh" alpha 2>&1)"
+assert_contains "$out" "PASS alpha.test.sh" "run.sh selects by name"
+assert_not_contains "$out" "beta" "run.sh skips non-matching names"
+out="$(TESTS_DIR="$fake" bash "$TESTS_REPO/tests/run.sh" 'alpha|gamma' 2>&1)"
+assert_contains "$out" "PASS gamma.test.sh" "run.sh accepts alternation"
+assert_not_contains "$out" "beta" "alternation skips others"
+out="$(TESTS_DIR="$fake" bash "$TESTS_REPO/tests/run.sh" 2>&1)"
+assert_contains "$out" "PASS beta.test.sh" "run.sh with no arg runs all"
+TESTS_DIR="$fake" bash "$TESTS_REPO/tests/run.sh" nomatch >/dev/null 2>&1
+assert_eq 1 "$?" "run.sh exits 1 when nothing matches"
+rm -rf "$fake"

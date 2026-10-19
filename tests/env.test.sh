@@ -26,6 +26,14 @@ assert_not_contains "$out" "QT_QPA_PLATFORM" "ssh_no_desktop_vars: no QT_QPA_PLA
 assert_not_contains "$out" "MOZ_ENABLE_WAYLAND" "ssh_no_desktop_vars: no MOZ_ENABLE_WAYLAND"
 assert_not_contains "$out" "XDG_SESSION_TYPE=wayland" "ssh_no_desktop_vars: no XDG_SESSION_TYPE"
 
+# ssh with X forwarding (DISPLAY set): still no BROWSER.
+out="$(run_zsh_env "$tmpl" "${clean[@]}" SSH_CONNECTION="1.2.3.4 1 5.6.7.8 22" DISPLAY=localhost:10.0)"
+assert_not_contains "$out" "BROWSER=" "ssh_with_display: BROWSER unset"
+
+# SSH_TTY alone (no SSH_CONNECTION) counts as ssh too.
+out="$(run_zsh_env "$tmpl" "${clean[@]}" SSH_TTY=/dev/pts/1 DISPLAY=:0)"
+assert_not_contains "$out" "BROWSER=" "ssh_tty_only: BROWSER unset"
+
 # no display and no ssh (e.g. a TTY): still no BROWSER on Linux.
 out="$(run_zsh_env "$tmpl" "${clean[@]}")"
 assert_not_contains "$out" "BROWSER=" "linux without display: BROWSER unset"
