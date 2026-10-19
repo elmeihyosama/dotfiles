@@ -33,7 +33,7 @@ lint_shell() {
 	# Bash: shellcheck + shfmt
 	while IFS= read -r f; do
 		[ -f "$f" ] || continue
-		shellcheck "$f" || {
+		shellcheck -x -P SCRIPTDIR "$f" || {
 			note shell "shellcheck: $f"
 			fail=1
 		}
@@ -211,6 +211,14 @@ lint_editorconfig() {
 	}
 }
 
+# Shell test suite (tests/*.test.sh); also covered by shellcheck/shfmt in lint_shell.
+lint_test() {
+	tests/run.sh || {
+		note test "tests/run.sh"
+		fail=1
+	}
+}
+
 main() {
 	case "${1:-all}" in
 	shell) lint_shell ;;
@@ -218,15 +226,17 @@ main() {
 	lua) lint_lua ;;
 	config) lint_config ;;
 	editorconfig) lint_editorconfig ;;
+	test) lint_test ;;
 	all)
 		lint_shell
 		lint_ansible
 		lint_lua
 		lint_config
 		lint_editorconfig
+		lint_test
 		;;
 	*)
-		echo "usage: .github/scripts/lint.sh {shell|ansible|lua|config|editorconfig|all}" >&2
+		echo "usage: .github/scripts/lint.sh {shell|ansible|lua|config|editorconfig|test|all}" >&2
 		exit 2
 		;;
 	esac
