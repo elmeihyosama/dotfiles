@@ -9,7 +9,6 @@ local_share: "{{ ansible_facts['env']['HOME'] }}/.local/share{{ ('-' + ansible_f
 local_opt: "{{ ansible_facts['env']['HOME'] }}/.local/opt{{ ('-' + ansible_facts['architecture']) if (shared_home | default(false)) else '' }}"
 
 # pinned versions
-ubi_version: "latest"          # bootstrap script pulls the latest ubi release
 nerd_font: "JetBrainsMono"
 nerd_font_version: "v3.2.1"
 python_version: "3.13"         # uv-managed default python
