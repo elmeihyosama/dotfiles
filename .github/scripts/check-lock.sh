@@ -11,6 +11,7 @@
 #   STALE-EXCEPTION X P   exception for X P, but the checksum is present
 # Exceptions file: one `tool-key platform  # reason` per line, tool-key exactly
 # as written in the lock; platform `*` means all of them. Exit 0 ok, 1 problems.
+# A line without a platform or a `# reason` is rejected (exit 2).
 set -uo pipefail
 
 lock="${1:-}"
@@ -41,6 +42,23 @@ if [ -n "$exceptions" ]; then
 		echo "check-lock: no such exceptions file: $exceptions" >&2
 		exit 2
 	}
+	# Every non-comment line must be `tool platform  # reason`; anything else is
+	# a hard error rather than a silently ignored (or silently broad) entry.
+	bad="$(awk '
+		/^[[:space:]]*(#|$)/ { next }
+		{
+			line = $0; reason = ""
+			if (match(line, /#/)) { reason = substr(line, RSTART + 1); line = substr(line, 1, RSTART - 1) }
+			n = split(line, f, /[[:space:]]+/); fields = 0
+			for (i = 1; i <= n; i++) if (f[i] != "") fields++
+			if (fields < 2) print FILENAME ":" FNR ": missing platform: " $0
+			else if (reason !~ /[^[:space:]]/) print FILENAME ":" FNR ": missing # reason: " $0
+		}' "$exceptions")"
+	if [ -n "$bad" ]; then
+		echo "check-lock: malformed exception line (need 'tool platform  # reason'):" >&2
+		echo "$bad" >&2
+		exit 2
+	fi
 	exc="$(sed -e 's/#.*//' "$exceptions" | awk 'NF >= 2 { print $1 "\t" $2 }')"
 fi
 
