@@ -1,0 +1,8 @@
+# Allowed gaps in mise.lock files, read by check-lock.sh.
+#
+# Format, one per line:   tool-key platform  # reason
+#   tool-key  exactly as written in the lock, e.g. aqua:PaulJuliusMartinez/jless
+#   platform  macos-arm64 | linux-x64 | linux-arm64 | * (all of them)
+# Every line needs a reason (why upstream ships no checksummed build). An entry
+# whose gap no longer exists is reported as STALE-EXCEPTION and fails CI, so
+# delete lines as soon as they stop being needed.
