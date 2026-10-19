@@ -15,23 +15,23 @@ if [ -f "$tmpl" ]; then
 	out="$(render_tmpl "$tmpl")"
 else
 	out=""
-	_tests_fail "symlink template missing: $tmpl"
+	fail "symlink template missing: $tmpl"
 fi
 assert_contains "$out" "/dot_config/nvim/.lazy-lock.json" "template points at the dotfile data"
 case "$out" in
 */dot_config/nvim/.lazy-lock.json) ;;
-*) _tests_fail "template output must end with /dot_config/nvim/.lazy-lock.json (got: $out)" ;;
+*) fail "template output must end with /dot_config/nvim/.lazy-lock.json (got: $out)" ;;
 esac
 case "$out" in
 /*) ;;
-*) _tests_fail "template output must be an absolute path (got: $out)" ;;
+*) fail "template output must be an absolute path (got: $out)" ;;
 esac
 
 # Data file is valid JSON with the lazy.nvim entry.
 if [ -f "$data" ] && command -v jq >/dev/null 2>&1; then
-	jq -e 'has("lazy.nvim")' "$data" >/dev/null 2>&1 || _tests_fail "data file must be JSON with a \"lazy.nvim\" key"
+	jq -e 'has("lazy.nvim")' "$data" >/dev/null 2>&1 || fail "data file must be JSON with a \"lazy.nvim\" key"
 else
-	_tests_fail "data file missing or jq not installed: $data"
+	fail "data file missing or jq not installed: $data"
 fi
 
 # Sandboxed apply: temp destination + temp config + this worktree as source.
@@ -52,11 +52,11 @@ assert_not_contains "$managed" ".lazy-lock.json" "dotfile data is not itself man
 # A pre-existing regular file (what LazyVim wrote before) is replaced by the symlink.
 mkdir -p "$dest/.config/nvim"
 echo '{"stale":{}}' >"$target"
-"${cz[@]}" apply --force "$target" >/dev/null 2>&1 || _tests_fail "chezmoi apply --force failed"
+"${cz[@]}" apply --force "$target" >/dev/null 2>&1 || fail "chezmoi apply --force failed"
 if [ -L "$target" ]; then
 	want="$(cd "$nvim_src" && pwd -P)/.lazy-lock.json"
 	got="$(cd "$(dirname "$target")" && cd "$(dirname "$(readlink "$target")")" 2>/dev/null && pwd -P)/$(basename "$(readlink "$target")")"
 	assert_eq "$want" "$got" "symlink resolves to the repo's .lazy-lock.json"
 else
-	_tests_fail "apply --force did not replace the regular file with a symlink"
+	fail "apply --force did not replace the regular file with a symlink"
 fi

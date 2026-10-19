@@ -17,7 +17,7 @@ stub_path="$stubs:$PATH"
 
 # Strip inherited desktop/ssh/locale vars so only the case's own vars count.
 clean=(-u BROWSER -u WAYLAND_DISPLAY -u DISPLAY -u SSH_CONNECTION -u SSH_TTY
-	-u QT_QPA_PLATFORM -u XDG_SESSION_TYPE -u MOZ_ENABLE_WAYLAND)
+	-u QT_QPA_PLATFORM -u XDG_SESSION_TYPE -u MOZ_ENABLE_WAYLAND -u LANG -u LC_ALL)
 
 # ssh_no_desktop_vars: over ssh with no display, no BROWSER and no Wayland vars.
 out="$(run_zsh_env "$tmpl" "${clean[@]}" SSH_CONNECTION="1.2.3.4 1 5.6.7.8 22")"

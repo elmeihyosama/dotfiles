@@ -37,7 +37,6 @@ repos:
         entry: .github/scripts/lint.sh test
         language: system
         pass_filenames: false
-        files: '^(tests/|home/|\.github/scripts/)'
       - id: secret-scan
         name: secrets (gitleaks git --staged)
         entry: gitleaks git --staged --redact --no-banner .

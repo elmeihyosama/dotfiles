@@ -23,14 +23,16 @@ _tests_cleanup() {
 }
 trap _tests_cleanup EXIT
 
-_tests_fail() {
+# fail MSG: record a failure (same effect as a failed assert) for checks that
+# are not a plain comparison.
+fail() {
 	TESTS_FAILED=1
 	printf 'FAIL: %s\n' "$1" >&2
 }
 
 assert_eq() {
 	if [ "$1" != "$2" ]; then
-		_tests_fail "$3"
+		fail "$3"
 		printf '  expected: %s\n  actual:   %s\n' "$1" "$2" >&2
 	fi
 }
@@ -39,7 +41,7 @@ assert_contains() {
 	case "$1" in
 	*"$2"*) ;;
 	*)
-		_tests_fail "$3"
+		fail "$3"
 		printf '  needle:   %s\n  haystack: %s\n' "$2" "$1" >&2
 		;;
 	esac
@@ -48,7 +50,7 @@ assert_contains() {
 assert_not_contains() {
 	case "$1" in
 	*"$2"*)
-		_tests_fail "$3"
+		fail "$3"
 		printf '  unwanted: %s\n  haystack: %s\n' "$2" "$1" >&2
 		;;
 	esac
@@ -58,24 +60,30 @@ assert_not_contains() {
 # (.chezmoi.* is built in and --override-data does not exist), so when
 # TESTS_CHEZMOI_OS is set (darwin|linux) render_tmpl rewrites the literal
 # `.chezmoi.os` in a temp copy of the template to that string before rendering.
-# Test-only: the real templates and real machines are never touched.
+# Only `.chezmoi.os` itself is replaced, never longer names such as
+# `.chezmoi.osRelease`, and only the top-level template is rewritten (not
+# includes/includeTemplate). Test-only: real templates and machines are never
+# touched.
 #
 # render_tmpl FILE [KEY=VALUE ...]: render a chezmoi template with the CI
-# fixture plus extra [data] keys. true/false stay TOML bools, anything else is
-# a TOML string. The temp config keeps a .toml name (chezmoi infers the format
-# from the extension). Each KEY=VALUE replaces any fixture line for that key.
+# fixture plus extra [data] keys. true/false, integers/floats and values that
+# start with [ or { (arrays/inline tables) pass through as raw TOML; anything
+# else is a TOML string. String values only get double quotes escaped, not
+# backslashes or tabs/newlines. The temp config keeps a .toml name (chezmoi
+# infers the format from the extension). Each KEY=VALUE replaces any fixture line for that key.
 render_tmpl() {
-	local file="$1" cfg_dir cfg kv key val line extra=""
+	local file="$1" cfg_dir cfg kv key val line extra="" num_re='^-?[0-9]+(\.[0-9]+)?$'
 	shift
 	cfg_dir="$(mktemp -d)"
 	cfg="$cfg_dir/fixture.toml"
 	for kv in "$@"; do
 		key="${kv%%=*}"
 		val="${kv#*=}"
-		case "$val" in
-		true | false) line="$key = $val" ;;
-		*) line="$key = \"${val//\"/\\\"}\"" ;;
-		esac
+		if [[ "$val" == true || "$val" == false || "$val" == \[* || "$val" == \{* || "$val" =~ $num_re ]]; then
+			line="$key = $val"
+		else
+			line="$key = \"${val//\"/\\\"}\""
+		fi
 		extra+="$key"$'\t'"$line"$'\n'
 	done
 	# Drop fixture lines for overridden keys, then add ours right after [data].
@@ -95,7 +103,9 @@ render_tmpl() {
 	local src="$file"
 	if [ -n "${TESTS_CHEZMOI_OS:-}" ]; then
 		src="$cfg_dir/forced-os.tmpl"
-		sed "s/\\.chezmoi\\.os/\"$TESTS_CHEZMOI_OS\"/g" "$file" >"$src"
+		# Anchored: only when not followed by an identifier char (BSD+GNU sed).
+		sed -e "s/\\.chezmoi\\.os\$/\"$TESTS_CHEZMOI_OS\"/" \
+			-e "s/\\.chezmoi\\.os\\([^A-Za-z0-9_]\\)/\"$TESTS_CHEZMOI_OS\"\\1/g" "$file" >"$src"
 	fi
 	chezmoi execute-template --source "$TESTS_REPO" --config "$cfg" <"$src"
 	local rc=$?
