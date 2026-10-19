@@ -3,6 +3,10 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Weekly run catches upstream drift (new tool releases, base images) between PRs.
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
 
 # Read-only ephemeral token — lint jobs only read the repo (they never push).
 permissions:

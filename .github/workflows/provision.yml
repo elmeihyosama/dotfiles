@@ -13,6 +13,10 @@ on:
       - '.github/scripts/provision-ci.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/workflows/provision.yml'
+  # Weekly run catches upstream drift (new tool releases, base images) between PRs.
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
 
 # Read-only ephemeral token: GITHUB_TOKEN is passed into the container only to
 # raise ubi's GitHub API rate limit; contents:read keeps it minimal so exposure

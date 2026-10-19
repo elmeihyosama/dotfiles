@@ -15,6 +15,10 @@ on:
       - '.github/scripts/bootstrap-smoke.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/workflows/bootstrap.yml'
+  # Weekly run catches upstream drift (new tool releases, base images) between PRs.
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
 
 # Read-only ephemeral token, passed into the container only to raise ubi's
 # GitHub API rate limit (same rationale as provision.yml).
