@@ -6,3 +6,6 @@
 # Every line needs a reason (why upstream ships no checksummed build). An entry
 # whose gap no longer exists is reported as STALE-EXCEPTION and fails CI, so
 # delete lines as soon as they stop being needed.
+pipx:ansible-core *  # pipx tools are locked by a hash-pinned uv.lock under .mise/locks/ (digest recorded in mise.lock), not per-platform archive checksums
+pipx:ansible-lint *  # pipx tools are locked by a hash-pinned uv.lock under .mise/locks/ (digest recorded in mise.lock), not per-platform archive checksums
+pipx:pre-commit *  # pipx tools are locked by a hash-pinned uv.lock under .mise/locks/ (digest recorded in mise.lock), not per-platform archive checksums

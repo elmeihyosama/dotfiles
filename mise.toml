@@ -1,0 +1,21 @@
+# Pinned toolchain for linting/CI. Exact versions only (no "latest"); the
+# checksums live in mise.lock (regenerate with:
+#   mise lock --platform macos-arm64,linux-x64,linux-arm64).
+[settings]
+lockfile = true
+
+[tools]
+"aqua:koalaman/shellcheck" = "0.11.0"
+"aqua:mvdan/sh" = "3.14.1"
+"aqua:JohnnyMorganz/StyLua" = "2.6.0"
+"aqua:mikefarah/yq" = "4.54.1"
+"github:editorconfig-checker/editorconfig-checker" = { version = "4.0.2", rename_exe = "ec" }
+"aqua:gitleaks/gitleaks" = "8.30.1"
+"aqua:zizmorcore/zizmor" = "1.31.1"
+"aqua:rhysd/actionlint" = "1.7.12"
+"aqua:twpayne/chezmoi" = "2.73.2"
+"aqua:astral-sh/uv" = "0.13.1"
+python = "3.13.16"
+"pipx:ansible-core" = "2.21.5"
+"pipx:ansible-lint" = "26.10.1"
+"pipx:pre-commit" = "4.7.0"
