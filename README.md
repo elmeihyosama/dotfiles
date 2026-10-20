@@ -16,10 +16,10 @@ curl -fsSL https://elmeihyosama.github.io/dotfiles/install.sh | sh
 
 One command — clones to `~/workspace/dotfiles`, prompts for your details, and provisions. Served from the project's [landing page](https://elmeihyosama.github.io/dotfiles/).
 
-It installs Ansible (Homebrew, apt/pacman, or [uv] on no-sudo hosts), prompts
-once for `git_name`, `git_email`, and whether to use sudo, then runs the
-playbook (toolchain, JetBrains Mono Nerd Font, shell plugins, login shell) and
-applies the config with `chezmoi apply`. Answers are saved to a git-ignored
+It installs Ansible (a pinned [uv], then the pinned ansible-core, on every
+OS), prompts once for `git_name`, `git_email`, and whether to use sudo, then
+runs the playbook (toolchain, JetBrains Mono Nerd Font, shell plugins, login
+shell) and applies the config with `chezmoi apply`. Answers are saved to a git-ignored
 `ansible/local.yml`.
 
 It's safe to re-run: an existing clone is fast-forwarded, your saved answers
@@ -38,7 +38,7 @@ cd ~/workspace/dotfiles
 
 | Platform | Install strategy |
 | --- | --- |
-| ![macOS][badge-macos] | mise-pinned CLI tools; Homebrew for the few native ones |
+| ![macOS][badge-macos] (Apple Silicon) | mise-pinned CLI tools; Homebrew for the few native ones |
 | ![Debian][badge-debian] ![Ubuntu][badge-ubuntu] | mise-pinned CLI tools; apt for essentials + native ones |
 | ![Arch Linux][badge-arch] | mise-pinned CLI tools; pacman for essentials + native ones |
 | ![Fedora][badge-fedora] | mise-pinned CLI tools; dnf for essentials + native ones |
@@ -54,7 +54,10 @@ images): Renovate proposes the bumps in one weekly PR and
 Renovate GitHub App for this repo. Details: [docs/mise.md](docs/mise.md#pins-and-renovate).
 
 Every distro × both paths (sudo-native and no-sudo) is provisioned for real in CI.
-WSL is supported and treated as Linux.
+WSL is supported and treated as Linux. Supported CPUs: Apple Silicon on macOS,
+x86_64 and arm64 on Linux. Intel Macs are not supported (the pinned tools are
+locked for those three platforms only); the playbook stops with a message
+saying so.
 
 ## Highlights
 
