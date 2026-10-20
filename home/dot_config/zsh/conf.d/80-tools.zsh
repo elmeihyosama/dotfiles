@@ -23,7 +23,7 @@ _dotfiles() {
   local src
   local -a subs names
   if (( CURRENT == 2 )); then
-    subs=('list:tools and their install state' 'add:select tools or groups' 'remove:deselect tools or groups' 'doctor:read-only health check' 'help:show usage')
+    subs=('list:tools and their install state' 'add:select tools or groups' 'remove:deselect tools or groups' 'update:pull, apply and verify (--check to preview)' 'doctor:read-only health check' 'help:show usage')
     _describe 'subcommand' subs
     return
   fi
@@ -36,6 +36,7 @@ _dotfiles() {
       compadd -- --no-apply
       ;;
     list) compadd -- --json ;;
+    update) compadd -- --check ;;
   esac
 }
 compdef _dotfiles dotfiles

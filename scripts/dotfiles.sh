@@ -9,6 +9,10 @@
 #   remove <tool|group>... [--no-apply]
 #                   deselect them; mise tools are uninstalled after the apply,
 #                   native ones get the command to run (never run for you)
+#   update [--check]
+#                   git pull --ff-only, ansible-playbook, chezmoi apply,
+#                   sheldon lock, nvim plugin restore, then doctor; --check
+#                   only reports what an update would do
 #   doctor [args]   run scripts/doctor.sh (read-only health check)
 #   help            print this usage
 # Exit codes: 0 ok, 1 an operation failed, 2 usage or validation error.
@@ -22,6 +26,21 @@
 # anything is written. Apply = ansible-playbook site.yml --tags
 # mise,chezmoi,packages; if it fails local.yml stays edited and re-running the
 # printed command is safe.
+#
+# update: each step prints `==> <step>`; the first failure stops it (exit 1).
+# It never stashes, resets or force-pulls: a dirty repo is refused. Step order:
+# git pull --ff-only; (cd ansible && ansible-playbook site.yml); chezmoi apply;
+# sheldon lock --update when home/dot_config/sheldon/plugins.toml differs between
+# the pre- and post-pull HEAD (plugins are pinned by rev, so --update only moves
+# them to the pinned revs), else sheldon lock; nvim --headless "+Lazy! restore"
+# +qa; dotfiles doctor (its exit code is update's). sheldon and nvim are skipped
+# with a notice when not installed. Nothing may prompt (it runs from Raycast
+# without a tty): GIT_TERMINAL_PROMPT=0, ssh BatchMode, no colour, no progress.
+# The playbook only uses sudo when allow_sudo is true (local.yml, else the
+# `sudo -n true` probe in site.yml); a password-needing sudo fails the task, it
+# does not wait. --check: git fetch (a failure is a warning), incoming commits,
+# `chezmoi diff --exclude scripts` (first 200 lines), and selected mise tools
+# whose pinned version is not installed (from `list --json`). It writes nothing.
 #
 # Environment (tests): DOTFILES_LOCAL_YML overrides ansible/local.yml (when the
 # file is missing, select-tools' defaults apply: every group); DOTFILES_TOOLS_YAML
@@ -52,7 +71,7 @@ repo_root="$(CDPATH='' cd "$(dirname "$0")/.." && pwd)"
 usage() { # usage [FD]: to stderr by default, stdout with 1
 	{
 		echo "usage: dotfiles <subcommand> [args]"
-		echo "subcommands: list [--json] | add TOOL|GROUP... | remove TOOL|GROUP... | doctor [args] | help"
+		echo "subcommands: list [--json] | add TOOL|GROUP... | remove TOOL|GROUP... | update [--check] | doctor [args] | help"
 	} >&"${1:-2}"
 }
 
@@ -172,6 +191,120 @@ cmd_list() {
 							"  " + (if .actual != null and .actual != .pinned then "\(.actual)≠\(.pinned)"
 								else (.actual // .pinned) end)
 						else "" end))'
+}
+
+# cmd_update [--check]
+cmd_update() {
+	check=0
+	for a in "$@"; do
+		case "$a" in
+		--check) check=1 ;;
+		-h | --help)
+			echo "usage: dotfiles update [--check]"
+			return 0
+			;;
+		*)
+			echo "dotfiles update: unknown option: $a" >&2
+			usage
+			exit 2
+			;;
+		esac
+	done
+	command -v git >/dev/null 2>&1 || {
+		echo "dotfiles update: git not on PATH" >&2
+		exit 1
+	}
+	# no tty may be present (Raycast): nothing below may prompt
+	export GIT_TERMINAL_PROMPT=0
+	[ -n "${GIT_SSH_COMMAND:-}" ] || export GIT_SSH_COMMAND="ssh -o BatchMode=yes"
+	export NO_COLOR=1
+	# a bare environment lacks the pinned tools; look in the usual places last
+	# shellcheck source=mise-env.sh
+	. "$repo_root/scripts/mise-env.sh"
+	_data="${MISE_DATA_DIR:-$HOME/.local/share$(mise_sfx "${DOTFILES_LOCAL_YML:-$repo_root/ansible/local.yml}")/mise}"
+	PATH="$PATH:$HOME/.local/bin:$_data/shims"
+	export PATH
+	cd / || exit 1
+
+	if [ "$check" -eq 1 ]; then
+		echo "==> git fetch"
+		if ! git -C "$repo_root" fetch -q 2>/dev/null; then
+			echo "dotfiles: warning: could not fetch (offline?); showing local state only" >&2
+		fi
+		echo "==> incoming commits"
+		if _in="$(git -C "$repo_root" log --oneline 'HEAD..@{u}' 2>/dev/null)"; then
+			[ -n "$_in" ] && printf '%s\n' "$_in" || echo "(none)"
+		else
+			echo "(no upstream branch to compare with)"
+		fi
+		echo "==> chezmoi diff"
+		if command -v chezmoi >/dev/null 2>&1; then
+			chezmoi diff --exclude scripts 2>/dev/null | head -200
+		else
+			echo "dotfiles: warning: chezmoi not on PATH; cannot show the diff" >&2
+		fi
+		echo "==> pending tool installs"
+		if _rows="$(cmd_list --json)"; then
+			_pend="$(printf '%s' "$_rows" | jq -r '.[]
+				| select(.selected and .source == "mise" and (.installed == false or .actual != .pinned))
+				| "  \(.name) \(.pinned) (" + (if .installed then "installed: \(.actual)" else "not installed" end) + ")"')"
+			[ -z "$_pend" ] && echo "(none)" || printf '%s\n' "$_pend"
+		else
+			echo "dotfiles: warning: could not determine pending installs" >&2
+		fi
+		return 0
+	fi
+
+	_st="$(git -C "$repo_root" status --porcelain)" || {
+		echo "dotfiles: cannot read the repo status of $repo_root" >&2
+		exit 1
+	}
+	if [ -n "$_st" ]; then
+		_files="$(printf '%s\n' "$_st" | cut -c4- | paste -sd, - | sed 's/,/, /g')"
+		echo "dotfiles: repo has local changes ($_files); commit or discard them, then re-run" >&2
+		if [ "$_files" = "home/dot_config/nvim/.lazy-lock.json" ]; then
+			echo "  to keep the plugin updates: git -C $repo_root commit -am \"nvim: update plugins\"" >&2
+		fi
+		exit 1
+	fi
+
+	upd_fail() {
+		echo "dotfiles: update failed at: $1" >&2
+		exit 1
+	}
+	echo "==> git pull --ff-only"
+	_old="$(git -C "$repo_root" rev-parse HEAD)" || upd_fail "git pull --ff-only"
+	git -C "$repo_root" pull --ff-only || upd_fail "git pull --ff-only"
+	echo "==> ansible-playbook site.yml"
+	command -v ansible-playbook >/dev/null 2>&1 || upd_fail "ansible-playbook site.yml (ansible-playbook not on PATH)"
+	(cd "$repo_root/ansible" && ansible-playbook site.yml) || upd_fail "ansible-playbook site.yml"
+	echo "==> chezmoi apply"
+	command -v chezmoi >/dev/null 2>&1 || upd_fail "chezmoi apply (chezmoi not on PATH)"
+	chezmoi apply || upd_fail "chezmoi apply"
+	if git -C "$repo_root" diff --quiet "$_old" HEAD -- home/dot_config/sheldon/plugins.toml; then
+		_sh="sheldon lock"
+	else
+		_sh="sheldon lock --update"
+	fi
+	echo "==> $_sh"
+	if command -v sheldon >/dev/null 2>&1; then
+		# sheldon reads ~/.config/sheldon/plugins.toml (chezmoi, just applied);
+		# no SHELDON_* variables are set anywhere, so no zsh is needed
+		# shellcheck disable=SC2086 # _sh is a fixed command line
+		$_sh || upd_fail "$_sh"
+	else
+		echo "  (sheldon not installed; skipped)"
+	fi
+	echo "==> nvim Lazy! restore"
+	if command -v nvim >/dev/null 2>&1; then
+		nvim --headless "+Lazy! restore" +qa || upd_fail "nvim Lazy! restore"
+	else
+		echo "  (nvim not installed; skipped)"
+	fi
+	echo "==> dotfiles doctor"
+	_rc=0
+	sh "$repo_root/scripts/doctor.sh" || _rc=$?
+	return "$_rc"
 }
 
 # suggest NAME: catalog names (tools and groups) near NAME, one per line
@@ -538,6 +671,7 @@ case "$sub" in
 help | -h | --help) usage 1 ;;
 list) cmd_list "$@" ;;
 add | remove) cmd_edit "$sub" "$@" ;;
+update) cmd_update "$@" ;;
 doctor) exec sh "$repo_root/scripts/doctor.sh" "$@" ;;
 *)
 	echo "dotfiles: unknown subcommand: $sub" >&2

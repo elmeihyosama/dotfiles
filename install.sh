@@ -179,7 +179,14 @@ if [ -z "$self_dir" ] || [ ! -f "$self_dir/ansible/site.yml" ]; then
 	}
 	if [ -d "$DEST/.git" ]; then
 		echo "Reusing existing clone at $DEST"
-		git -C "$DEST" pull --ff-only || echo "  (skipping update; resolve local changes by hand)"
+		if ! git -C "$DEST" pull --ff-only; then
+			_dirty="$(git -C "$DEST" status --porcelain 2>/dev/null | cut -c4- | paste -sd, - | sed 's/,/, /g')"
+			if [ -n "$_dirty" ]; then
+				echo "  (skipping update; local changes in: $_dirty; commit or discard them, then run \`dotfiles update\` once installed)"
+			else
+				echo "  (skipping update; the pull failed; \`dotfiles update\` retries it once installed)"
+			fi
+		fi
 	elif [ -e "$DEST" ]; then
 		echo "$DEST exists but is not a git clone; move it aside or set DOTFILES_DIR." >&2
 		exit 1
