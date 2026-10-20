@@ -179,6 +179,7 @@ tools:
     bin: ec
     backend: github:editorconfig-checker/editorconfig-checker
     version: "4.0.2"
+    # 4.x names its binary editorconfig-checker; rename_exe keeps `ec`.
     mise_options: {rename_exe: ec}
   hyperfine:
     group: dev

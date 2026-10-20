@@ -19,6 +19,7 @@ for t in yq jq; do
 		}
 	done
 	[ -n "$p" ] || {
+		[ -z "${CI:-}" ] || fail "no non-shim $t on PATH (CI must not skip)"
 		echo "SKIP: no non-shim $t on PATH" >&2
 		exit 0
 	}
@@ -332,6 +333,42 @@ for body in 'tool_groups: &g [core, git]' $'tool_groups: [core,\n  git]' 'tool_g
 	assert_contains "$out" "can't safely edit tool_groups in $LOCAL; edit it by hand" "unsupported($body): message"
 	cmp -s "$LOCAL" "$HOME/before.yml" || fail "unsupported($body): file byte-identical"
 done
+# a blank line or comment between block items: exit 2, nothing written
+for body in $'tools_remove:\n  - fzf\n\n  - devx' $'tools_remove:\n  - fzf\n  # note\n  - devx\nx: 1'; do
+	printf '%s\n' "$body" >"$LOCAL"
+	cp "$LOCAL" "$HOME/before.yml"
+	run add fzf --no-apply
+	assert_eq 2 "$rc" "gapped_block: exit 2 ($out)"
+	assert_contains "$out" "can't safely edit tools_remove in $LOCAL; edit it by hand" "gapped_block: message"
+	cmp -s "$LOCAL" "$HOME/before.yml" || fail "gapped_block: file byte-identical"
+done
+printf '%s\n' 'tools_remove:' '  - fzf' 'other:' '  - z' >"$LOCAL"
+run remove devx --no-apply
+assert_eq 0 "$rc" "block_then_other_list: exit 0 ($out)"
+# empty, comment-only and --- local.yml: remove works
+for body in '' '# only a comment' '---'; do
+	printf '%s\n' "$body" >"$LOCAL"
+	run remove fzf --no-apply
+	assert_eq 0 "$rc" "empty_local($body): exit 0 ($out)"
+	assert_eq '["fzf"]' "$(val tools_remove)" "empty_local($body): key written"
+done
+# symlinked local.yml: the target is edited, the link survives; dangling exits 2
+mkdir -p "$HOME/real"
+printf 'git_name: "A"\n' >"$HOME/real/target.yml"
+ln -sf real/target.yml "$HOME/link.yml"
+LOCAL_SAVE="$LOCAL"
+LOCAL="$HOME/link.yml"
+run remove fzf --no-apply
+assert_eq 0 "$rc" "symlink: exit 0 ($out)"
+[ -L "$HOME/link.yml" ] || fail "symlink: link survives"
+assert_eq '["fzf"]' "$(yq -o=json -I0 .tools_remove "$HOME/real/target.yml")" "symlink: target edited"
+assert_eq 1 "$(find "$HOME/real" -type f | wc -l | tr -d ' ')" "symlink: no temp left next to the target"
+ln -sf real/gone.yml "$HOME/dangling.yml"
+LOCAL="$HOME/dangling.yml"
+run remove fzf --no-apply
+assert_eq 2 "$rc" "dangling: exit 2"
+assert_contains "$out" "dangling" "dangling: message"
+LOCAL="$LOCAL_SAVE"
 # mode preserved, no temp files left behind
 nfiles() {
 	set -- "$HOME"/local.yml*

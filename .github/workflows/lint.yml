@@ -58,7 +58,8 @@ jobs:
           fetch-depth: ${{ matrix.area == 'secret-scan' && '0' || '1' }}
           persist-credentials: false
       # zizmor wants `$/.github/...`, which actionlint 1.7.12 rejects; the
-      # same-repo, credential-less checkout makes this form safe.
+      # same-repo, credential-less checkout makes this form safe; revisit when
+      # actionlint learns `$/`.
       - uses: ./.github/actions/setup-lint # zizmor: ignore[self-repository]
       - name: Install ${{ matrix.area }} extras
         if: matrix.install

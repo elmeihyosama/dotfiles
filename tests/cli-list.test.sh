@@ -22,6 +22,7 @@ real_bin() {
 }
 for t in yq jq; do
 	real_bin "$t" >/dev/null || {
+		[ -z "${CI:-}" ] || fail "no non-shim $t on PATH (CI must not skip)"
 		echo "SKIP: no non-shim $t on PATH" >&2
 		exit 0
 	}
@@ -93,6 +94,14 @@ run bogus
 assert_eq 2 "$rc" "unknown_subcommand: exit 2"
 run list --nope
 assert_eq 2 "$rc" "unknown_list_flag: exit 2"
+run
+assert_eq 2 "$rc" "no_args: exit 2"
+assert_contains "$out" "usage: dotfiles" "no_args: prints usage"
+cp "$HOME/local.yml" "$HOME/local.good"
+printf 'tool_groups: [nope]\n' >"$HOME/local.yml"
+run list --json
+assert_eq 2 "$rc" "invalid_local: exit 2 ($out)"
+cp "$HOME/local.good" "$HOME/local.yml"
 run help
 assert_eq 0 "$rc" "help: exit 0"
 assert_contains "$out" "usage: dotfiles" "help: prints usage"

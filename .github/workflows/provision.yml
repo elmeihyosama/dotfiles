@@ -113,8 +113,8 @@ jobs:
         uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
         with:
           version: 2026.10.11
-          # sha256 of mise-v2026.10.11-macos-arm64; bump with `version` and
-          # setup-lint's linux-x64 sha.
+          # sha256 of mise-v2026.10.11-macos-arm64 (bump with `version`; Renovate
+          # PRs need scripts/relock.sh for the sha256s).
           sha256: 62e86e51f834899610e9bd0ee37580cfe01fac5fff03002318e714fbdb86faeb
           install: false
           cache: false

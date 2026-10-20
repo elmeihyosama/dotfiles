@@ -8,7 +8,8 @@
 #   update [--check]    pull, playbook, chezmoi, sheldon, nvim, then doctor
 #   doctor [args]       scripts/doctor.sh
 #   help
-# Exit codes: 0 ok, 1 an operation failed, 2 usage or validation error.
+# Exit codes: 0 ok, 1 an operation failed, 2 usage or validation error
+# (no subcommand, an invalid local.yml, an unsafe local.yml shape).
 #
 # add/remove line-edit only tool_groups/tools_add/tools_remove in local.yml, so
 # every other byte (comments, CRLF) stays; an unsupported shape exits 2 with
@@ -20,12 +21,16 @@
 #
 # Tests: DOTFILES_LOCAL_YML and DOTFILES_TOOLS_YAML override the default paths.
 #
-# `list --json` is a contract (the TUI parses it): one object per catalog tool,
-# sorted by tool_groups order then name: name, group, bin, source (select-tools'
-# enum; an unselected tool gets the one it would have), selected, installed
-# (mise: some version installed; else bin on PATH), pinned and actual (mise
-# tools, else null). mise runs as `mise -C /` with the global config masked, as
-# in assert-tools.sh, so the repo's own mise.toml never answers.
+# `list --json` is a contract (the TUI parses it): an array, one object per
+# catalog tool, sorted by tool_groups order then name:
+#   name, group, bin  string
+#   source            string, select-tools' enum (unselected: the one it would get)
+#   selected          bool
+#   installed         bool: mise tools, some version installed; others, bin on PATH
+#   pinned            string|null, tools.yaml version (mise tools only)
+#   actual            string|null, active version, else newest installed (mise only)
+# mise runs as `mise -C /` with the global config masked, as in assert-tools.sh,
+# so the repo's own mise.toml never answers.
 set -eu
 
 repo_root="$(CDPATH='' cd "$(dirname "$0")/.." && pwd)"
@@ -88,13 +93,13 @@ cmd_list() {
 
 	set -- --os "$os" --arch "$arch" --tools "$tools_yaml"
 	[ -f "$local_yml" ] && set -- "$@" --local "$local_yml"
-	if ! sel="$("$repo_root/scripts/select-tools.sh" "$@")"; then
-		echo "dotfiles list: select-tools failed" >&2
-		exit 1
-	fi
 	if ! catalog="$(yq -o=json '.' "$tools_yaml")"; then
 		echo "dotfiles list: cannot read $tools_yaml" >&2
 		exit 1
+	fi
+	if ! sel="$("$repo_root/scripts/select-tools.sh" "$@")"; then
+		echo "dotfiles list: select-tools failed" >&2
+		exit 2
 	fi
 	mise_ls='{}'
 	if command -v mise >/dev/null 2>&1; then
@@ -302,7 +307,8 @@ suggest() {
 #   block `KEY:` + `- item` lines: only the item lines, first item's indent
 #   absent: `KEY: [a, b]` appended (REQUIRED=1 means it must exist: exit 4)
 # An emptied list is written as `KEY: []`. CR line endings are kept.
-# Exit 3: a shape we do not edit (scalar, anchor, multi-line flow, duplicate).
+# Exit 3: a shape we do not edit (scalar, anchor, multi-line flow, duplicate,
+# a blank line or comment inside a block list).
 edit_key() {
 	KEY="$1" REQUIRE="$5" EMPTY="$([ "$2" = '[]' ] && echo 1 || echo 0)" \
 	ITEMS="$(printf '%s' "$2" | jq -r 'map(if test("^[A-Za-z0-9][A-Za-z0-9._-]*$") then . else tojson end) | join("\n")')" \
@@ -316,7 +322,7 @@ edit_key() {
 				print hdr nl
 				for (i = 1; i <= n; i++) print indent "- " it[i] (icr ? "\r" : "")
 			}
-			mode = 0
+			mode = 0; ended = 1
 		}
 		BEGIN {
 			key = ENVIRON["KEY"]
@@ -328,12 +334,17 @@ edit_key() {
 			line = $0; cr = 0
 			if (sub(/\r$/, "", line)) cr = 1
 			lastcr = cr
+			if (ended) {
+				if (line ~ /^[ ]*-([ ]|$)/) rc = 3
+				else if (line ~ /^[^ \t#]/) ended = 0
+			}
 			if (mode == 2) {
 				if (line ~ /^[ ]*-([ ]|$)/) {
 					if (!seen) { indent = line; sub(/-.*/, "", indent); icr = cr; seen = 1 }
 					next
 				}
 				emit_items()
+				if (line ~ /^[^ \t#]/) ended = 0
 			}
 			if (line ~ ("^" key ":([ \t]|$)")) {
 				if (found) rc = 3
@@ -407,6 +418,18 @@ cmd_edit() {
 		echo "dotfiles $verb: tools file not found: $tools_yaml" >&2
 		exit 1
 	}
+	# Edit a symlinked local.yml's target in place, so the link survives.
+	_n=0
+	while [ -L "$local_yml" ]; do
+		_n=$((_n + 1))
+		_t="$(readlink "$local_yml")"
+		case "$_t" in /*) ;; *) _t="$(dirname "$local_yml")/$_t" ;; esac
+		if [ "$_n" -gt 40 ] || { [ ! -e "$_t" ] && [ ! -L "$_t" ]; }; then
+			echo "dotfiles: $local_yml is a dangling or looping symlink; fix the link first" >&2
+			exit 2
+		fi
+		local_yml="$_t"
+	done
 	[ -f "$local_yml" ] || {
 		echo "dotfiles: $local_yml not found; run install.sh or copy ansible/local.yml.example" >&2
 		exit 2
@@ -548,14 +571,14 @@ dotfiles: deselected $n"
 
 	# Verify before committing the write: keys we did not touch are identical,
 	# the edited ones hold the plan, and select-tools accepts the file.
-	_other='del(.tool_groups, .tools_add, .tools_remove)'
+	_other='(. // {}) | del(.tool_groups, .tools_add, .tools_remove)'
 	_o1="$(yq -o=json -I0 "$_other" "$local_yml" | jq -cS .)" || _o1=x1
 	_o2="$(yq -o=json -I0 "$_other" "$tmp" | jq -cS .)" || _o2=x2
 	ok=1
 	[ "$_o1" = "$_o2" ] || ok=0
 	for key in $changed; do
 		_want="$(printf '%s' "$st" | jq -c ".$key")"
-		_got="$(yq -o=json -I0 ".$key" "$tmp" | jq -c . 2>/dev/null)" || _got=x
+		_got="$(yq -o=json -I0 "(. // {}) | .$key" "$tmp" | jq -c . 2>/dev/null)" || _got=x
 		[ "$_want" = "$_got" ] || ok=0
 	done
 	if [ "$ok" -ne 1 ] || ! after="$(sel_run "$tmp")"; then
@@ -636,7 +659,7 @@ native_hint() {
 
 [ $# -gt 0 ] || {
 	usage
-	exit 0
+	exit 2
 }
 sub="$1"
 shift
