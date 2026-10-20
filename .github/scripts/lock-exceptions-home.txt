@@ -1,0 +1,13 @@
+# Allowed gaps in the shipped dotfiles lock (home/dot_config/mise-dotfiles/mise.lock),
+# read by check-lock.sh. Same format as lock-exceptions.txt (see there). Separate
+# file because the repo lock's pipx exceptions would be stale here.
+#
+# mise records a checksum at lock time only when upstream publishes one; for the
+# tools below it keeps just the asset url/url_api (pinned to the release asset id)
+# and `mise install --locked` still works. Drop a line as soon as it goes stale.
+aqua:PaulJuliusMartinez/jless *  # upstream releases publish no checksum file; lock holds url/url_api only
+aqua:ajeetdsouza/zoxide *  # upstream releases publish no checksum file; lock holds url/url_api only
+aqua:dandavison/delta *  # upstream releases publish no checksum file; lock holds url/url_api only
+aqua:denisidoro/navi *  # upstream releases publish no checksum file; lock holds url/url_api only
+aqua:sxyazi/yazi *  # upstream releases publish no checksum file; lock holds url/url_api only
+aqua:aristocratos/btop macos-arm64  # upstream ships no macOS build; btop is native_on darwin (brew), so the pins skip it there

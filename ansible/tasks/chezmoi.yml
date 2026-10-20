@@ -52,6 +52,22 @@
       - personal_git_name
       - personal_git_email
       - personal_git_dirs
+      - selected_tools
+
+# Tools to pin via mise on this machine (OS-filtered, source == mise only), so
+# the pins template renders exactly what select-tools.sh would install. Needs
+# jq + yq on PATH. Without selected_tools in chezmoi.toml the template falls
+# back to every mise-capable tool.
+- name: Select tools for this machine
+  ansible.builtin.command:
+    argv:
+      - "{{ playbook_dir }}/../scripts/select-tools.sh"
+      - --os
+      - "{{ 'darwin' if ansible_facts['system'] == 'Darwin' else 'linux' }}"
+      - --local
+      - "{{ playbook_dir }}/local.yml"
+  register: _selected_tools_raw
+  changed_when: false
 
 - name: Template chezmoi.toml from per-machine vars
   ansible.builtin.copy:
@@ -84,6 +100,7 @@
           shared_home = {{ shared_home | default(false) | lower }}
           git_name = "{{ git_name }}"
           git_email = "{{ git_email }}"
+          selected_tools = {{ _selected_tools_raw.stdout | from_json | selectattr('source', 'eq', 'mise') | map(attribute='name') | list | to_json }}
 
 - name: Check for pending chezmoi changes
   ansible.builtin.command: "{{ _chezmoi.stdout }} status"

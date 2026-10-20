@@ -12,4 +12,6 @@
 # Documentation:
 # @raycast.description Toggle the themed terminal background image
 
+# Raycast does not read .zshenv before zsh starts; mise needs the dotfiles config dir.
+export MISE_SYSTEM_CONFIG_DIR="$HOME/.config/mise-dotfiles"
 exec zsh -ic "wallpaper toggle"

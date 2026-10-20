@@ -1,3 +1,5 @@
+# mise reads the dotfiles pins/lock from here (bash never reads .zshenv).
+export MISE_SYSTEM_CONFIG_DIR="$HOME/.config/mise-dotfiles"
 # Standard bashrc head (interactive guard)
 case $- in *i*) ;; *) return ;; esac
 {{ if not (.allow_sudo | default false) }}

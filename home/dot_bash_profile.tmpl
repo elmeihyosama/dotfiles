@@ -1,3 +1,5 @@
+# mise reads the dotfiles pins/lock from here (bash never reads .zshenv).
+export MISE_SYSTEM_CONFIG_DIR="$HOME/.config/mise-dotfiles"
 # Bash LOGIN shells read this file, not ~/.bashrc. Source ~/.bashrc so its
 # interactive config — and, on no-sudo machines, the one-shot jump into zsh —
 # runs on login too. Without this, a minimal distro that ships no

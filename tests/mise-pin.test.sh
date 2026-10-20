@@ -27,7 +27,10 @@ mise_ver() { grep -E '^[[:space:]]*version:[[:space:]]*[0-9]' "$1" | head -1 | s
 assert_eq "$ver" "$(mise_ver .github/actions/setup-lint/action.yml)" "setup-lint version equals group_vars mise_version"
 assert_eq "$ver" "$(mise_ver .github/workflows/provision.yml)" "macOS job version equals group_vars mise_version"
 
-# CI shas are the matching group_vars shas (setup-lint: linux-x64 glibc binary, macOS: macos-arm64).
+# The macOS job's sha is group_vars' macos-arm64 sha. setup-lint pins the
+# linux-x64 glibc asset, which group_vars (musl) does not carry, so only its
+# shape is checked below; relock.sh writes it from SHASUMS256.txt.
+grep -Eq '^[[:space:]]*sha256:[[:space:]]*[0-9a-f]{64}$' .github/actions/setup-lint/action.yml || fail "setup-lint sha256 is 64 lowercase hex"
 sha_of() { printf '%s\n' "$block" | sed -nE "s/^[[:space:]]+$1:[[:space:]]*\"([0-9a-f]{64})\".*/\1/p"; }
 assert_eq "$(sha_of macos-arm64)" "$(grep -E '^[[:space:]]*sha256:' .github/workflows/provision.yml | head -1 | sed -E 's/.*sha256:[[:space:]]*//')" "macOS job sha256 equals mise_sha256.macos-arm64"
 
@@ -40,5 +43,6 @@ mi="$(grep -n 'import_tasks: tasks/mise.yml' ansible/site.yml | head -1 | cut -d
 pk="$(grep -n 'import_tasks: tasks/packages.yml' ansible/site.yml | head -1 | cut -d: -f1)"
 [ -n "$mi" ] && [ -n "$pk" ] && [ "$mi" -lt "$pk" ] || fail "mise import precedes packages"
 
-# relock.sh is executable and idempotent offline-safe check: syntax only here.
+# relock.sh is executable and parses (running it needs the network).
 [ -x scripts/relock.sh ] || fail "scripts/relock.sh is executable"
+bash -n scripts/relock.sh || fail "scripts/relock.sh passes bash -n"

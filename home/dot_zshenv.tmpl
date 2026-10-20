@@ -13,3 +13,7 @@ if [[ -d $_mise_shims && ":$PATH:" != *":$_mise_shims:"* ]]; then
   export PATH="$_mise_shims:$PATH"
 fi
 unset _mise_shims
+
+# The dotfiles' pinned mise tools (and their lock) live here, apart from the
+# user's own ~/.config/mise/config.toml. Set for every zsh so shims resolve.
+export MISE_SYSTEM_CONFIG_DIR="$HOME/.config/mise-dotfiles"
