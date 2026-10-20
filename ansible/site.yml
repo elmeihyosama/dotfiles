@@ -53,6 +53,10 @@
           local_bin={{ local_bin }}
 
   tasks:
+    - name: Pinned mise
+      ansible.builtin.import_tasks: tasks/mise.yml
+      tags: [mise]
+
     - name: Packages
       ansible.builtin.import_tasks: tasks/packages.yml
       tags: [packages]

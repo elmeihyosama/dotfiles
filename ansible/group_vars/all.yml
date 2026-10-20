@@ -12,6 +12,15 @@ local_opt: "{{ ansible_facts['env']['HOME'] }}/.local/opt{{ ('-' + ansible_facts
 nerd_font: "JetBrainsMono"
 nerd_font_version: "v3.2.1"
 python_version: "3.13"         # uv-managed default python
+# mise is bootstrapped from a pinned release binary (tasks/mise.yml). Linux uses
+# the musl asset (static, no glibc floor). Keep in step with CI's mise pin
+# (.github/actions/setup-lint/action.yml, the macos job in provision.yml): only
+# scripts/relock.sh edits these, together.
+mise_version: "2026.10.11"
+mise_sha256:
+  macos-arm64: "62e86e51f834899610e9bd0ee37580cfe01fac5fff03002318e714fbdb86faeb"
+  linux-x64: "2b010104bfedca93b0dd69a8276a4f364bd9236a41d1faceae367d39b5e53f8a"
+  linux-arm64: "b8994b622e2065e6bb083322bd011fd4111102bfec4883c4ce0336c1e3cb9e0d"
 # zjstatus must match the installed zellij minor (zellij-tile ABI) or the
 # server wedges at 100% CPU ("Unrecognized plugin command"). zellij is unpinned,
 # so tasks/zjstatus.yml picks the entry for `zellij --version`. To add one:

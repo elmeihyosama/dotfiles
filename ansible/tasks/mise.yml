@@ -1,0 +1,46 @@
+---
+# Pinned mise binary in {{ local_bin }} (per-arch under shared_home). Downloaded
+# from the release with a sha256 check; skipped when the installed mise already
+# reports mise_version. Linux uses the static musl asset. Homebrew's mise, if any,
+# is left alone (PATH precedence is handled elsewhere).
+- name: Map platform to mise release asset
+  ansible.builtin.set_fact:
+    _mise_os: "{{ {'Darwin': 'macos', 'Linux': 'linux'}[ansible_facts.system] | default('unsupported') }}"
+    _mise_arch: "{{ {'x86_64': 'x64', 'amd64': 'x64', 'aarch64': 'arm64', 'arm64': 'arm64'}[ansible_facts.architecture] | default('unsupported') }}"
+
+- name: Fail clearly on a platform outside the locked set
+  ansible.builtin.fail:
+    msg: >-
+      mise bootstrap supports macos-arm64, linux-x64 and linux-arm64 only;
+      this host is {{ ansible_facts.system }}/{{ ansible_facts.architecture }}.
+  when: >-
+    (_mise_os ~ '-' ~ _mise_arch) not in mise_sha256
+
+- name: Name the release asset
+  ansible.builtin.set_fact:
+    _mise_asset: "mise-v{{ mise_version }}-{{ _mise_os }}-{{ _mise_arch }}{{ '-musl' if _mise_os == 'linux' else '' }}"
+
+- name: Read the installed mise version
+  ansible.builtin.command: "{{ local_bin }}/mise --version"
+  register: _mise_v
+  changed_when: false
+  failed_when: false
+
+- name: Ensure local bin directory
+  ansible.builtin.file:
+    path: "{{ local_bin }}"
+    state: directory
+    mode: "0755"
+
+- name: Install pinned mise {{ mise_version }}
+  ansible.builtin.get_url:
+    url: "https://github.com/jdx/mise/releases/download/v{{ mise_version }}/{{ _mise_asset }}"
+    dest: "{{ local_bin }}/mise"
+    checksum: "sha256:{{ mise_sha256[_mise_os ~ '-' ~ _mise_arch] }}"
+    mode: "0755"
+    timeout: 120
+  register: _mise_dl
+  until: _mise_dl is succeeded
+  retries: 3
+  delay: 5
+  when: _mise_v.rc != 0 or not (_mise_v.stdout | trim).startswith(mise_version ~ ' ')
