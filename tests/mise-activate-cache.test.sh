@@ -49,13 +49,22 @@ got="$(shell "/fresh/session-C:$HOME/misebin:/usr/bin:/bin")"
 assert_contains "$got" "/fresh/session-C" "legacy cache: PATH kept"
 assert_not_contains "$got" "/stale/legacy" "legacy cache: regenerated"
 
+# A failed regeneration (here: a different binary whose `mise activate`
+# fails) keeps the previous cache, so the shell is not left unactivated, and
+# leaves no temp file behind.
+shell "$HOME/misebin:/usr/bin:/bin" >/dev/null
+before="$(cat "$cache")"
+mkdir -p "$HOME/flaky"
+printf '#!/bin/sh\nexit 1\n' >"$HOME/flaky/mise"
+chmod +x "$HOME/flaky/mise"
+shell "$HOME/flaky:/usr/bin:/bin" >/dev/null
+assert_eq "$before" "$(cat "$cache" 2>/dev/null)" "failed regeneration keeps the previous cache"
+assert_eq "" "$(find "$HOME/cache/mise" -name 'activate.zsh.*' 2>/dev/null)" "failed regeneration leaves no temp file"
+
 # A failed generation (mise activate exits non-zero or prints nothing) leaves
 # no cache: otherwise the key line alone would match, and every later shell
 # would source it and silently stay unactivated until the binary changed.
 rm -f "$cache"
-mkdir -p "$HOME/flaky"
-printf '#!/bin/sh\nexit 1\n' >"$HOME/flaky/mise"
-chmod +x "$HOME/flaky/mise"
 shell "$HOME/flaky:/usr/bin:/bin" >/dev/null
 [ -e "$cache" ] && fail "failed generation: no cache written"
 rm "$HOME/flaky/mise"
