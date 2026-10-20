@@ -105,6 +105,16 @@ wallpaper() {
   _theme_live_reload
 }
 
+# _ghostty_usr2_ok: true when Ghostty is 1.2+, which reloads config on SIGUSR2.
+_ghostty_usr2_ok() {
+  local g v
+  g=${commands[ghostty]:-/Applications/Ghostty.app/Contents/MacOS/ghostty}
+  [[ -x $g ]] || return 1
+  v=$($g --version 2>/dev/null | command head -1)
+  [[ $v =~ '^Ghostty ([0-9]+)\.([0-9]+)' ]] || return 1
+  (( match[1] > 1 || (match[1] == 1 && match[2] >= 2) ))
+}
+
 # _theme_live_reload: repaint running apps after `chezmoi apply`: nvim over RPC
 # (THEME_NVIM_GLOB overrides the socket glob), cmux, Ghostty via SIGUSR2;
 # zellij reloads config.kdl itself. Under DOTFILES_TEST the default globs and
@@ -144,7 +154,8 @@ _theme_live_reload() {
   line="reloaded $n nvim"
   if [[ -z ${DOTFILES_TEST-} || -n ${THEME_TEST_SIGNAL-} ]] &&
     pgrep -u "$USER" -x ghostty >/dev/null 2>&1; then
-    if pkill -USR2 -u "$USER" -x ghostty 2>/dev/null; then
+    # SIGUSR2 kills a Ghostty older than 1.2 (no handler): only signal 1.2+.
+    if _ghostty_usr2_ok && pkill -USR2 -u "$USER" -x ghostty 2>/dev/null; then
       line+="; ghostty: reloaded"
     else
       line+="; ghostty: press ⌘⇧, (or ctrl+shift+, on Linux) to apply"

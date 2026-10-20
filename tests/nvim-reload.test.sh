@@ -54,6 +54,7 @@ stub() {
 stub cmux 'echo "cmux $*" >>"$STUB_LOG"'
 stub pgrep 'echo "pgrep $*" >>"$STUB_LOG"; [ "${GH_RUNNING:-0}" = 1 ]'
 stub pkill 'echo "pkill $*" >>"$STUB_LOG"; exit "${GH_PKILL_RC:-0}"'
+stub ghostty 'echo "Ghostty ${GH_VERSION:-1.2.3}"'
 stub zellij '[ "$1" = list-sessions ] && printf "%s" "${ZJ_LIST:-}"; exit 0'
 export REAL_CHEZMOI="$real_chezmoi" STUB_SRC="$TESTS_REPO" STUB_CFG="$TESTS_FIXTURE"
 stub chezmoi 'case "$1" in
@@ -208,6 +209,10 @@ assert_eq "reloaded 0 nvim" "$(gh GH_RUNNING=0)" "ghostty: none running, nothing
 assert_not_contains "$(cat "$STUB_LOG")" "pkill" "ghostty: none running, no signal"
 assert_eq "reloaded 0 nvim; ghostty: press ⌘⇧, (or ctrl+shift+, on Linux) to apply" \
 	"$(gh GH_RUNNING=1 GH_PKILL_RC=1)" "ghostty: signal failed, key hint"
+: >"$STUB_LOG"
+assert_eq "reloaded 0 nvim; ghostty: press ⌘⇧, (or ctrl+shift+, on Linux) to apply" \
+	"$(gh GH_RUNNING=1 GH_VERSION=1.1.3)" "ghostty: pre-1.2, key hint"
+assert_not_contains "$(cat "$STUB_LOG")" "pkill" "ghostty: pre-1.2 never signalled"
 : >"$STUB_LOG"
 reload "$sockdir/none/*.0" GH_RUNNING=1 >/dev/null
 assert_not_contains "$(cat "$STUB_LOG")" "pkill" "guard: no signal in tests without opt-in"

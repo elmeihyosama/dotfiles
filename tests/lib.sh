@@ -24,7 +24,7 @@ trap _tests_cleanup EXIT
 _tests_safe="$(mktemp -d)"
 _tests_tmpdirs+=("$_tests_safe")
 mkdir -p "$_tests_safe/stubbin"
-for _t in cmux zellij pkill pgrep; do
+for _t in cmux zellij pkill pgrep ghostty; do
 	printf '#!/bin/sh\nexit 0\n' >"$_tests_safe/stubbin/$_t"
 	chmod +x "$_tests_safe/stubbin/$_t"
 done
