@@ -1,0 +1,23 @@
+# Ghostty glass levels, shared by ghostty/config.tmpl and `glass`
+# (conf.d/45-theme.zsh). The machine-local `glass` key picks one; unset =
+# default. Opacity is a string to keep its exact text; blur "false" = off.
+# macos-glass-* needs macOS 26+; elsewhere Ghostty treats it as blur 20.
+[glass_levels.clear]
+opacity    = "0.50"
+blur       = "macos-glass-clear"
+
+[glass_levels.frosted]
+opacity    = "0.66"
+blur       = "macos-glass-regular"
+
+[glass_levels.tinted]
+opacity    = "0.82"
+blur       = "macos-glass-regular"
+
+[glass_levels.solid]
+opacity    = "1.0"
+blur       = "false"
+
+[glass_levels.default]
+opacity    = "0.8"
+blur       = "20"

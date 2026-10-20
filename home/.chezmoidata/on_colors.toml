@@ -1713,6 +1713,26 @@ base0D = "#021012"
 base0E = "#021012"
 base0F = "#021012"
 
+[on_colors.iglass-dark]
+base08 = "#17181c"
+base09 = "#17181c"
+base0A = "#17181c"
+base0B = "#17181c"
+base0C = "#17181c"
+base0D = "#17181c"
+base0E = "#17181c"
+base0F = "#17181c"
+
+[on_colors.iglass-light]
+base08 = "#f5f5f7"
+base09 = "#f5f5f7"
+base0A = "#f5f5f7"
+base0B = "#f5f5f7"
+base0C = "#f5f5f7"
+base0D = "#f5f5f7"
+base0E = "#f5f5f7"
+base0F = "#f5f5f7"
+
 [on_colors.irblack]
 base08 = "#000000"
 base09 = "#000000"
