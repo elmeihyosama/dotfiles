@@ -19,22 +19,26 @@ can't leak into `allowed_signers`) and `scripts/doctor.sh` fails on it. Blank
 means no signing. Generate a key if you have none:
 `ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519`.
 
-Re-run `./install.sh` (or the playbook) to render the git config and
+On an existing machine `install.sh` reuses `ansible/local.yml`: add the
+`signing_key:` line by hand (or pass `--reconfigure`). Then re-run
+`./install.sh` (or the playbook) to render the git config and
 `~/.config/git/allowed_signers`.
 
 ## The manual step
 
 GitHub must know the key as a **signing** key (separate from an auth key).
-Once per machine:
+Once per machine. gh's default token can't manage signing keys, so grant the
+scope first:
 
 ```sh
+gh auth refresh -h github.com -s admin:ssh_signing_key
 gh ssh-key add ~/.ssh/id_ed25519.pub --type signing --title "$(hostname -s)"
 ```
 
 ## Verify
 
 ```sh
-scripts/doctor.sh          # key file present; registered on GitHub (WARN if not)
+scripts/doctor.sh          # key present; registered on GitHub (WARN if not or no scope)
 git commit --allow-empty -m test && git log --show-signature -1
 ```
 

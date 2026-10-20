@@ -24,7 +24,8 @@ age-keygen -o ~/.config/chezmoi/key.txt   # prints the public key (age1...)
 #    chezmoi.toml, or uncomment it from chezmoi.toml.example by hand.
 
 # 3. Back it up: save key.txt's contents as a secure note in Apple Passwords.
-#    On Linux, paste it into ~/.config/chezmoi/key.txt and chmod 600 it.
+#    On every other machine, paste it into ~/.config/chezmoi/key.txt, chmod
+#    600 it, and set age_recipient in its ansible/local.yml.
 ```
 
 ## Using it
@@ -36,7 +37,7 @@ chezmoi edit ~/.config/some-tool/credentials            # edit through the encry
 ```
 
 Machines **without** `key.txt` fail to apply encrypted files — enable
-encryption everywhere (step 3) before committing the first `encrypted_` file.
+encryption everywhere (steps 2 and 3) before committing the first `encrypted_` file.
 
 ## When migrating password managers
 
