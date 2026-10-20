@@ -18,6 +18,17 @@ require("lazy").setup({
   spec = {
     -- add LazyVim and import its plugins
     { "LazyVim/LazyVim", import = "lazyvim.plugins" },
+    -- Shared LazyVim extras, declared here rather than in lazyvim.json so every
+    -- machine gets the same plugin set and the symlinked lazy-lock.json does not
+    -- churn (lazyvim.json stays ignored: LazyVim rewrites it for news state).
+    -- Must come after the LazyVim import and before the user plugins.
+    { import = "lazyvim.plugins.extras.lang.python" },
+    { import = "lazyvim.plugins.extras.lang.clangd" },
+    { import = "lazyvim.plugins.extras.lang.docker" },
+    { import = "lazyvim.plugins.extras.lang.json" },
+    { import = "lazyvim.plugins.extras.lang.yaml" },
+    { import = "lazyvim.plugins.extras.lang.toml" },
+    { import = "lazyvim.plugins.extras.lang.markdown" },
     -- import/override with your plugins
     { import = "plugins" },
   },

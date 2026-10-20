@@ -50,6 +50,10 @@ jobs:
             # v4 renamed the binary in the archive; keep invoking it as `ec`.
             install: command -v ec >/dev/null || ubi --project editorconfig-checker/editorconfig-checker --in "$HOME/.local/bin" --exe editorconfig-checker --rename-exe ec
             run: ./.github/scripts/lint.sh editorconfig
+          - area: test
+            # Renders templates (chezmoi, from setup-lint) and runs zsh (also from setup-lint).
+            install: ':'
+            run: ./.github/scripts/lint.sh test
           - area: secret-scan
             install: command -v gitleaks >/dev/null || ubi --project gitleaks/gitleaks --in "$HOME/.local/bin"
             run: gitleaks git --no-banner --redact .

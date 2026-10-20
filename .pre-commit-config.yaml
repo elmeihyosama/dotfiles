@@ -32,6 +32,11 @@ repos:
         entry: .github/scripts/lint.sh editorconfig
         language: system
         pass_filenames: false
+      - id: lint-test
+        name: test (tests/*.test.sh)
+        entry: .github/scripts/lint.sh test
+        language: system
+        pass_filenames: false
       - id: secret-scan
         name: secrets (gitleaks git --staged)
         entry: gitleaks git --staged --redact --no-banner .

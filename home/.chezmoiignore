@@ -1,9 +1,10 @@
 # Machine-local secrets/overrides — managed by hand, never by chezmoi.
 .config/zsh/local.zsh
 
-# LazyVim rewrites these at runtime — let Neovim own them, don't manage via
+# LazyVim rewrites this at runtime — let Neovim own it, don't manage via
 # chezmoi (avoids "changed since chezmoi last wrote it" apply conflicts).
-.config/nvim/lazy-lock.json
+# lazy-lock.json is deliberately NOT ignored: it is a symlink into the repo
+# (dot_config/nvim/symlink_lazy-lock.json.tmpl) so lockfile updates are tracked.
 .config/nvim/lazyvim.json
 
 # Antigravity IDE settings are managed for macOS only (the Linux fork config
