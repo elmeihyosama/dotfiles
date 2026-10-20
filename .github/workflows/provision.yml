@@ -168,8 +168,13 @@ jobs:
           # each entry needs a reason). Empty = no FAIL tolerated.
           ALLOW='^NONE$'
           set +e
-          ./scripts/doctor.sh | tee "$RUNNER_TEMP/doctor.log"
+          sh scripts/doctor.sh | tee "$RUNNER_TEMP/doctor.log"
           set -e
+          # The summary line proves doctor actually ran to the end.
+          grep -q '^doctor: ' "$RUNNER_TEMP/doctor.log" || {
+            echo "doctor did not run to completion" >&2
+            exit 1
+          }
           if grep -E '^FAIL' "$RUNNER_TEMP/doctor.log" | grep -vE "$ALLOW"; then
             echo "doctor reported unexpected FAIL lines (above)" >&2
             exit 1
