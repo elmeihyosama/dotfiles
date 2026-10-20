@@ -7,11 +7,35 @@ set -eu
 MODE="${MODE:?set MODE=sudo|nosudo}"
 
 # --- Bootstrap deps via whichever package manager exists (we are root here) ---
+# ansible-core at the version users get (install.sh: ansible_core_version in
+# group_vars), so the matrix tests the same Ansible. Arch keeps pacman's (see
+# below).
+gv_pin() { sed -nE "s/^$1:[[:space:]]*\"([^\"]*)\".*/\\1/p" ansible/group_vars/all.yml; }
+ANSIBLE_CORE="$(gv_pin ansible_core_version)"
+UV="$(gv_pin uv_version)"
+PY="$(gv_pin python_version)"
+[ -n "$ANSIBLE_CORE" ] && [ -n "$UV" ] && [ -n "$PY" ] || {
+	echo "ansible_core_version / uv_version / python_version not found in ansible/group_vars/all.yml"
+	exit 1
+}
+# install_ansible PYTHON: the pinned ansible-core into /usr/local/bin. Through
+# PYTHON's pip when it meets ansible-core's floor (3.12); otherwise (Debian 12
+# ships 3.11) through the pinned uv with the pinned uv-managed Python, as
+# install.sh does. Under /opt so the unprivileged tester can run it too.
+install_ansible() {
+	if "$1" -c 'import sys; sys.exit(sys.version_info < (3, 12))'; then
+		"$1" -m pip install --quiet --break-system-packages "ansible-core==$ANSIBLE_CORE"
+	else
+		"$1" -m pip install --quiet --break-system-packages "uv==$UV"
+		UV_TOOL_DIR=/opt/uv/tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_INSTALL_DIR=/opt/uv/python \
+			"$1" -m uv tool install --quiet --python "$PY" "ansible-core==$ANSIBLE_CORE"
+	fi
+}
 if command -v apt-get >/dev/null 2>&1; then
 	export DEBIAN_FRONTEND=noninteractive
 	apt-get update -qq
 	apt-get install -y -qq python3 python3-pip git curl ca-certificates sudo >/dev/null
-	pip install --quiet --break-system-packages ansible-core
+	install_ansible python3
 elif command -v pacman >/dev/null 2>&1; then
 	# ansible-core from pacman, not pip: pip's PyYAML in system site-packages
 	# collides with pacman's python-yaml when the playbook later installs yq
@@ -19,16 +43,17 @@ elif command -v pacman >/dev/null 2>&1; then
 	pacman -Sy --noconfirm --quiet python git curl sudo ansible-core >/dev/null
 elif command -v dnf >/dev/null 2>&1; then
 	# Fedora's python3 is new enough for ansible-core; EL (Rocky/Alma/RHEL) ships
-	# too old, so pin python3.12. --allowerasing resolves the curl vs curl-minimal
-	# conflict on EL9+.
+	# too old, so pin python3.12. EL images ship curl-minimal, which conflicts
+	# with the curl package: leave it alone (no curl, no --allowerasing here) so
+	# the playbook's essentials task meets a stock EL host.
 	# shellcheck source=/dev/null
 	. /etc/os-release
 	if [ "${ID:-}" = "fedora" ]; then
 		dnf install -y -q --allowerasing python3 python3-pip git curl sudo >/dev/null
-		python3 -m pip install --quiet ansible-core
+		install_ansible python3
 	else
-		dnf install -y -q --allowerasing python3.12 python3.12-pip git curl sudo >/dev/null
-		python3.12 -m pip install --quiet ansible-core
+		dnf install -y -q python3.12 python3.12-pip git sudo >/dev/null
+		install_ansible python3.12
 	fi
 else
 	echo "no supported package manager"
@@ -43,7 +68,7 @@ export ANSIBLE_COLLECTIONS_PATH="$COLLECTIONS_PATH"
 ansible-galaxy collection install -r ansible/requirements.yml -p "$COLLECTIONS_PATH" >/dev/null
 git config --global --add safe.directory "$PWD"
 
-# ubi reads GITHUB_TOKEN from the env to raise its GitHub API rate limit; empty is fine.
+# mise reads GITHUB_TOKEN from the env to raise its GitHub API rate limit; empty is fine.
 export GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
 write_local() { # $1 = allow_sudo value
