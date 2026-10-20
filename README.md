@@ -115,8 +115,9 @@ saying so.
   Removed mise tools are uninstalled; native ones get the command to run.
 - `dotfiles update [--check]` — refuses a dirty repo, then runs `git pull
   --ff-only`, the ansible playbook, `chezmoi apply`, `sheldon lock`, nvim plugin
-  restore and `doctor`, stopping at the first failure. `--check` writes nothing
-  and reports incoming commits, chezmoi drift and missing tools.
+  restore and `doctor`, stopping at the first failure. `--check` only fetches
+  (no file changes) and reports incoming commits, chezmoi drift and missing
+  tools.
 - `dotfiles doctor` — read-only health check (also `doctor`).
 
 On macOS, Raycast has *Dotfiles Update* and *Dotfiles Doctor* commands
