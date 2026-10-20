@@ -1,18 +1,39 @@
 # mise — per-project tool versions + env + tasks. Dynamic activation (cd-aware)
 # for interactive shells; shims for non-interactive live in ~/.zshenv.
 if command -v mise >/dev/null 2>&1; then
-  # Cache `mise activate zsh` (a binary fork) to a file; re-source that and only
-  # regenerate when missing or the mise binary is upgraded. This caches the
-  # activation-script GENERATION only — the runtime `_mise_hook` (cd-aware env
-  # resolve) still runs each prompt exactly as before, so per-project env is
-  # unchanged. Same self-refreshing idiom as the completion cache below.
+  # Cache `mise activate zsh` (a binary fork, ~12 ms) to a file and re-source
+  # it. This caches the activation-script GENERATION only — the runtime
+  # `_mise_hook` (cd-aware env resolve) still runs each prompt exactly as
+  # before, so per-project env is unchanged.
+  #
+  # The raw output is not shell-independent: it bakes the generating shell's
+  # PATH in as literals (`export PATH='<shims>:<that PATH>'`,
+  # `export __MISE_ORIG_PATH='<that PATH>'`, plus a deactivate preamble when
+  # generated under an activated shell). Replayed, that resets every later
+  # shell's PATH to one old snapshot and drops its own entries (per-session
+  # dirs, a venv). So generate it from a clean mise state, drop the PATH
+  # export (00-env already put the shims first) and take __MISE_ORIG_PATH from
+  # the sourcing shell, as a live `eval "$(mise activate zsh)"` would.
+  #
+  # Regenerate when missing, older than the mise binary, or written for a
+  # different binary or by an older version of this file (the first line is
+  # the key: the output embeds the binary's absolute path).
   _mise_activate="${ZSH_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}}/mise/activate.zsh"
-  if [[ ! -s "$_mise_activate" || "$_mise_activate" -ot ${commands[mise]:A} ]]; then
+  _mise_key="# dotfiles 49-mise activate cache v2: ${commands[mise]}"
+  _mise_line=""
+  [[ -s "$_mise_activate" ]] && read -r _mise_line <"$_mise_activate"
+  if [[ "$_mise_line" != "$_mise_key" || "$_mise_activate" -ot ${commands[mise]:A} ]]; then
     mkdir -p "${_mise_activate:h}"
-    mise activate zsh >| "$_mise_activate"
+    {
+      print -r -- "$_mise_key"
+      env -u MISE_SHELL -u __MISE_DIFF -u __MISE_SESSION -u __MISE_ORIG_PATH \
+        -u __MISE_ZSH_ACTIVATE_PATH -u __MISE_ZSH_ACTIVATE_ENV mise activate zsh |
+        sed -e '/^export PATH=/d' \
+          -e 's/^export __MISE_ORIG_PATH=.*/export __MISE_ORIG_PATH="$PATH"/'
+    } >| "$_mise_activate"
   fi
   source "$_mise_activate"
-  unset _mise_activate
+  unset _mise_activate _mise_key _mise_line
 
   # Completions.
   #
