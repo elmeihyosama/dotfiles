@@ -29,7 +29,7 @@ never shows up as a git diff. `wallpaper` with no argument toggles.
 `glass <level>` sets the Ghostty background opacity and blur. Levels live in
 `home/.chezmoidata/glass.toml`:
 
-| Level | Opacity | Blur (macOS) |
+| Level | Opacity | Blur |
 |---|---|---|
 | `clear` | 0.50 | `macos-glass-clear` |
 | `frosted` | 0.66 | `macos-glass-regular` |
@@ -40,8 +40,8 @@ never shows up as a git diff. `wallpaper` with no argument toggles.
 `glass off` is an alias for `default`; unset also means `default`. `glass` with
 no argument opens an fzf picker. The level is stored per-machine in
 `~/.config/chezmoi/chezmoi.toml [data] glass`, so it never shows up as a git
-diff. Ghostty only accepts `macos-glass-*` on macOS, so other OSes get a
-numeric blur (`20`) for the same levels.
+diff. The `macos-glass-*` blur needs macOS 26+; older macOS and Linux get the
+plain blur (`20`).
 
 **Readability:** `clear` is very see-through; text over busy windows is hard to
 read. A wallpaper (`wallpaper on`) shows through the same translucency, so

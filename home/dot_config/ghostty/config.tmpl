@@ -4,11 +4,9 @@ font-size = {{ .font.size }}
 {{- /* Level from machine-local `glass` (absent/unknown = default); see glass.toml. */ -}}
 {{- $g := "default" -}}
 {{- if and (hasKey . "glass") (hasKey .glass_levels .glass) }}{{ $g = .glass }}{{ end -}}
-{{- $lv := index .glass_levels $g -}}
-{{- $blur := $lv.blur -}}
-{{- if ne .chezmoi.os "darwin" }}{{ $blur = $lv.blur_other }}{{ end }}
+{{- $lv := index .glass_levels $g }}
 background-opacity = {{ $lv.opacity }}
-background-blur = {{ $blur }}
+background-blur = {{ $lv.blur }}
 clipboard-write = allow
 copy-on-select = clipboard
 {{- /* Background image when the theme has a wallpaper.toml entry and

@@ -15,7 +15,7 @@ command -v jq >/dev/null 2>&1 || {
 }
 tmpl="$TESTS_REPO/home/dot_config/ghostty/config.tmpl"
 
-# opa/blur [KEY=VAL ...]: the two glass lines, joined.
+# glass_lines [KEY=VAL ...]: the two glass lines, joined.
 glass_lines() {
 	render_tmpl "$tmpl" "$@" | grep -E '^background-(opacity|blur) ' | paste -sd'|' -
 }
@@ -30,14 +30,11 @@ assert_eq "background-opacity = 0.8|background-blur = 20" "$(glass_lines glass=d
 assert_eq "background-opacity = 0.8|background-blur = 20" "$(glass_lines)" "darwin unset = default"
 assert_eq "background-opacity = 0.8|background-blur = 20" "$(glass_lines glass=bogus)" "darwin unknown = default"
 
-# Linux: Ghostty rejects macos-glass-* there, so numeric blur.
+# Same values on every OS (Ghostty macos-glass-* to blur 20 off macOS).
 export TESTS_CHEZMOI_OS=linux
-assert_eq "background-opacity = 0.50|background-blur = 20" "$(glass_lines glass=clear)" "linux clear"
-assert_eq "background-opacity = 0.66|background-blur = 20" "$(glass_lines glass=frosted)" "linux frosted"
+assert_eq "background-opacity = 0.50|background-blur = macos-glass-clear" "$(glass_lines glass=clear)" "linux clear"
 assert_eq "background-opacity = 1.0|background-blur = false" "$(glass_lines glass=solid)" "linux solid"
 assert_eq "background-opacity = 0.8|background-blur = 20" "$(glass_lines)" "linux unset"
-out="$(render_tmpl "$tmpl" glass=clear)"
-assert_not_contains "$out" "macos-glass" "no macOS-only blur on linux"
 
 # with_wallpaper: one background-opacity line, image lines kept.
 export TESTS_CHEZMOI_OS=darwin
@@ -109,11 +106,17 @@ assert_contains "$out" "rc=1" "invalid_level exits 1"
 assert_eq "$before" "$(cat "$cfg")" "invalid_level leaves config untouched"
 assert_eq "" "$(cat "$STUB_LOG")" "invalid_level does not apply"
 
-# No arg, no fzf: usage, exit 1.
-out="$(PATH="$HOME/bin:/usr/bin:/bin" CHEZMOI_CONFIG="$cfg" zsh -f -c '
+# No arg, no fzf: usage, exit 1. PATH drops dirs with fzf; jq/mise are linked in.
+nofzf="$HOME/bin"
+for t in jq mise sh env; do
+	p="$(command -v "$t" 2>/dev/null)" && ln -sf "$p" "$HOME/bin/$t"
+done
+IFS=: read -ra _dirs <<<"$PATH"
+for d in "${_dirs[@]}"; do
+	[ -x "$d/fzf" ] || nofzf+=":$d"
+done
+out="$(PATH="$nofzf" CHEZMOI_CONFIG="$cfg" zsh -f -c '
 	compdef() { :; }
 	source "$1"; glass; echo "rc=$?"' _ "$TESTS_REPO/home/dot_config/zsh/conf.d/45-theme.zsh" 2>&1 </dev/null)"
-if ! PATH="/usr/bin:/bin" command -v fzf >/dev/null 2>&1; then
-	assert_contains "$out" "usage: glass" "no-arg usage"
-	assert_contains "$out" "rc=1" "no-arg exits 1"
-fi
+assert_contains "$out" "usage: glass" "no-arg usage"
+assert_contains "$out" "rc=1" "no-arg exits 1"
