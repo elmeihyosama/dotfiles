@@ -1,7 +1,8 @@
 version: 2
 updates:
   - package-ecosystem: github-actions
-    directory: /
+    # The composite action (.github/actions/setup-lint) holds actions too.
+    directories: ["/", "/.github/actions/*"]
     schedule:
       interval: weekly
       day: monday

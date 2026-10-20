@@ -26,6 +26,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   provision:
     # Short, stable check name ("debian (sudo)", "rocky10 (nosudo)", …) instead
@@ -47,7 +51,9 @@ jobs:
         # docker ecosystem does not read workflow matrices, so bump by hand:
         #   docker buildx imagetools inspect <image:tag>   # "Digest:" line
         # and update bootstrap.yml's copies of ubuntu/fedora in the same commit
-        # (plan 03's Renovate is slated to take this over).
+        # (tests/ci-pins.test.sh fails if they diverge). These digests, and the
+        # mise version+sha256 pins (here and in setup-lint), are manual bumps
+        # for now; plan 03 will automate them.
         include:
           - distro: debian
             image: mirror.gcr.io/library/debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587 # bookworm-slim
@@ -101,6 +107,7 @@ jobs:
     # skipped: GUI apps are slow, large and need no CI signal.
     name: macos
     runs-on: macos-26
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -154,3 +161,16 @@ jobs:
           }
           cat "$RUNNER_TEMP/run2.log"
           ./.github/scripts/assert-idempotent.sh "$RUNNER_TEMP/run2.log"
+      - name: Doctor (health check)
+        run: |
+          # scripts/doctor.sh exits non-zero on any FAIL line. Run it, then fail
+          # on every FAIL line except those matching ALLOW (explicit allow-list;
+          # each entry needs a reason). Empty = no FAIL tolerated.
+          ALLOW='^NONE$'
+          set +e
+          ./scripts/doctor.sh | tee "$RUNNER_TEMP/doctor.log"
+          set -e
+          if grep -E '^FAIL' "$RUNNER_TEMP/doctor.log" | grep -vE "$ALLOW"; then
+            echo "doctor reported unexpected FAIL lines (above)" >&2
+            exit 1
+          fi
