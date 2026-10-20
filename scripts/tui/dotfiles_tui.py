@@ -556,6 +556,7 @@ class DotfilesApp(App[None]):
     CSS = """
     #tool-filter, #theme-filter { margin: 0 0 1 0; }
     #tool-summary, #health-summary, #update-summary { height: 1; padding: 0 1; color: $text-muted; }
+    #tool-table, #health-log, #update-log { height: 1fr; }
     #look-left { width: 34; }
     #theme-list { height: 1fr; }
     #look-right { padding: 0 2; }
