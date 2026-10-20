@@ -11,8 +11,9 @@ MODE="${MODE:?set MODE=sudo|nosudo}"
 
 # The first full apply must not hit a tool before it is installed (chezmoi's
 # run_onchange scripts need jq/bat; the playbook prints chezmoi's output).
+# bash/zsh say "command not found"; dash (#!/bin/sh) says "sh: 1: x: not found".
 assert_no_command_not_found() {
-	if grep -i 'command not found' "$1"; then
+	if grep -iE 'command not found|: [0-9]+: [^:]+: not found' "$1"; then
 		echo "FAIL: the first run logged 'command not found' (above)"
 		exit 1
 	fi

@@ -3,8 +3,9 @@
 # Usage: .github/scripts/assert-tools.sh [LOCAL_YML]   (default: ansible/local.yml)
 # The tool set comes from scripts/select-tools.sh over home/.chezmoidata/tools.yaml
 # (one source of truth with the playbook). mise / bootstrap / bundled tools are
-# required; native tools (brew/distro packages, best effort) are checked only
-# when present. Runs from / so no repo mise.toml shadows the dotfiles pins.
+# required; native tools are required on macOS (brew) and checked only when
+# present on Linux (distro packages, best effort). Runs from / so no repo
+# mise.toml shadows the dotfiles pins.
 set -eu
 
 repo="$(CDPATH='' cd "$(dirname "$0")/../.." && pwd)"
@@ -45,7 +46,10 @@ for row in $(printf '%s\n' "$sel" | jq -r '.[] | "\(.name):\(.bin):\(.source)"')
 	source="${rest#*:}"
 
 	if ! command -v "$bin" >/dev/null 2>&1; then
-		if [ "$source" = native ]; then
+		# Native tools are best effort on Linux (the distro may lack the
+		# package, no-sudo hosts skip them) but required on macOS, where brew
+		# is always there and every native tool has a formula.
+		if [ "$source" = native ] && [ "$os" != darwin ]; then
 			echo "SKIP: $tool -> '$bin' (native, best effort: not installed here)"
 		else
 			echo "FAIL: $tool -> '$bin' not found on PATH"

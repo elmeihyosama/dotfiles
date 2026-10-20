@@ -41,6 +41,13 @@ assert_eq mise-shim "$(run_fzf "$HOME/brew/bin:/usr/bin:/bin" -c)" "zsh -c (fres
 assert_eq mise-shim "$(run_fzf "$HOME/brew/bin:/usr/bin:/bin" -i -c)" "zsh -i (no mise binary): mise shim wins"
 assert_eq mise-shim "$(run_fzf "$inherited" -i -c)" "zsh -i (inherited PATH): mise shim wins"
 
+# bash (e.g. non-interactive `ssh host cmd`, which reads ~/.bashrc): the
+# shims move to the front before the interactive guard.
+render_tmpl "$TESTS_REPO/home/dot_bashrc.tmpl" >"$HOME/.bashrc" || fail "render .bashrc"
+# shellcheck disable=SC2016 # expanded by the inner bash
+got="$(cd "$HOME" && env -i HOME="$HOME" PATH="$inherited" bash -c '. "$HOME/.bashrc"; fzf' 2>/dev/null)"
+assert_eq mise-shim "$got" "bash sourcing .bashrc: mise shim wins over ~/.local/bin and brew"
+
 # With a real mise: `mise activate` puts the pinned install dir first.
 if real_mise="$(command -v mise)" && [ -x "$real_mise" ]; then
 	mkdir -p "$HOME/misebin" "$HOME/.config/mise-dotfiles"

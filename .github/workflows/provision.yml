@@ -175,11 +175,16 @@ jobs:
             exit 1
           }
           want="$(yq '.tools.fzf.version' home/.chezmoidata/tools.yaml)"
+          # A hostile inherited PATH, as a shell or IDE started from a
+          # brew-first environment passes down: Homebrew and ~/.local/bin
+          # ahead of the (already present) mise shims. The pre-fix .zshenv left
+          # the shims where they were, so zsh -c ran brew's fzf.
+          hostile="/opt/homebrew/bin:$HOME/.local/bin:$HOME/.local/share/mise/shims:/usr/bin:/bin"
           for flags in -c -ic; do
             # From / (no repo mise.toml), through the deployed ~/.zshenv
             # (plus ~/.zshrc for -i).
-            path="$(cd / && zsh "$flags" 'command -v fzf' 2>/dev/null | tail -n1)"
-            ver="$(cd / && zsh "$flags" 'fzf --version' 2>/dev/null | tail -n1 | awk '{print $1}')"
+            path="$(cd / && env PATH="$hostile" zsh "$flags" 'command -v fzf' 2>/dev/null | tail -n1)"
+            ver="$(cd / && env PATH="$hostile" zsh "$flags" 'fzf --version' 2>/dev/null | tail -n1 | awk '{print $1}')"
             echo "zsh $flags: fzf -> $path ($ver)"
             case "$path" in
             "$HOME/.local/share/mise/"*) ;;
