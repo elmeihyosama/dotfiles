@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# scripts/select-tools.sh: group/add/remove selection and per-OS source.
+source "$(dirname "$0")/lib.sh"
+
+sel="$TESTS_REPO/scripts/select-tools.sh"
+tools_yaml="$TESTS_REPO/home/.chezmoidata/tools.yaml"
+d="$(mktemp -d)"
+_tests_tmpdirs+=("$d")
+
+run() { # run OS LOCAL_CONTENT -> stdout; stderr to $d/err; sets rc
+	local os="$1"
+	printf '%s' "$2" >"$d/local.yml"
+	out="$("$sel" --os "$os" --local "$d/local.yml" 2>"$d/err")"
+	rc=$?
+}
+names() { jq -r '.[].name' <<<"$out" | paste -sd, -; }
+field() { jq -r --arg n "$1" --arg f "$2" '.[] | select(.name == $n) | .[$f] // "null"' <<<"$out"; }
+
+# default_all: no selection keys -> every tool in the catalog
+run linux ''
+all="$(yq '.tools | keys | .[]' "$tools_yaml" | sort | paste -sd, -)"
+assert_eq 0 "$rc" "default_all: exit 0"
+assert_eq "$all" "$(names)" "default_all: every tool selected"
+assert_eq "$(names)" "$(jq -r '[.[].name] | sort | join(",")' <<<"$out")" "default_all: sorted by name"
+
+# groups_subset: core + named groups only
+run linux 'tool_groups: [git]'
+assert_eq 0 "$rc" "groups_subset: exit 0"
+assert_contains "$(names)" "lazygit" "groups_subset: git tool present"
+assert_contains "$(names)" "ripgrep" "groups_subset: core present"
+assert_not_contains "$(names)" "lazydocker" "groups_subset: containers absent"
+assert_not_contains "$(names)" "cava" "groups_subset: media absent"
+run linux 'tool_groups: []'
+assert_not_contains "$(names)" "lazygit" "groups_subset: empty list is core only"
+assert_contains "$(names)" "jq" "groups_subset: empty list keeps core"
+
+# add_remove
+run linux $'tool_groups: [git]\ntools_add: [lazydocker]\ntools_remove: [gh-dash]'
+assert_eq 0 "$rc" "add_remove: exit 0"
+assert_contains "$(names)" "lazydocker" "add_remove: added"
+assert_not_contains "$(names)" "gh-dash" "add_remove: removed"
+run linux $'tool_groups: [files]\ntools_remove: [age]'
+assert_not_contains "$(names)" "age" "add_remove: removing provider drops age-keygen too"
+
+# age-keygen follows age and is never installed on its own
+run linux ''
+assert_eq age "$(field age-keygen provided_by)" "provided_by recorded"
+assert_eq null "$(field age-keygen version)" "provided_by has no version"
+assert_eq null "$(field age-keygen backend)" "provided_by has no backend"
+assert_eq mise "$(field age-keygen source)" "provided_by source follows provider"
+
+# core_cannot_be_removed
+run linux 'tools_remove: [fzf]'
+assert_eq 2 "$rc" "core_cannot_be_removed: exit 2"
+assert_contains "$(cat "$d/err")" "fzf" "core_cannot_be_removed: names tool"
+
+# unknown_group_fails / unknown tool
+run linux 'tool_groups: [nope]'
+assert_eq 2 "$rc" "unknown_group_fails: exit 2"
+assert_contains "$(cat "$d/err")" "unknown group: nope (valid: core, git," "unknown_group_fails: message"
+run linux 'tools_add: [nope]'
+assert_eq 2 "$rc" "unknown_tool: exit 2"
+assert_contains "$(cat "$d/err")" "unknown tool: nope" "unknown_tool: message"
+
+# btop_darwin_native
+run darwin ''
+assert_eq native "$(field btop source)" "btop_darwin_native: darwin native"
+assert_eq null "$(field btop version)" "btop_darwin_native: no version"
+assert_eq null "$(field btop backend)" "btop_darwin_native: no backend"
+run linux ''
+assert_eq mise "$(field btop source)" "btop linux: mise"
+assert_eq aqua:aristocratos/btop "$(field btop backend)" "btop linux: backend"
+
+# cava_native_only
+for os in darwin linux; do
+	run "$os" ''
+	assert_eq native "$(field cava source)" "cava_native_only: $os"
+	assert_eq null "$(field cava backend)" "cava_native_only: $os no backend"
+done
+
+# bin defaults and overrides; bootstrap
+run linux ''
+assert_eq rg "$(field ripgrep bin)" "bin override"
+assert_eq fzf "$(field fzf bin)" "bin defaults to name"
+assert_eq ec "$(field editorconfig-checker bin)" "ec bin"
+assert_eq bootstrap "$(field mise source)" "mise is bootstrap"
+
+# missing local file is the default selection
+out="$("$sel" --os linux --local "$d/absent.yml")"
+assert_eq "$all" "$(names)" "missing local.yml: default selection"
+
+# yaml_has_every_legacy_tool
+legacy="$(yq '.tools[]' "$TESTS_REPO/ansible/group_vars/all.yml")"
+for t in $legacy; do
+	if [ "$(yq ".tools | has(\"$t\")" "$tools_yaml")" != true ]; then
+		fail "yaml_has_every_legacy_tool: $t missing from tools.yaml"
+	fi
+done
+
+# no tool may pin "latest"; mise-sourced tools need backend+version
+bad="$(yq -o=json '.' "$tools_yaml" | jq -r '.tools | to_entries[] | select((.value.version // "") == "latest") | .key')"
+assert_eq "" "$bad" "no latest pins"
