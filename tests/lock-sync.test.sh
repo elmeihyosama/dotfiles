@@ -13,7 +13,16 @@ mkdir -p "$d/tools" "$d/mise-locks"
 cat >"$d/tools.yaml" <<'Y'
 {"tool_groups": ["core"], "tools": {"fzf": {"group": "core", "backend": "aqua:junegunn/fzf", "version": "0.67.0"}, "eza": {"group": "core", "backend": "github:eza-community/eza", "version": "0.23.4"}, "cava": {"group": "core", "native_only": true}, "mise": {"group": "core", "bootstrap": true, "version": "1.0.0", "backend": "aqua:jdx/mise"}}}
 Y
-plat() { printf '[tools."%s"."platforms.%s"]\nurl = "https://example.invalid/x"\n\n' "$1" "$2"; }
+# plat KEY PLATFORM: a platform entry with an OS-named asset url and a checksum
+plat() {
+	local asset
+	case "$2" in
+	macos-arm64) asset=x-darwin_arm64.tar.gz ;;
+	linux-x64) asset=x-linux_amd64.tar.gz ;;
+	*) asset=x-linux_arm64.tar.gz ;;
+	esac
+	printf '[tools."%s"."platforms.%s"]\nurl = "https://example.invalid/%s"\nchecksum = "sha256:00"\n\n' "$1" "$2" "$asset"
+}
 {
 	printf '[[tools."aqua:junegunn/fzf"]]\nversion = "0.67.0"\nbackend = "aqua:junegunn/fzf"\n\n'
 	for p in macos-arm64 linux-x64 linux-arm64; do plat aqua:junegunn/fzf $p; done
@@ -21,6 +30,7 @@ plat() { printf '[tools."%s"."platforms.%s"]\nurl = "https://example.invalid/x"\
 	for p in macos-arm64 linux-x64 linux-arm64; do plat github:eza-community/eza $p; done
 } >"$d/home.lock"
 cp "$d/home.lock" "$d/home.lock.orig"
+: >"$d/exceptions.txt"
 cat >"$d/mise.toml" <<'T'
 [tools]
 "aqua:mvdan/sh" = "3.14.1"
@@ -46,7 +56,7 @@ mkdir -p "$d/.mise/locks/pipx-pre-commit/4.7.0"
 
 run() {
 	out="$(bash "$script" --root "$d" --tools "$d/tools.yaml" --home-lock "$d/home.lock" \
-		--mise-toml "$d/mise.toml" --repo-lock "$d/repo.lock" 2>&1)"
+		--mise-toml "$d/mise.toml" --repo-lock "$d/repo.lock" --home-exceptions "$d/exceptions.txt" 2>&1)"
 	rc=$?
 }
 
@@ -62,7 +72,7 @@ assert_contains "$out" "run scripts/relock.sh" "version_without_lock_fails: hint
 mv "$d/tools.yaml.bak" "$d/tools.yaml"
 
 # platform_asset_missing_fails: fzf has no linux-arm64 asset in the lock
-awk '/^\[tools."aqua:junegunn\/fzf"."platforms.linux-arm64"\]/ {skip=3} skip>0 {skip--; next} {print}' "$d/home.lock.orig" >"$d/home.lock"
+awk '/^\[tools."aqua:junegunn\/fzf"."platforms.linux-arm64"\]/ {skip=4} skip>0 {skip--; next} {print}' "$d/home.lock.orig" >"$d/home.lock"
 run
 assert_eq 1 "$rc" "platform_asset_missing_fails: exit 1"
 assert_contains "$out" "fzf" "platform_asset_missing_fails: names the tool"
@@ -72,6 +82,30 @@ sed -i.bak 's/"version": "0.67.0"/"version": "0.67.0", "missing_on": ["linux-arm
 run
 assert_eq 0 "$rc" "missing_on_exempts_platform: exit 0 ($out)"
 mv "$d/tools.yaml.bak" "$d/tools.yaml"
+cp "$d/home.lock.orig" "$d/home.lock"
+
+# platform_checksum_missing_fails: fzf's linux-x64 entry has a url but no checksum
+awk '/^\[tools."aqua:junegunn\/fzf"."platforms.linux-x64"\]/ {p=1} p && /^checksum/ {p=0; next} {print}' "$d/home.lock.orig" >"$d/home.lock"
+run
+assert_eq 1 "$rc" "platform_checksum_missing_fails: exit 1"
+assert_contains "$out" "fzf (aqua:junegunn/fzf@0.67.0) has no linux-x64 checksum" "platform_checksum_missing_fails: names tool and platform"
+# ... unless the home exceptions file lists that tool and platform
+printf 'aqua:junegunn/fzf linux-x64  # no checksum upstream\n' >"$d/exceptions.txt"
+run
+assert_eq 0 "$rc" "checksum_exception_exempts_platform: exit 0 ($out)"
+# an exception for another platform does not cover it
+printf 'aqua:junegunn/fzf linux-arm64  # no checksum upstream\n' >"$d/exceptions.txt"
+run
+assert_eq 1 "$rc" "exception_for_other_platform: still fails"
+: >"$d/exceptions.txt"
+cp "$d/home.lock.orig" "$d/home.lock"
+
+# platform_url_wrong_os_fails: the macos-arm64 url is a Linux asset (or a man
+# page, or anything without the platform's OS in its name)
+sed 's|"https://example.invalid/x-darwin_arm64.tar.gz"|"https://example.invalid/x-linux_amd64.tar.gz"|' "$d/home.lock.orig" >"$d/home.lock"
+run
+assert_eq 1 "$rc" "platform_url_wrong_os_fails: exit 1"
+assert_contains "$out" "the macos-arm64 url does not look like a macos asset" "platform_url_wrong_os_fails: says why"
 cp "$d/home.lock.orig" "$d/home.lock"
 
 # repo mise.toml tool missing from the repo lock

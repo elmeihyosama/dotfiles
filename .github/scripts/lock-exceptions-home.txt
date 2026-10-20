@@ -3,10 +3,11 @@
 # file because the repo lock's pipx exceptions would be stale here.
 #
 # Per platform on purpose: a `*` line could hide a platform with no release asset
-# at all. scripts/check-lock-sync.sh separately requires an asset url on every
-# locked platform for each tool installed via mise, so a gap listed here is only
-# ever a missing checksum, never a missing asset (that goes in tools.yaml as
-# native_on / missing_on).
+# at all. scripts/check-lock-sync.sh reads this file too: for each tool installed
+# via mise on a locked platform it requires an asset url (named for that OS) and
+# a checksum unless listed here, so a gap listed here is only ever a missing
+# checksum, never a missing asset (that goes in tools.yaml as native_on /
+# missing_on).
 #
 # mise records a checksum only when the release publishes one (a checksum file or
 # a GitHub asset digest); otherwise the lock keeps url/url_api, pinned to the
