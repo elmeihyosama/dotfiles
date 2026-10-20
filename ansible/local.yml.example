@@ -17,3 +17,12 @@ git_email: "you@example.com"
 #                       # CPU architectures (e.g. x86_64 + aarch64 login hosts): binaries
 #                       # and runtimes then go to ~/.local/bin-<arch> / ~/.local/share-<arch>
 #                       # so the two arches don't clobber each other.
+
+# Tool selection (catalog: home/.chezmoidata/tools.yaml; preview with
+# scripts/select-tools.sh --os <darwin|linux> --local ansible/local.yml).
+# The `core` group is always installed. With none of these keys set, every
+# group is installed. Dropping a tool here never uninstalls it.
+# tool_groups: [git, dev]          # core + these groups (valid: git, files,
+#                                  #   containers, system, media, dev)
+# tools_add: [lazydocker]          # extra tools on top of the groups
+# tools_remove: [gh-dash]          # tools to skip (core tools cannot be removed)

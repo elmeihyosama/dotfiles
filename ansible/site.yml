@@ -15,6 +15,17 @@
       changed_when: true
 
   pre_tasks:
+    # Tool catalog (shared with chezmoi, doctor and the dotfiles CLI). Loaded
+    # under a name, not via vars_files: its top-level `tools:` map would
+    # otherwise outrank and break group_vars' legacy `tools:` list, which
+    # tasks/packages.yml still iterates. Read it as tool_catalog.tools /
+    # tool_catalog.tool_groups.
+    - name: Load tool catalog
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../home/.chezmoidata/tools.yaml"
+        name: tool_catalog
+      tags: [always]
+
     - name: Detect passwordless sudo when allow_sudo is unset
       ansible.builtin.command: sudo -n true
       register: _sudo_probe
