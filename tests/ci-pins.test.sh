@@ -48,11 +48,11 @@ key="$(grep -E '^[[:space:]]*key:' .github/actions/setup-lint/action.yml)"
 assert_contains "$key" "hashFiles('mise.lock'" "setup-lint cache key mentions mise.lock"
 assert_contains "$key" ".github/actions/setup-lint/action.yml" "setup-lint cache key covers the pinned mise version"
 
-# scheduled_and_dispatchable: weekly refresh catches upstream drift
-for w in lint provision bootstrap; do
-	wf="$(cat ".github/workflows/$w.yml")"
-	assert_contains "$wf" '- cron: "17 5 * * 1"' "$w.yml has the weekly schedule"
-	assert_contains "$wf" "workflow_dispatch:" "$w.yml has workflow_dispatch"
+# scheduled_and_dispatchable: ci.yml's weekly full run catches upstream
+# drift; each called workflow stays dispatchable on its own.
+assert_contains "$(cat .github/workflows/ci.yml)" '- cron: "17 5 * * 1"' "ci.yml has the weekly schedule"
+for w in ci lint provision bootstrap; do
+	assert_contains "$(cat ".github/workflows/$w.yml")" "workflow_dispatch:" "$w.yml has workflow_dispatch"
 done
 
 # dependabot_groups_actions
@@ -112,10 +112,11 @@ assert_contains "$prov" ".github/scripts/assert-idempotent.sh" "macOS job checks
 assert_contains "$prov" "scripts/doctor.sh" "macOS job runs the doctor health check"
 assert_contains "$prov" "timeout-minutes: 30" "macOS job has a timeout"
 
-# concurrency_cancels_superseded_runs
+# concurrency_cancels_superseded_runs: ci.yml only (a callee group would
+# collide with its caller's, both being named after ci.yml).
+assert_contains "$(cat .github/workflows/ci.yml)" "cancel-in-progress: true" "ci.yml cancels superseded runs"
 for w in lint provision bootstrap; do
-	wf="$(cat ".github/workflows/$w.yml")"
-	assert_contains "$wf" "cancel-in-progress: true" "$w.yml cancels superseded runs"
+	assert_not_contains "$(cat ".github/workflows/$w.yml")" "concurrency:" "$w.yml leaves concurrency to ci.yml"
 done
 
 # pages_dispatchable, zizmor hook and online audits

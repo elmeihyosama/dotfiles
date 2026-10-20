@@ -1,25 +1,17 @@
 name: Lint
+# Called by ci.yml, which decides when this runs; dispatchable by hand.
 on:
-  pull_request:
-  push:
-    branches: [main]
-  # Weekly: catches upstream drift (tool releases, base images) between PRs.
-  schedule:
-    - cron: "17 5 * * 1"
+  workflow_call:
   workflow_dispatch:
 
 # Lint jobs only read the repo.
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   lint:
     # Explicit name = just the area: the matrix would otherwise append the
-    # command, renaming the checks the repo ruleset requires.
+    # command to the check name.
     name: ${{ matrix.area }}
     runs-on: ubuntu-24.04
     strategy:
