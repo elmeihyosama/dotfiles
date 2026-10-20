@@ -24,18 +24,18 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
+from rich.table import Table
 from rich.text import Text
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.theme import Theme
 from textual.widgets import (
     Button,
     DataTable,
     Footer,
-    Header,
     Input,
     Label,
     OptionList,
@@ -171,62 +171,72 @@ def base16_theme(colors: dict[str, str]) -> Theme:
     )
 
 
-def swatch(slug: str, colors: dict[str, str]) -> Text:
-    """A preview of a palette: the 16 colours and a code sample."""
+def clip(text: str, width: int) -> str:
+    """TEXT cut to WIDTH cells with an ellipsis."""
+    return text if len(text) <= width else text[: width - 1] + "…"
+
+
+def swatch(slug: str, colors: dict[str, str], active: bool) -> Text:
+    """A card painted in the palette itself: name, the 16 colours (base00 as a
+    pattern, being the card's own background) and a code sample."""
+    width = 34
+    bg, fg, dim = colors["base00"], colors["base05"], colors["base03"]
     t = Text()
-    t.append(f" {slug}\n\n", style="bold")
+
+    def line(parts: list[tuple[str, str]]) -> None:
+        used = 0
+        for text, style in parts:
+            t.append(text, style=f"{style} on {bg}")
+            used += len(text)
+        t.append(" " * max(0, width - used) + "\n", style=f"on {bg}")
+
+    line([])
+    line([(" " + clip(slug, width - 2), f"bold {fg}")])
+    line([(" ● active" if active else " enter applies it", dim)])
+    line([])
     for row in (BASES[:8], BASES[8:]):
+        cells: list[tuple[str, str]] = [(" ", fg)]
         for k in row:
-            t.append("      ", style=f"on {colors[k]}")
-            t.append(" ")
-        t.append("\n")
-        for k in row:
-            t.append(f"{k[4:]:^6} ", style="dim")
-        t.append("\n\n")
-    bg, fg = colors["base00"], colors["base05"]
-    sample = [
-        [("# switch the look", colors["base03"])],
-        [
-            ("def ", colors["base0E"]),
-            ("apply", colors["base0D"]),
-            ("(theme: ", fg),
-            ("str", colors["base0A"]),
-            ("):", fg),
-        ],
-        [
-            ("    run(", fg),
-            ('"chezmoi apply"', colors["base0B"]),
-            (", retries=", fg),
-            ("3", colors["base09"]),
-            (")", fg),
-        ],
-        [("    ", fg), ("raise ", colors["base08"]), ("Done", colors["base0C"])],
-    ]
-    for parts in sample:
-        width = 0
-        for text, color in parts:
-            t.append(text, style=f"{color} on {bg}")
-            width += len(text)
-        t.append(" " * max(0, 46 - width), style=f"on {bg}")
-        t.append("\n")
+            cells += [("░░░" if k == "base00" else "███", dim if k == "base00" else colors[k]), (" ", fg)]
+        line(cells)
+        line([(" ", fg)] + [(f"{k[4:]:<4}", dim) for k in row])
+    line([])
+    line([(" # switch the look", dim)])
+    line([(" def ", colors["base0E"]), ("apply", colors["base0D"]), ("(theme):", fg)])
+    line([("     run(", fg), ('"chezmoi"', colors["base0B"]), (", ", fg), ("3", colors["base09"]), (")", fg)])
+    line([("     ", fg), ("raise ", colors["base08"]), ("Done", colors["base0C"])])
+    line([])
     return t
 
 
+def empty(title: str, hint: str) -> Text:
+    """An empty-state message: a title line and a dim hint."""
+    t = Text(justify="center")
+    t.append(title + "\n", style="bold")
+    t.append(hint, style="dim")
+    return t
+
+
+class Empty(Static, can_focus=True):
+    """An empty-state panel that can hold focus, so its tab's keys work."""
+
+
 class Confirm(ModalScreen[bool]):
-    """Yes/no dialog."""
+    """Yes/no dialog with a title and a body."""
 
-    BINDINGS = [Binding("y", "answer(True)", "yes"), Binding("n,escape", "answer(False)", "no")]
+    BINDINGS = [Binding("y", "answer(True)", "yes"), Binding("n,escape", "answer(False)", "cancel")]
 
-    def __init__(self, question: str) -> None:
+    def __init__(self, title: str, body: Text | str, yes: str = "Run") -> None:
         super().__init__()
-        self.question = question
+        self.title_text, self.body, self.yes = title, body, yes
 
     def compose(self) -> ComposeResult:
-        with Vertical(classes="dialog"):
-            yield Label(self.question)
+        with Vertical(classes="dialog") as box:
+            box.border_title = self.title_text
+            yield Static(self.body, classes="body")
             with Horizontal(classes="buttons"):
-                yield Button("Yes (y)", variant="primary", id="yes")
-                yield Button("No (n)", id="no")
+                yield Button(f"{self.yes}  y", variant="primary", id="yes")
+                yield Button("Cancel  n", id="no")
 
     def action_answer(self, yes: bool) -> None:
         self.dismiss(yes)
@@ -248,12 +258,13 @@ class Run(ModalScreen[int]):
         self.rc: int | None = None
 
     def compose(self) -> ComposeResult:
-        with Vertical(classes="dialog wide"):
-            yield Label(self.title_text, classes="title")
+        with Vertical(classes="dialog wide") as box:
+            box.border_title = self.title_text
             yield RichLog(id="run-log", wrap=True, min_width=20)
-            yield Label("running…", id="run-status")
+            yield Label("", id="run-status")
 
     def on_mount(self) -> None:
+        self.query_one("#run-status", Label).update(Text("● running…", style=tone(self.app, "$accent")))
         self.go()
 
     @work(exclusive=True)
@@ -268,9 +279,9 @@ class Run(ModalScreen[int]):
         self.rc = rc
         status = self.query_one("#run-status", Label)
         if rc:
-            status.update(Text(f"failed (exit {rc}) — esc to close", style=tone(self.app, "$error")))
+            status.update(Text(f"✗ failed (exit {rc}) · esc closes", style=tone(self.app, "bold $error")))
         else:
-            status.update(Text("done — esc to close", style=tone(self.app, "$success")))
+            status.update(Text("✓ done · esc closes", style=tone(self.app, "bold $success")))
 
     def action_close(self) -> None:
         if self.rc is None:
@@ -279,40 +290,84 @@ class Run(ModalScreen[int]):
         self.dismiss(self.rc)
 
 
-class ToolsPane(TabPane):
+class Pane(TabPane):
+    """A tab with a main widget that gets focus when the tab opens, and an
+    optional one-line filter (/ opens it, esc clears it)."""
+
+    main = ""
+    filter_id = ""
+
+    def focus_main(self) -> None:
+        self.query_one(self.main).focus()
+
+    def action_filter(self) -> None:
+        box = self.query_one(self.filter_id, Input)
+        box.display = True
+        box.focus()
+
+    def action_clear_filter(self) -> None:
+        if not self.filter_id:
+            return
+        box = self.query_one(self.filter_id, Input)
+        box.value = ""
+        box.display = False
+        self.focus_main()
+
+    @on(Input.Submitted)
+    def filter_done(self, event: Input.Submitted) -> None:
+        event.input.display = bool(event.value)
+        self.focus_main()
+
+
+class ToolsPane(Pane):
     """The tool catalog with selection and install state."""
 
     BINDINGS = [
-        Binding("space", "toggle", "mark add/remove"),
-        Binding("a", "apply", "apply marks"),
-        Binding("r", "refresh", "refresh"),
+        Binding("space", "toggle", "mark"),
+        Binding("a", "apply", "apply"),
         Binding("slash", "filter", "filter"),
+        Binding("r", "refresh", "refresh"),
+        Binding("escape", "clear_filter", "clear", show=False),
     ]
+    main = "#tool-table"
+    filter_id = "#tool-filter"
 
     def __init__(self) -> None:
         super().__init__("Tools", id="tools")
-        self.main = "#tool-table"  # focused when the tab opens, so its keys work
         self.tools: list[dict[str, Any]] = []
         self.pending: dict[str, str] = {}
+        self.error = ""
 
     def compose(self) -> ComposeResult:
-        yield Input(placeholder="filter tools (/)", id="tool-filter")
-        yield DataTable(id="tool-table", cursor_type="row", zebra_stripes=True)
-        yield Label("", id="tool-summary")
+        yield Input(placeholder="filter tools", id="tool-filter", classes="filter")
+        yield DataTable(id="tool-table", cursor_type="row")
+        yield Static("", id="tool-empty", classes="empty")
+        yield Label("", id="tool-summary", classes="summary")
+
+    compact: bool | None = None  # under 100 cells: no group column, shorter versions
 
     def on_mount(self) -> None:
+        self.query_one("#tool-filter").display = False
+        self.action_refresh()
+
+    def on_resize(self) -> None:
+        compact = self.size.width < 100
+        if compact == self.compact:
+            return
+        self.compact = compact
         table = self.query_one(DataTable)
+        table.clear(columns=True)
         for label, key in (
-            ("", "mark"),
+            (" ", "mark"),
             ("tool", "name"),
             ("group", "group"),
             ("source", "source"),
-            ("", "installed"),
-            ("pinned", "pinned"),
-            ("actual", "actual"),
+            ("state", "state"),
+            ("version", "version"),
         ):
-            table.add_column(label, key=key)
-        self.action_refresh()
+            if not (compact and key == "group"):
+                table.add_column(label, key=key)
+        self.render_rows()
 
     @work(exclusive=True, group="tools")
     async def action_refresh(self) -> None:
@@ -327,15 +382,13 @@ class ToolsPane(TabPane):
             if not isinstance(tools, list):
                 raise ValueError("not a list")
         except (ValueError, json.JSONDecodeError) as e:
-            self.tools = []
+            self.tools, self.error = [], f"dotfiles list failed: {e}"
             self.render_rows()
-            self.query_one("#tool-summary", Label).update(
-                Text(f"dotfiles list failed: {e}", style=tone(self.app, "$error"))
-            )
             return
+        self.error = ""
         # off-contract items are dropped, not fatal
         self.tools = [t for t in tools if isinstance(t, dict) and isinstance(t.get("name"), str)]
-        self.pending = {k: v for k, v in self.pending.items() if any(t["name"] == k for t in tools)}
+        self.pending = {k: v for k, v in self.pending.items() if any(t["name"] == k for t in self.tools)}
         self.render_rows()
 
     def mark_cell(self, tool: dict[str, Any]) -> Text:
@@ -346,57 +399,84 @@ class ToolsPane(TabPane):
                 return Text("−", style=tone(self.app, "bold $error"))
         return Text("✓", style=tone(self.app, "$primary")) if tool.get("selected") else Text("·", style="dim")
 
+    def state_cell(self, tool: dict[str, Any]) -> Text:
+        if tool.get("installed"):
+            return Text("● installed", style=tone(self.app, "$success") if tool.get("selected") else "dim")
+        if tool.get("selected"):
+            return Text("○ missing", style=tone(self.app, "bold $error"))
+        return Text("·", style="dim")
+
+    def version_cell(self, tool: dict[str, Any]) -> Text:
+        pinned, actual = field(tool, "pinned"), field(tool, "actual")
+        n = 9 if self.compact else 14
+        if actual and pinned and actual != pinned:
+            return Text(f"{clip(actual, n)} → {clip(pinned, n)}", style=tone(self.app, "bold $warning"))
+        return Text(clip(pinned or actual, 2 * n), style="" if tool.get("installed") else "dim")
+
     def render_rows(self) -> None:
         table = self.query_one(DataTable)
+        if self.compact is None:  # columns come with the first resize
+            return
         needle = self.query_one("#tool-filter", Input).value.strip().lower()
         cursor = table.cursor_row
         table.clear()
         shown = drift = missing = 0
         for t in self.tools:
             group, source = field(t, "group"), field(t, "source")
-            hay = f"{t['name']} {group} {source}".lower()
-            if needle and needle not in hay:
+            if needle and needle not in f"{t['name']} {group} {source}".lower():
                 continue
             shown += 1
             pinned, actual = field(t, "pinned"), field(t, "actual")
-            drifted = bool(actual and pinned and actual != pinned)
-            drift += drifted
+            drift += bool(actual and pinned and actual != pinned)
             missing += bool(t.get("selected") and not t.get("installed"))
-            table.add_row(
+            cells = [
                 self.mark_cell(t),
-                t["name"],
-                Text(group, style="dim"),
-                source,
-                Text("●", style=tone(self.app, "$success")) if t.get("installed") else Text("○", style="dim"),
-                pinned,
-                Text(actual, style=tone(self.app, "bold $warning") if drifted else ""),
-                key=t["name"],
-            )
+                clip(t["name"], 22),
+                Text(clip(group, 12), style="dim"),
+                Text(clip(source, 10), style="dim"),
+                self.state_cell(t),
+                self.version_cell(t),
+            ]
+            if self.compact:
+                del cells[2]
+            table.add_row(*cells, key=t["name"])
         if shown:
             table.move_cursor(row=min(cursor, shown - 1))
-        parts = [f"{shown}/{len(self.tools)} tools"]
+        empty_box = self.query_one("#tool-empty", Static)
+        table.display = bool(shown)
+        empty_box.display = not shown
+        if self.error:
+            empty_box.update(empty("Couldn't load the tools", self.error))
+        elif not self.tools:
+            empty_box.update(empty("No tools", "the catalog is empty"))
+        elif not shown:
+            empty_box.update(empty(f"No tools match “{needle}”", "esc clears the filter"))
+        self.render_summary(shown, missing, drift)
+
+    def render_summary(self, shown: int, missing: int, drift: int) -> None:
+        total = len(self.tools)
+        t = Text(f"{shown} of {total} tools" if shown != total else f"{total} tools", style="dim")
         if missing:
-            parts.append(f"{missing} selected but missing")
+            t.append(" · ", style="dim")
+            t.append(f"{missing} missing", style=tone(self.app, "$error"))
         if drift:
-            parts.append(f"{drift} not at their pin")
+            t.append(" · ", style="dim")
+            t.append(f"{drift} off pin", style=tone(self.app, "$warning"))
         if self.pending:
-            parts.append(f"{len(self.pending)} marked — a to apply")
-        self.query_one("#tool-summary", Label).update(" · ".join(parts))
+            t.append(" · ", style="dim")
+            t.append(f"{len(self.pending)} marked, a applies", style=tone(self.app, "bold $primary"))
+        self.query_one("#tool-summary", Label).update(t)
+        if isinstance(self.app, DotfilesApp):
+            self.app.tool_status = (missing, drift) if self.tools else None
+            self.app.render_bar()
 
     @on(Input.Changed, "#tool-filter")
     def filtered(self) -> None:
         self.render_rows()
 
-    @on(Input.Submitted, "#tool-filter")
-    def filter_done(self) -> None:
-        self.query_one(DataTable).focus()
-
-    def action_filter(self) -> None:
-        self.query_one("#tool-filter", Input).focus()
-
     def action_toggle(self) -> None:
         table = self.query_one(DataTable)
-        if not table.row_count:
+        if not table.row_count or not table.display:
             return
         name = str(table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value)
         tool = next(t for t in self.tools if t["name"] == name)
@@ -416,13 +496,18 @@ class ToolsPane(TabPane):
         removes = sorted(n for n, v in self.pending.items() if v == "remove")
         commands = [["add", *adds]] if adds else []
         commands += [["remove", *removes]] if removes else []
-        summary = "; ".join(shlex.join(c) for c in commands)
+        body = Text()
+        for verb, names, style in (("add", adds, "$success"), ("remove", removes, "$error")):
+            if names:
+                body.append(f"{verb:<7}", style=tone(self.app, f"bold {style}"))
+                body.append(", ".join(names) + "\n")
+        body.append("\nthen apply: mise installs or uninstalls, native tools print a hint", style="dim")
 
         def confirmed(yes: bool | None) -> None:
             if yes:
                 self.app.push_screen(Run("Apply tool changes", commands), self.applied)
 
-        self.app.push_screen(Confirm(f"Run: dotfiles {summary}?"), confirmed)
+        self.app.push_screen(Confirm("Apply tool changes", body, yes="Apply"), confirmed)
 
     def applied(self, rc: int | None) -> None:
         if rc == 0:
@@ -430,69 +515,165 @@ class ToolsPane(TabPane):
         self.action_refresh()
 
 
-class HealthPane(TabPane):
-    """`dotfiles doctor`, coloured, with counts."""
+DOCTOR_MARK = {"OK": ("✓", "$success"), "WARN": ("▲", "$warning"), "FAIL": ("✗", "$error")}
 
-    BINDINGS = [Binding("r", "check", "re-run doctor")]
+
+class HealthPane(Pane):
+    """`dotfiles doctor`, problems first; runs only on r."""
+
+    BINDINGS = [Binding("r", "check", "run doctor")]
+    main = "#health-log"
 
     def __init__(self) -> None:
         super().__init__("Health", id="health")
-        self.main = "#health-log"  # focused when the tab opens, so its keys work
-        self.ran = False
 
     def compose(self) -> ComposeResult:
-        yield Label("", id="health-summary")
-        yield RichLog(id="health-log", wrap=True, min_width=20)
+        yield Label("", id="health-summary", classes="summary top")
+        yield Empty(
+            empty("Health check", "r runs doctor · it only reads, nothing changes"), classes="empty", id="health-empty"
+        )
+        # no auto-scroll: the report opens at its top, problems first
+        yield RichLog(id="health-log", wrap=True, min_width=20, auto_scroll=False)
+
+    def on_mount(self) -> None:
+        self.query_one("#health-log").display = False
+        self.query_one("#health-summary").display = False
+
+    def focus_main(self) -> None:
+        log = self.query_one("#health-log")
+        (log if log.display else self.query_one("#health-empty")).focus()
 
     @work(exclusive=True, group="health")
     async def action_check(self) -> None:
-        self.ran = True
         log = self.query_one(RichLog)
         summary = self.query_one("#health-summary", Label)
+        self.query_one("#health-empty").display = False
+        log.display = summary.display = True
         log.clear()
-        summary.update("running doctor…")
-        counts = {"OK": 0, "WARN": 0, "FAIL": 0}
+        log.focus()
+        summary.update(Text("● running doctor…", style=tone(self.app, "$accent")))
+        entries: list[tuple[str, str, list[str]]] = []
+        tail: list[str] = []
 
         def line(s: str) -> None:
-            word = s.split(" ", 1)[0]
-            if word in counts:
-                counts[word] += 1
-            log.write(styled(self.app, s))
+            word, _, rest = s.partition(" ")
+            if word in DOCTOR_MARK:
+                entries.append((word, rest.strip(), []))
+            elif s.startswith(" ") and entries:
+                entries[-1][2].append(s.strip())
+            elif s.strip():
+                tail.append(s)
 
         rc = await stream(["doctor"], line)
-        text = Text()
-        text.append(f"{counts['OK']} ok", style=tone(self.app, "$success"))
-        text.append("  ")
-        text.append(f"{counts['WARN']} warn", style=tone(self.app, "$warning") if counts["WARN"] else "dim")
-        text.append("  ")
-        text.append(f"{counts['FAIL']} fail", style=tone(self.app, "bold $error") if counts["FAIL"] else "dim")
+        self.render_report(entries, tail, rc)
+
+    def render_report(self, entries: list[tuple[str, str, list[str]]], tail: list[str], rc: int) -> None:
+        log = self.query_one(RichLog)
+        log.clear()
+        counts = {k: sum(1 for e in entries if e[0] == k) for k in DOCTOR_MARK}
+        problems = [e for e in entries if e[0] != "OK"]
+        problems.sort(key=lambda e: e[0] != "FAIL")
+        passing = [e for e in entries if e[0] == "OK"]
+
+        def section(title: str, rows: list[tuple[str, str, list[str]]], dim: bool) -> None:
+            log.write(Text(title, style=tone(self.app, "bold $accent")))
+            grid = Table.grid(padding=(0, 1))
+            grid.add_column(width=1)
+            grid.add_column(ratio=1)
+            for kind, text, details in rows:
+                mark, style = DOCTOR_MARK[kind]
+                body = Text(text, style="dim" if dim else "")
+                for d in details:
+                    body.append("\n" + d, style="dim")
+                grid.add_row(Text(mark, style=tone(self.app, style)), body)
+            log.write(grid)
+            log.write("")
+
+        if problems:
+            section(f"Needs attention ({len(problems)})", problems, dim=False)
+        if passing:
+            section(f"Passing ({len(passing)})", passing, dim=True)
+        for s in tail:
+            log.write(Text(s, style="dim"))
+        log.scroll_home(animate=False)
+        t = Text()
+        for kind, label in (("OK", "passing"), ("WARN", "warning"), ("FAIL", "failing")):
+            mark, style = DOCTOR_MARK[kind]
+            n = counts[kind]
+            label += "s" if kind == "WARN" and n != 1 else ""
+            t.append(f"{mark} {n} {label}", style=tone(self.app, style) if n else "dim")
+            t.append("   ")
         if rc and not counts["FAIL"]:
-            text.append(f"  (doctor exited {rc})", style=tone(self.app, "$error"))
-        summary.update(text)
+            t.append(f"doctor exited {rc}", style=tone(self.app, "$error"))
+        else:
+            t.append("r runs it again", style="dim")
+        self.query_one("#health-summary", Label).update(t)
 
 
-class UpdatePane(TabPane):
-    """`dotfiles update --check`, and `update` after a confirm."""
+class UpdatePane(Pane):
+    """`dotfiles update --check` on c, `update` on u (after a confirm)."""
 
-    BINDINGS = [Binding("c", "check", "check again"), Binding("u", "update", "update now")]
+    BINDINGS = [Binding("c", "check", "check"), Binding("u", "update", "update")]
+    main = "#update-log"
 
     def __init__(self) -> None:
         super().__init__("Update", id="update")
-        self.main = "#update-log"  # focused when the tab opens, so its keys work
-        self.ran = False
 
     def compose(self) -> ComposeResult:
-        yield Label("what `dotfiles update` would change — u runs it", id="update-summary")
-        yield RichLog(id="update-log", wrap=True, min_width=20)
+        yield Label("", id="update-summary", classes="summary top")
+        yield Empty(
+            empty("Updates", "c checks what would change (fetch only) · u runs the update"),
+            classes="empty",
+            id="update-empty",
+        )
+        yield RichLog(id="update-log", wrap=True, min_width=20, auto_scroll=False)
+
+    def on_mount(self) -> None:
+        self.query_one("#update-log").display = False
+        self.query_one("#update-summary").display = False
+
+    def focus_main(self) -> None:
+        log = self.query_one("#update-log")
+        (log if log.display else self.query_one("#update-empty")).focus()
+
+    section = ""
+
+    def styled_check(self, s: str) -> Text:
+        if s.startswith("==> "):
+            self.section = s[4:]
+            return Text("\n" + s[4:], style=tone(self.app, "bold $accent"))
+        if self.section == "incoming commits" and s[:1].isalnum() and " " in s:
+            sha, _, subject = s.partition(" ")
+            t = Text(no_wrap=True, overflow="ellipsis")
+            t.append(sha, style=tone(self.app, "$warning"))
+            t.append(" " + subject)
+            return t
+        if s.strip() in ("(none)", "(no upstream branch to compare with)"):
+            return Text(s, style="dim")
+        if s.startswith("+") and not s.startswith("+++"):
+            return Text(s, style=tone(self.app, "$success"))
+        if s.startswith("-") and not s.startswith("---"):
+            return Text(s, style=tone(self.app, "$error"))
+        return styled(self.app, s)
 
     @work(exclusive=True, group="update")
     async def action_check(self) -> None:
-        self.ran = True
         log = self.query_one(RichLog)
+        summary = self.query_one("#update-summary", Label)
+        self.query_one("#update-empty").display = False
+        log.display = summary.display = True
         log.clear()
-        rc = await stream(["update", "--check"], lambda s: log.write(styled(self.app, s)))
+        log.focus()
+        self.section = ""
+        summary.update(Text("● checking (fetch only, nothing changes)…", style=tone(self.app, "$accent")))
+        rc = await stream(["update", "--check"], lambda s: log.write(self.styled_check(s)))
+        log.scroll_home(animate=False)
         if rc:
-            log.write(Text(f"update --check exited {rc}", style=tone(self.app, "$error")))
+            summary.update(Text(f"✗ update --check exited {rc} · c checks again", style=tone(self.app, "$error")))
+        else:
+            done = Text("✓ checked", style=tone(self.app, "$success"))
+            done.append("   u runs the update · c checks again", style="dim")
+            summary.update(done)
 
     def action_update(self) -> None:
         def confirmed(yes: bool | None) -> None:
@@ -501,30 +682,51 @@ class UpdatePane(TabPane):
                 self.app.workers.cancel_group(self, "update")
                 self.app.push_screen(Run("dotfiles update", [["update"]]), lambda _rc: self.action_check())
 
-        self.app.push_screen(Confirm("Pull the repo, run the playbook and chezmoi apply, then doctor?"), confirmed)
+        body = Text(
+            "git pull --ff-only, the ansible playbook, chezmoi apply, sheldon, nvim plugin restore, then doctor."
+        )
+        body.append("\n\nIt stops at the first failure. A dirty repo is refused.", style="dim")
+        self.app.push_screen(Confirm("Update this machine", body, yes="Update"), confirmed)
 
 
-class LookPane(TabPane):
+class LookPane(Pane):
     """Theme and glass, with a live palette preview."""
 
-    BINDINGS = [Binding("slash", "filter", "filter"), Binding("r", "refresh", "refresh")]
+    BINDINGS = [
+        Binding("slash", "filter", "filter"),
+        Binding("g", "glass", "glass"),
+        Binding("t", "themes", "themes", show=False),
+        Binding("r", "refresh", "refresh"),
+        Binding("escape", "clear_filter", "clear", show=False),
+    ]
+    main = "#theme-list"
+
+    def action_glass(self) -> None:
+        glass = self.query_one("#glass-list", OptionList)
+        glass.focus()
+        glass.scroll_visible()
+
+    def action_themes(self) -> None:
+        self.focus_main()
+
+    filter_id = "#theme-filter"
 
     def __init__(self) -> None:
         super().__init__("Look", id="look")
-        self.main = "#theme-list"  # focused when the tab opens, so its keys work
         self.look: dict[str, Any] = {}
 
     def compose(self) -> ComposeResult:
         with Horizontal():
             with Vertical(id="look-left"):
-                yield Input(placeholder="filter themes (/)", id="theme-filter")
+                yield Input(placeholder="filter themes", id="theme-filter", classes="filter")
                 yield OptionList(id="theme-list")
-            with Vertical(id="look-right"):
+            with VerticalScroll(id="look-right"):
                 yield Static("", id="swatch")
-                yield Label("glass (Ghostty)", classes="title")
+                yield Label("Glass (Ghostty) · g", classes="title")
                 yield OptionList(id="glass-list")
 
     def on_mount(self) -> None:
+        self.query_one("#theme-filter").display = False
         self.action_refresh()
 
     @work(exclusive=True, group="look")
@@ -537,7 +739,7 @@ class LookPane(TabPane):
             if not isinstance(look, dict):
                 raise ValueError("not an object")
         except (ValueError, json.JSONDecodeError) as e:
-            self.query_one("#swatch", Static).update(Text(f"dotfiles look failed: {e}", style=tone(self.app, "$error")))
+            self.query_one("#swatch", Static).update(empty("Couldn't load themes", f"dotfiles look failed: {e}"))
             return
         self.look = look
         self.render_themes()
@@ -545,12 +747,14 @@ class LookPane(TabPane):
         glass.clear_options()
         active = look.get("glass") or "default"
         glass.add_options(
-            Option(f"{'● ' if lv == active else '  '}{lv}", id=lv)
+            Option(f"{'●' if lv == active else ' '} {lv}", id=lv)
             for lv in look.get("levels") or []
             if isinstance(lv, str)
         )
         if isinstance(self.app, DotfilesApp):
+            self.app.look_status = (field(look, "theme"), field(look, "glass") or "default")
             self.app.apply_palette(self.palette(look.get("theme")))
+            self.app.render_bar()
 
     def palette(self, slug: str | None) -> dict[str, str] | None:
         """SLUG's colours, or None unless all 16 are #rrggbb."""
@@ -573,31 +777,26 @@ class LookPane(TabPane):
         active = self.look.get("theme")
         themes.clear_options()
         slugs = [t["slug"] for t in self.themes() if needle in t["slug"].lower()]
-        themes.add_options(Option(f"{'● ' if s == active else '  '}{s}", id=s) for s in slugs)
+        themes.add_options(Option(f"{'●' if s == active else ' '} {s}", id=s) for s in slugs)
         if active in slugs:
             themes.highlighted = slugs.index(active)
         elif slugs:
             themes.highlighted = 0
         else:
-            self.query_one("#swatch", Static).update(Text("no theme matches", style="dim"))
+            self.query_one("#swatch", Static).update(empty(f"No themes match “{needle}”", "esc clears the filter"))
 
     @on(Input.Changed, "#theme-filter")
     def filtered(self) -> None:
         self.render_themes()
-
-    @on(Input.Submitted, "#theme-filter")
-    def filter_done(self) -> None:
-        self.query_one("#theme-list", OptionList).focus()
-
-    def action_filter(self) -> None:
-        self.query_one("#theme-filter", Input).focus()
 
     @on(OptionList.OptionHighlighted, "#theme-list")
     def preview(self, event: OptionList.OptionHighlighted) -> None:
         slug = event.option.id
         colors = self.palette(slug)
         if slug and colors:
-            self.query_one("#swatch", Static).update(swatch(slug, colors))
+            self.query_one("#swatch", Static).update(swatch(slug, colors, slug == self.look.get("theme")))
+        elif slug:
+            self.query_one("#swatch", Static).update(empty(slug, "no preview: its palette is incomplete"))
 
     @on(OptionList.OptionSelected, "#theme-list")
     def pick_theme(self, event: OptionList.OptionSelected) -> None:
@@ -617,22 +816,40 @@ class DotfilesApp(App[None]):
     """The dotfiles TUI."""
 
     TITLE = "dotfiles"
+    ENABLE_COMMAND_PALETTE = False
     CSS = """
-    #tool-filter, #theme-filter { margin: 0 0 1 0; }
-    #tool-summary, #health-summary, #update-summary { height: 1; padding: 0 1; color: $text-muted; }
-    #tool-table, #health-log, #update-log { height: 1fr; }
-    #look-left { width: 34; }
-    #theme-list { height: 1fr; }
-    #look-right { padding: 0 2; }
-    #swatch { height: auto; }
-    #glass-list { height: auto; max-height: 8; }
+    Screen { background: $background; }
+    #bar { height: 1; padding: 0 1; background: $surface; }
+    #bar-left { width: 1fr; }
+    #bar-right { width: auto; }
+    TabbedContent { height: 1fr; }
+    TabPane { padding: 0; }
+    .filter { height: 1; border: none; padding: 0 1; margin: 0 0 0 0; background: $surface; }
+    .filter:focus { border: none; background-tint: $primary 10%; }
+    DataTable { height: 1fr; background: $background; scrollbar-size-vertical: 1; }
+    DataTable > .datatable--header { background: $background; color: $text-muted; text-style: bold; }
+    DataTable > .datatable--cursor { background: $primary 25%; }
+    DataTable:focus > .datatable--cursor { background: $primary 35%; }
+    .empty { height: 1fr; content-align: center middle; color: $text; }
+    .summary { height: 1; width: 1fr; padding: 0 1; background: $surface; text-wrap: nowrap; text-overflow: ellipsis; }
+    .summary.top { background: $background; padding: 1 1 0 1; height: 2; }
+    RichLog { height: 1fr; padding: 0 1; background: $background; scrollbar-size-vertical: 1; }
+    #look-left { width: 38; border-right: tall $surface; }
+    #theme-list { height: 1fr; border: none; padding: 0; background: $background; scrollbar-size-vertical: 1; }
+    #theme-list > .option-list--option { padding: 0 0 0 1; }
+    #look-right { padding: 1 2; scrollbar-size-vertical: 1; }
+    #swatch { height: auto; width: auto; }
+    #glass-list { height: auto; max-height: 7; border: none; background: $background; width: 24; }
     .title { text-style: bold; color: $accent; margin: 1 0 0 0; }
-    Confirm, Run { align: center middle; }
-    .dialog { width: 64; height: auto; padding: 1 2; border: round $primary; background: $surface; }
-    .dialog.wide { width: 90%; height: 80%; }
-    .dialog RichLog { height: 1fr; }
-    .buttons { height: auto; margin: 1 0 0 0; }
-    .buttons Button { margin: 0 2 0 0; }
+    Confirm, Run { align: center middle; background: $background 60%; }
+    .dialog { width: 70; max-width: 95%; height: auto; padding: 1 2; border: round $primary;
+              border-title-color: $primary; border-title-style: bold; background: $surface; }
+    .dialog.wide { width: 95%; height: 85%; }
+    .dialog .body { height: auto; }
+    .dialog RichLog { height: 1fr; background: $surface; padding: 0; }
+    #run-status { height: 1; margin: 1 0 0 0; }
+    .buttons { height: auto; margin: 1 0 0 0; align-horizontal: right; }
+    .buttons Button { margin: 0 0 0 2; min-width: 12; }
     """
     BINDINGS = [
         Binding("q", "quit", "quit"),
@@ -643,6 +860,8 @@ class DotfilesApp(App[None]):
     ]
 
     quit_armed = False
+    tool_status: tuple[int, int] | None = None
+    look_status: tuple[str, str] | None = None
 
     async def action_quit(self) -> None:
         """Quit; while a command runs, only on a second press (it stops the command)."""
@@ -656,7 +875,9 @@ class DotfilesApp(App[None]):
         self.exit()
 
     def compose(self) -> ComposeResult:
-        yield Header()
+        with Horizontal(id="bar"):
+            yield Label("", id="bar-left")
+            yield Label("", id="bar-right")
         with TabbedContent(initial="tools"):
             yield ToolsPane()
             yield HealthPane()
@@ -665,9 +886,36 @@ class DotfilesApp(App[None]):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.sub_title = os.uname().nodename.split(".")[0]
+        self.render_bar()
         # the first tab opens without a TabActivated
         self.call_after_refresh(lambda: self.query_one("#tool-table").focus())
+
+    def render_bar(self) -> None:
+        wide = self.size.width >= 140
+        left = Text()
+        left.append("dotfiles", style=tone(self, "bold $primary"))
+        if wide:
+            left.append(f"  {os.uname().nodename.split('.')[0]}", style="dim")
+        if self.look_status:
+            theme, glass = self.look_status
+            theme = clip(theme or "default theme", 34 if wide else 20)
+            left.append(f"  ·  {theme}  ·  {'glass ' if wide else ''}{glass}", style="dim")
+        right = Text("  ")
+        if self.tool_status:
+            missing, drift = self.tool_status
+            if missing:
+                right.append(f"○ {missing} missing  ", style=tone(self, "$error"))
+            if drift:
+                right.append(f"→ {drift} off pin  ", style=tone(self, "$warning"))
+            if not (missing or drift):
+                right.append("✓ tools in sync  ", style=tone(self, "$success"))
+        if wide:
+            right.append("1-4 tabs", style="dim")
+        self.query_one("#bar-left", Label).update(left)
+        self.query_one("#bar-right", Label).update(right)
+
+    def on_resize(self) -> None:
+        self.render_bar()
 
     def apply_palette(self, colors: dict[str, str] | None) -> None:
         """Re-theme the TUI from the active base16 palette."""
@@ -681,11 +929,9 @@ class DotfilesApp(App[None]):
 
     @on(TabbedContent.TabActivated)
     def tab_shown(self, event: TabbedContent.TabActivated) -> None:
-        pane = event.pane
-        if main := getattr(pane, "main", None):
-            pane.query_one(main).focus()
-        if isinstance(pane, (HealthPane, UpdatePane)) and not pane.ran:
-            pane.action_check()
+        # Opening a tab only moves focus: nothing runs until its key is pressed.
+        if isinstance(event.pane, Pane):
+            event.pane.focus_main()
 
 
 def main() -> int:

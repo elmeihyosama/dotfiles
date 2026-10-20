@@ -66,11 +66,12 @@ async def test_tools_table_shows_catalog_and_drift(calls):
         table = pilot.app.query_one("#tool-table", DataTable)
         assert table.row_count == 4
         assert [str(k.value) for k in table.rows] == ["fzf", "ripgrep", "lazygit", "zellij"]
-        assert str(table.get_cell("ripgrep", "actual")) == "14.0.0"
+        assert str(table.get_cell("ripgrep", "version")) == "14.0.0 → 15.1.0"
+        assert str(table.get_cell("zellij", "state")) == "○ missing"
         summary = text(pilot.app.query_one("#tool-summary", Label))
-        assert "4/4 tools" in summary
-        assert "1 not at their pin" in summary
-        assert "1 selected but missing" in summary
+        assert "4 tools" in summary
+        assert "1 off pin" in summary
+        assert "1 missing" in summary
         assert ["list", "--json"] in calls()
 
 
@@ -138,17 +139,21 @@ async def test_bad_list_output_shows_error(calls, monkeypatch):
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
         assert pilot.app.query_one("#tool-table", DataTable).row_count == 0
-        assert "dotfiles list failed" in text(pilot.app.query_one("#tool-summary", Label))
+        assert "dotfiles list failed" in text(pilot.app.query_one("#tool-empty"))
 
 
-async def test_health_runs_doctor_once_and_counts(calls):
+async def test_health_runs_doctor_only_on_r_and_counts(calls):
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
         await pilot.press("2")
         await settle(pilot)
+        assert ["doctor"] not in calls(), "opening the tab runs nothing"
+        await pilot.press("r")
+        await settle(pilot)
         summary = text(pilot.app.query_one("#health-summary", Label))
-        assert "2 ok" in summary and "1 warn" in summary and "1 fail" in summary
-        assert "zellij missing" in log_text(pilot.app.query_one("#health-log", RichLog))
+        assert "2 passing" in summary and "1 warning " in summary and "1 failing" in summary
+        log = log_text(pilot.app.query_one("#health-log", RichLog))
+        assert log.index("Needs attention (2)") < log.index("zellij missing") < log.index("Passing (2)")
         await pilot.press("1", "2")
         await settle(pilot)
         assert calls().count(["doctor"]) == 1
@@ -157,10 +162,13 @@ async def test_health_runs_doctor_once_and_counts(calls):
         assert calls().count(["doctor"]) == 2
 
 
-async def test_update_checks_on_open_and_updates_after_confirm(calls):
+async def test_update_checks_on_c_and_updates_after_confirm(calls):
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
         await pilot.press("3")
+        await settle(pilot)
+        assert ["update", "--check"] not in calls(), "opening the tab runs nothing"
+        await pilot.press("c")
         await settle(pilot)
         assert ["update", "--check"] in calls()
         assert "abc1234" in log_text(pilot.app.query_one("#update-log", RichLog))
@@ -238,19 +246,19 @@ async def test_long_line_without_newline_does_not_crash(calls, monkeypatch):
     monkeypatch.setenv("STUB_BIG", "1")
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
-        await pilot.press("2")
+        await pilot.press("2", "r")
         await settle(pilot)
         log = log_text(pilot.app.query_one("#health-log", RichLog))
         assert "zellij missing" in log
-        assert "1 fail" in text(pilot.app.query_one("#health-summary", Label))
+        assert "1 failing" in text(pilot.app.query_one("#health-summary", Label))
 
 
 async def test_missing_cli_shows_errors_instead_of_crashing(calls, monkeypatch):
     monkeypatch.setenv("DOTFILES_CMD", "/nonexistent/dotfiles")
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
-        assert "cannot run the dotfiles CLI" in text(pilot.app.query_one("#tool-summary", Label))
-        await pilot.press("2")
+        assert "cannot run the dotfiles CLI" in text(pilot.app.query_one("#tool-empty"))
+        await pilot.press("2", "r")
         await settle(pilot)
         assert "cannot run the dotfiles CLI" in log_text(pilot.app.query_one("#health-log", RichLog))
 
@@ -310,7 +318,7 @@ async def test_update_cancels_a_running_check_first(calls, tmp_path, monkeypatch
     monkeypatch.setenv("STUB_SLOW", "update --check")
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
-        await pilot.press("3")
+        await pilot.press("3", "c")
         for _ in range(50):
             await pilot.pause(0.1)
             if "--check" in log.read_text():
@@ -325,6 +333,41 @@ async def test_update_cancels_a_running_check_first(calls, tmp_path, monkeypatch
                 break
         assert ["update"] in calls()
         assert not alive(check), "the slow check was stopped before update ran"
+
+
+async def test_opening_tabs_runs_nothing(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        await settle(pilot)
+        await pilot.press("2", "3", "4", "1", "2", "3")
+        await settle(pilot)
+        assert sorted(map(tuple, calls())) == [("list", "--json"), ("look", "--json")]
+
+
+async def test_escape_leaves_the_filter_so_tab_keys_work(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        await settle(pilot)
+        await pilot.press("slash", *"zzz")
+        await pilot.pause()
+        assert "No tools match" in text(pilot.app.query_one("#tool-empty"))
+        await pilot.press("escape", "2")
+        await pilot.pause()
+        assert pilot.app.query_one("#tool-filter", Input).value == ""
+        assert pilot.app.query_one(tui.TabbedContent).active == "health"
+
+
+async def test_narrow_terminal_drops_the_group_column(calls):
+    async with tui.DotfilesApp().run_test(size=(80, 24)) as pilot:
+        await settle(pilot)
+        table = pilot.app.query_one("#tool-table", DataTable)
+        assert [str(c.value) for c in table.columns] == ["mark", "name", "source", "state", "version"]
+
+
+async def test_g_focuses_the_glass_list(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        await settle(pilot)
+        await pilot.press("4", "g")
+        await pilot.pause()
+        assert pilot.app.focused is pilot.app.query_one("#glass-list", OptionList)
 
 
 def main() -> int:

@@ -6,6 +6,9 @@ STUB_LIST: replaces the `list --json` output verbatim.
 STUB_PROC: file that gets one JSON {argv, pid, leader, prompt} per call.
 STUB_SLOW: a full command line (e.g. "update") that sleeps 30s (quit/cancel tests).
 STUB_BIG: doctor prints 200 KB with no newline first.
+STUB_THEME: the active theme slug in `look --json`.
+STUB_WORST: worst realistic data everywhere (the WORST_* fixtures), for the
+  break-the-UI pass and its screenshots.
 """
 
 import json
@@ -18,18 +21,15 @@ with open(os.environ["STUB_LOG"], "a") as f:
     f.write(json.dumps(args) + "\n")
 if proc_log := os.environ.get("STUB_PROC"):
     with open(proc_log, "a") as f:
-        f.write(
-            json.dumps(
-                {
-                    "argv": args,
-                    "pid": os.getpid(),
-                    "leader": os.getsid(0) == os.getpid(),
-                    "prompt": os.environ.get("GIT_TERMINAL_PROMPT"),
-                }
-            )
-            + "\n"
-        )
+        record = {
+            "argv": args,
+            "pid": os.getpid(),
+            "leader": os.getsid(0) == os.getpid(),
+            "prompt": os.environ.get("GIT_TERMINAL_PROMPT"),
+        }
+        f.write(json.dumps(record) + "\n")
 sub = args[0] if args else ""
+worst = bool(os.environ.get("STUB_WORST"))
 if " ".join(args) == os.environ.get("STUB_SLOW"):
     print("started", flush=True)
     time.sleep(30)
@@ -37,81 +37,169 @@ if sub == os.environ.get("STUB_FAIL"):
     print(f"FAIL  stub {sub} failed")
     sys.exit(1)
 
+
+def tool(name, group, source, selected, installed, pinned=None, actual=None):
+    return {
+        "name": name,
+        "group": group,
+        "bin": name,
+        "source": source,
+        "selected": selected,
+        "installed": installed,
+        "pinned": pinned,
+        "actual": actual,
+    }
+
+
 TOOLS = [
-    {
-        "name": "fzf",
-        "group": "core",
-        "bin": "fzf",
-        "source": "mise",
-        "selected": True,
-        "installed": True,
-        "pinned": "0.70.0",
-        "actual": "0.70.0",
-    },
-    {
-        "name": "ripgrep",
-        "group": "core",
-        "bin": "rg",
-        "source": "mise",
-        "selected": True,
-        "installed": True,
-        "pinned": "15.1.0",
-        "actual": "14.0.0",
-    },
-    {
-        "name": "lazygit",
-        "group": "git",
-        "bin": "lazygit",
-        "source": "mise",
-        "selected": False,
-        "installed": False,
-        "pinned": "0.60.0",
-        "actual": None,
-    },
-    {
-        "name": "zellij",
-        "group": "terminal",
-        "bin": "zellij",
-        "source": "native",
-        "selected": True,
-        "installed": False,
-        "pinned": None,
-        "actual": None,
-    },
+    tool("fzf", "core", "mise", True, True, "0.70.0", "0.70.0"),
+    tool("ripgrep", "core", "mise", True, True, "15.1.0", "14.0.0"),
+    tool("lazygit", "git", "mise", False, False, "0.60.0"),
+    tool("zellij", "terminal", "native", True, False),
 ]
-PAL = {f"base0{c}": f"#{i:02x}{i:02x}{i:02x}" for i, c in enumerate("0123456789ABCDEF")}
-LIGHT = {**PAL, "base00": "#f5f5f7", "base05": "#1d1d1f"}
+# real palettes from the repo: catppuccin-mocha and iglass-light
+PAL = dict(
+    zip(
+        [f"base0{c}" for c in "0123456789ABCDEF"],
+        [
+            "#1e1e2e",
+            "#181825",
+            "#313244",
+            "#45475a",
+            "#585b70",
+            "#cdd6f4",
+            "#f5e0dc",
+            "#b4befe",
+            "#f38ba8",
+            "#fab387",
+            "#f9e2af",
+            "#a6e3a1",
+            "#94e2d5",
+            "#89b4fa",
+            "#cba6f7",
+            "#f2cdcd",
+        ],
+        strict=True,
+    )
+)
+LIGHT = dict(
+    zip(
+        PAL,
+        [
+            "#f5f5f7",
+            "#e5e5ea",
+            "#bad7f9",
+            "#605f64",
+            "#3a3a3c",
+            "#1d1d1f",
+            "#1d1d1f",
+            "#000000",
+            "#92000b",
+            "#c30006",
+            "#763200",
+            "#00521b",
+            "#004a6e",
+            "#0035bb",
+            "#6a238a",
+            "#902fbd",
+        ],
+        strict=True,
+    )
+)
+THEMES = [
+    {"slug": "dark-one", "colors": PAL},
+    {"slug": "light-two", "colors": LIGHT},
+    {"slug": "bad-hex", "colors": {**LIGHT, "base00": "#abc"}},
+    "junk",
+]
+DOCTOR = [
+    "OK    user-local bin dir on PATH",
+    "OK    mise 2026.10.11",
+    "WARN  fzf also installed at /opt/homebrew/bin/fzf (shadowed)",
+    "FAIL  zellij missing",
+    "doctor: 1 failure(s)",
+]
+CHECK = ["==> incoming commits", "abc1234 a change"]
+
+# Worst realistic values: the repo's longest tool name and theme slug, CalVer
+# and Go pseudo-version pins, drift, every source, 60 tools, a 200+ char doctor
+# line (real ones reach 213), long commit subjects, a light active theme.
+GROUPS = ["core", "git", "files", "containers", "system", "media", "dev"]
+WORST_TOOLS = [
+    tool("editorconfig-checker", "dev", "mise", True, True, "2026.10.11", "2026.9.30"),
+    tool("kubectl-neat", "containers", "mise", True, True, "0.0.0-20261011120000-abc1234def56"),
+    tool("jq", "core", "mise", True, False, "1.8.2"),
+    tool("age-keygen", "files", "bundled", True, True),
+    tool("mise", "core", "bootstrap", True, True),
+    tool("lazydocker", "containers", "mise", False, False, "0.24.2"),
+] + [
+    tool(
+        f"tool-{i:02d}",
+        GROUPS[i % len(GROUPS)],
+        ["mise", "native", "mise"][i % 3],
+        i % 4 != 0,
+        i % 5 != 0,
+        f"{i}.{i % 7}.{i % 3}" if i % 3 != 1 else None,
+        f"{i}.{i % 7}.{i % 3}" if i % 3 != 1 and i % 5 != 0 else None,
+    )
+    for i in range(1, 55)
+]
+HOME = "/Users/aleksandra.wisniewska-kowalczyk"
+WORST_DOCTOR = [
+    "OK    user-local bin dir on PATH",
+    "OK    mise 2026.10.11 (pinned bootstrap, first on PATH)",
+    "WARN  fzf also installed at /opt/homebrew/bin/fzf (shadowed); remove with: brew uninstall fzf",
+    "FAIL  zellij: selected but not installed; run `dotfiles update` (or `mise install --locked`); expected "
+    f"{HOME}/.local/share/mise/installs/aqua-zellij-org-zellij/0.44.3/bin/zellij",
+    f"      {HOME}/.local/share/mise/installs/aqua-zellij-org-zellij is empty",
+    "WARN  signing: ~/.ssh/id_ed25519.pub is not registered on GitHub as a signing key; run: "
+    "gh ssh-key add ~/.ssh/id_ed25519.pub --type signing",
+    *[f"OK    tool-{i:02d} {i}.0.0" for i in range(1, 40)],
+    "doctor: 1 failure(s), 2 warning(s)",
+]
+SUBJECT = "feat(tui): keep the tools table summary on screen when the terminal is short and the catalog long"
+WORST_CHECK = [
+    "==> git fetch",
+    "==> incoming commits",
+    *[f"{i:07x} {SUBJECT}" for i in range(1, 9)],
+    "==> chezmoi diff",
+    "diff --git a/.config/ghostty/config b/.config/ghostty/config",
+    "-background-opacity = 0.8",
+    "+background-opacity = 0.66",
+    "==> pending tool installs",
+    "  jq 1.8.2 (not installed)",
+    "  editorconfig-checker 2026.10.11 (installed: 2026.9.30)",
+]
+WORST_THEMES = [
+    {"slug": s, "colors": LIGHT if "light" in s else PAL}
+    for s in [
+        "a",
+        "gruvbox-material-light-medium",
+        "iglass-light",
+        "penumbra-dark-contrast-plus-plus",
+        "penumbra-light-contrast-plus-plus",
+        *[f"theme-{i:03d}" for i in range(1, 324)],
+    ]
+]
 
 if args == ["list", "--json"]:
-    print(os.environ.get("STUB_LIST") or json.dumps(TOOLS))
+    print(os.environ.get("STUB_LIST") or json.dumps(WORST_TOOLS if worst else TOOLS))
 elif args == ["look", "--json"]:
-    current = os.environ.get("STUB_THEME", "dark-one")
-    print(
-        json.dumps(
-            {
-                "theme": current,
-                "glass": None,
-                "levels": ["clear", "frosted", "solid", "default"],
-                "themes": [
-                    {"slug": "dark-one", "colors": PAL},
-                    {"slug": "light-two", "colors": LIGHT},
-                    {"slug": "bad-hex", "colors": {**LIGHT, "base00": "#abc"}},
-                    "junk",
-                ],
-            }
-        )
-    )
+    current = os.environ.get("STUB_THEME", "penumbra-light-contrast-plus-plus" if worst else "dark-one")
+    levels = ["clear", "frosted", "tinted", "solid", "default"] if worst else ["clear", "frosted", "solid", "default"]
+    look = {
+        "theme": current,
+        "glass": "frosted" if worst else None,
+        "levels": levels,
+        "themes": WORST_THEMES if worst else THEMES,
+    }
+    print(json.dumps(look))
 elif sub == "doctor":
     if os.environ.get("STUB_BIG"):
         print("x" * 200_000, end="\r")
-    print("OK    user-local bin dir on PATH")
-    print("OK    mise 2026.10.11")
-    print("WARN  fzf also installed at /opt/homebrew/bin/fzf (shadowed)")
-    print("FAIL  zellij missing")
-    print("doctor: 1 failure(s)")
+    print("\n".join(WORST_DOCTOR if worst else DOCTOR))
     sys.exit(1)
 elif args == ["update", "--check"]:
-    print("==> incoming commits")
-    print("abc1234 a change")
+    print("\n".join(WORST_CHECK if worst else CHECK))
 else:
     print("applied " + " ".join(args))
