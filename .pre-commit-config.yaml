@@ -42,7 +42,7 @@ repos:
         entry: .github/scripts/lint.sh zizmor
         language: system
         pass_filenames: false
-        files: '^\.github/(workflows|actions)/'
+        files: '^\.github/'
       - id: lint-actionlint
         name: actionlint (workflow syntax)
         entry: .github/scripts/lint.sh actionlint

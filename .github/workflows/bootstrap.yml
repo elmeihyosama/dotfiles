@@ -27,12 +27,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   bootstrap:
     # The provision matrix covers per-distro package installs; this job covers
     # the entry point itself (install.sh end-to-end): Ubuntu for its apt
     # branch, Fedora for its dnf branch.
-    name: ${{ matrix.distro }} (${{ matrix.mode }})
+    name: bootstrap ${{ matrix.distro }} (${{ matrix.mode }})
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -40,7 +44,7 @@ jobs:
         distro: [ubuntu, fedora]
         mode: [sudo, nosudo]
         # Digest-pinned like provision.yml (bump both files together; see the
-        # note there).
+        # note there; tests/ci-pins.test.sh fails if the copies diverge).
         include:
           - distro: ubuntu
             image: mirror.gcr.io/library/ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac # 24.04

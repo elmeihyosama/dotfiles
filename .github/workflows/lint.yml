@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     # Stable check name = just the area ("shell", "config", …), so the
@@ -41,7 +45,8 @@ jobs:
           - area: test
             run: ./.github/scripts/lint.sh test
           - area: zizmor
-            run: ./.github/scripts/lint.sh zizmor
+            # Online audits (e.g. impostor-commit, ref-confusion) need a token.
+            run: ZIZMOR_ONLINE=1 ./.github/scripts/lint.sh zizmor
           - area: actionlint
             run: ./.github/scripts/lint.sh actionlint
           - area: lock
@@ -72,4 +77,6 @@ jobs:
         shell: bash
         env:
           RUN: ${{ matrix.run }}
+          # Read-only token for zizmor's online audits; the zizmor area only.
+          GH_TOKEN: ${{ matrix.area == 'zizmor' && github.token || '' }}
         run: eval "$RUN"

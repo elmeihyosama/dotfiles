@@ -64,6 +64,10 @@ assert_contains "$dep" "day: monday" "dependabot runs on Monday"
 assert_contains "$dep" "actions:" "dependabot has the actions group"
 assert_contains "$dep" 'patterns: ["*"]' "dependabot actions group matches everything"
 assert_contains "$dep" "prefix: ci" "dependabot commit prefix is ci"
+# The composite action (actions/cache, jdx/mise-action) lives outside
+# /.github/workflows, so dependabot must be told to scan it.
+assert_contains "$dep" 'directories: ["/", "/.github/actions/*"]' "dependabot scans / and the composite actions dir"
+assert_not_contains "$dep" "directory: /" "dependabot uses directories:, not a single directory"
 
 # no_latest: comments excepted (runner labels and container tags included)
 latest="$(grep -nE '\blatest\b' "${gh_files[@]}" | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' | sed -E 's/[[:space:]]+#.*$//' | grep -E '\blatest\b' || true)"
@@ -76,10 +80,29 @@ assert_contains "$imgs" "image:" "workflows declare container images"
 unpinned="$(printf '%s\n' "$imgs" | grep -vE '^[0-9]+:[[:space:]]*#' | grep -vE '[a-z0-9./_-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}' || true)"
 assert_eq "" "$unpinned" "every container image is pinned by tag@sha256 digest"
 
+# image_pins_agree: bootstrap.yml's ubuntu/fedora images (tag@digest) are
+# copies of provision.yml's; a one-sided bump must fail here.
+img_of() { # FILE DISTRO -> the image: reference (no trailing comment)
+	awk -v d="$2" '$0 ~ "distro: "d"$" {f=1; next} f && /image:/ {sub(/^[^:]*image:[ ]*/, ""); sub(/[ ]+#.*$/, ""); print; exit}' "$1"
+}
+for d in ubuntu fedora; do
+	p_img="$(img_of .github/workflows/provision.yml "$d")"
+	b_img="$(img_of .github/workflows/bootstrap.yml "$d")"
+	assert_contains "$p_img" "@sha256:" "provision.yml has a pinned $d image"
+	assert_eq "$p_img" "$b_img" "$d image is identical in provision.yml and bootstrap.yml"
+done
+
+# mise_versions_agree: the CI mise binary pin in setup-lint and the macOS job.
+mise_ver() { grep -E '^[[:space:]]*version:[[:space:]]*[0-9]' "$1" | head -1 | sed -E 's/.*version:[[:space:]]*//'; }
+sl_ver="$(mise_ver .github/actions/setup-lint/action.yml)"
+mac_ver="$(mise_ver .github/workflows/provision.yml)"
+assert_contains "$sl_ver" "20" "setup-lint pins a mise version"
+assert_eq "$sl_ver" "$mac_ver" "setup-lint and the macOS job pin the same mise version"
+
 # bootstrap_covers_fedora: the bootstrap matrix exercises install.sh's dnf path.
 boot="$(cat .github/workflows/bootstrap.yml)"
 # shellcheck disable=SC2016 # literal GitHub expression, not shell
-assert_contains "$boot" 'name: ${{ matrix.distro }} (${{ matrix.mode }})' "bootstrap job name is distro (mode)"
+assert_contains "$boot" 'name: bootstrap ${{ matrix.distro }} (${{ matrix.mode }})' "bootstrap job name is prefixed (no clash with provision checks)"
 assert_contains "$boot" "distro: [ubuntu, fedora]" "bootstrap matrix covers ubuntu and fedora"
 
 # macos_job: real playbook on a macOS runner, casks skipped, idempotence shared.
@@ -88,6 +111,19 @@ assert_contains "$prov" "runs-on: macos-26" "provision has a macOS job on a vers
 assert_contains "$prov" "ansible-playbook site.yml --skip-tags casks" "macOS job skips casks"
 assert_contains "$prov" "mise install --locked" "macOS job installs ansible from the locked repo toolchain"
 assert_contains "$prov" ".github/scripts/assert-idempotent.sh" "macOS job checks second-run idempotence"
+assert_contains "$prov" "scripts/doctor.sh" "macOS job runs the doctor health check"
+assert_contains "$prov" "timeout-minutes: 30" "macOS job has a timeout"
+
+# concurrency_cancels_superseded_runs
+for w in lint provision bootstrap; do
+	wf="$(cat ".github/workflows/$w.yml")"
+	assert_contains "$wf" "cancel-in-progress: true" "$w.yml cancels superseded runs"
+done
+
+# pages_dispatchable, zizmor hook and online audits
+assert_contains "$(cat .github/workflows/pages.yml)" "workflow_dispatch:" "pages.yml has workflow_dispatch"
+assert_contains "$(grep -A6 'id: lint-zizmor' .pre-commit-config.yaml)" "files: '^\\.github/'" "zizmor hook covers all of .github/"
+assert_contains "$(cat .github/workflows/lint.yml)" "ZIZMOR_ONLINE" "lint.yml runs zizmor online"
 assert_contains "$(cat .github/scripts/bootstrap-smoke.sh)" "assert-idempotent.sh" "bootstrap-smoke uses the shared idempotence check"
 
 # assert_idempotent_script: passes a converged recap, fails changes or no recap.
