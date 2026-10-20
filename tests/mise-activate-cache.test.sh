@@ -28,7 +28,9 @@ shell() {
 	# shellcheck disable=SC2016 # expanded by zsh
 	(cd "$HOME" && env -i HOME="$HOME" PATH="$1" TERM=dumb ZSH_CACHE_DIR="$HOME/cache" MISE_OFFLINE=1 \
 		MISE_DATA_DIR="$HOME/data" MISE_CACHE_DIR="$HOME/mcache" MISE_STATE_DIR="$HOME/state" \
-		zsh -f -c 'compdef() { :; }; source "$HOME/49-mise.zsh"; print -r -- "$PATH"' 2>&1)
+		zsh -f -c 'compdef() { :; }; source "$HOME/49-mise.zsh"
+			(( $+functions[_mise_hook] )) && [[ $MISE_SHELL == zsh ]] && print -r -- ACTIVATED
+			print -r -- "$PATH"' 2>&1)
 }
 
 shell "/stale/session-A:$HOME/misebin:/usr/bin:/bin" >/dev/null
@@ -36,6 +38,7 @@ shell "/stale/session-A:$HOME/misebin:/usr/bin:/bin" >/dev/null
 assert_not_contains "$(cat "$cache")" "/stale/session-A" "cache holds no PATH snapshot"
 
 got="$(shell "/fresh/session-B:$HOME/misebin:/usr/bin:/bin")"
+assert_contains "$got" "ACTIVATED" "cached activation still defines the mise hooks"
 assert_contains "$got" "/fresh/session-B" "cached activation keeps this shell's PATH entries"
 assert_not_contains "$got" "/stale/session-A" "cached activation does not replay the generating shell's PATH"
 
@@ -45,6 +48,20 @@ printf "export PATH='/stale/legacy:/usr/bin:/bin'\n" >"$cache"
 got="$(shell "/fresh/session-C:$HOME/misebin:/usr/bin:/bin")"
 assert_contains "$got" "/fresh/session-C" "legacy cache: PATH kept"
 assert_not_contains "$got" "/stale/legacy" "legacy cache: regenerated"
+
+# A failed generation (mise activate exits non-zero or prints nothing) leaves
+# no cache: otherwise the key line alone would match, and every later shell
+# would source it and silently stay unactivated until the binary changed.
+rm -f "$cache"
+mkdir -p "$HOME/flaky"
+printf '#!/bin/sh\nexit 1\n' >"$HOME/flaky/mise"
+chmod +x "$HOME/flaky/mise"
+shell "$HOME/flaky:/usr/bin:/bin" >/dev/null
+[ -e "$cache" ] && fail "failed generation: no cache written"
+rm "$HOME/flaky/mise"
+ln -s "$real_mise" "$HOME/flaky/mise" # same path, now working (and older)
+got="$(shell "$HOME/flaky:/usr/bin:/bin")"
+assert_contains "$got" "ACTIVATED" "after a failed generation the next shell activates"
 
 # A different mise binary (e.g. Homebrew's vs the dotfiles' one) regenerates
 # the cache: it embeds the binary's absolute path.

@@ -120,6 +120,9 @@ one line at the end of `~/.zprofile`, after the `brew shellenv` line:
 path=("${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims" ${path:#${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims})
 ```
 
+Use the same shims dir `.zshenv` uses: on a `shared_home` host that is
+`$HOME/.local/share-$(uname -m)/mise/shims` instead.
+
 Do not just delete the `brew shellenv` line: the dotfiles do not put
 Homebrew on PATH themselves, so `brew` and its formulae would disappear from
 every shell started from a login shell.

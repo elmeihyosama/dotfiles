@@ -71,8 +71,9 @@ done
 case "$(uname -s)" in Darwin) os=darwin ;; *) os=linux ;; esac
 sel="$("$repo/scripts/select-tools.sh" --os "$os" --local "$local_yml" --tools "$tools_yaml")"
 
-# resolve PATH: the file a path finally points at (or the path itself)
-resolve() { realpath "$1" 2>/dev/null || printf '%s\n' "$1"; }
+# resolve, remove_hint (needs $os and $tools_yaml)
+# shellcheck source=../../scripts/remove-hint.sh
+. "$repo/scripts/remove-hint.sh"
 data_real="$(resolve "$MISE_DATA_DIR")"
 in_mise() { # in_mise PATH: a shim or install under mise's data dir
 	case "$1" in "$MISE_DATA_DIR"/*) return 0 ;; esac
@@ -93,46 +94,6 @@ copies() {
 	done
 	IFS="$_ifs"
 }
-# pkg_name TOOL MANAGER: tools.yaml native_pkg.<manager>, else the tool name
-pkg_name() { yq ".tools.\"$1\".native_pkg.$2 // \"$1\"" "$tools_yaml"; }
-# remove_hint TOOL PATH: how to remove a non-mise copy of TOOL at PATH; prints
-# nothing for a file macOS owns (SIP: cannot, and need not, be removed).
-remove_hint() {
-	_real="$(resolve "$2")"
-	case "$_real" in */Cellar/*)
-		_f="${_real#*/Cellar/}"
-		echo "brew uninstall ${_f%%/*}"
-		return
-		;;
-	esac
-	for _p in ${HOMEBREW_PREFIX:-} /opt/homebrew /home/linuxbrew/.linuxbrew; do
-		case "$2" in "$_p"/*)
-			echo "brew uninstall $(pkg_name "$1" brew)"
-			return
-			;;
-		esac
-	done
-	case "$2" in /usr/bin/* | /bin/* | /usr/sbin/* | /sbin/*)
-		[ "$os" = darwin ] && return
-		if command -v dpkg >/dev/null 2>&1; then
-			_k="$(dpkg -S "$2" 2>/dev/null || dpkg -S "$_real" 2>/dev/null)" || _k=""
-			_k="${_k%%:*}"
-			echo "sudo apt remove ${_k:-$(pkg_name "$1" apt)}"
-		elif command -v rpm >/dev/null 2>&1; then
-			_k="$(rpm -qf --qf '%{NAME}\n' "$2" 2>/dev/null | head -n1)" || _k=""
-			echo "sudo dnf remove ${_k:-$(pkg_name "$1" dnf)}"
-		elif command -v pacman >/dev/null 2>&1; then
-			_k="$(pacman -Qoq "$2" 2>/dev/null)" || _k=""
-			echo "sudo pacman -R ${_k:-$(pkg_name "$1" pacman)}"
-		else
-			echo "your package manager"
-		fi
-		return
-		;;
-	esac
-	echo "rm $2"
-}
-
 fail=0
 # name|bin|source|version|mise-managed (yes/no). A bundled tool takes its
 # provider's version and is mise-managed when its provider is.
@@ -159,8 +120,10 @@ while IFS='|' read -r tool bin source want managed; do
 	fi
 
 	if [ "$managed" = yes ]; then
-		if ! got="$(mise -C / which --version "$bin" 2>&1)"; then
-			echo "FAIL: $tool -> mise does not provide '$bin' from the dotfiles pins (want $want): $(printf '%s' "$got" | head -n1)"
+		# stdout only: a mise WARN on stderr must not spoil the comparison.
+		if ! got="$(mise -C / which --version "$bin" 2>/dev/null)"; then
+			err="$(mise -C / which --version "$bin" 2>&1 >/dev/null | head -n1)" || true
+			echo "FAIL: $tool -> mise does not provide '$bin' from the dotfiles pins (want $want): $err"
 			fail=1
 			continue
 		fi
@@ -169,6 +132,17 @@ while IFS='|' read -r tool bin source want managed; do
 			fail=1
 			continue
 		fi
+		# An install dir on PATH (mise activate) must be the pinned one, not
+		# an old version left there by a stale shell.
+		case "$where" in "$MISE_DATA_DIR"/installs/*)
+			pinned="$(mise -C / which "$bin" 2>/dev/null)" || pinned=""
+			if [ "$(resolve "$where")" != "$(resolve "$pinned")" ]; then
+				echo "FAIL: $tool -> '$bin' resolves to $where, not the pinned $want install ($pinned): restart the shell, or run: mise -C / install --locked"
+				fail=1
+				continue
+			fi
+			;;
+		esac
 		if ! in_mise "$where"; then
 			hint="$(remove_hint "$tool" "$where")"
 			echo "FAIL: $tool -> '$bin' resolves to $where, not mise's (under $MISE_DATA_DIR)${hint:+; remove with: $hint}"

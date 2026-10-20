@@ -3,26 +3,32 @@
 # Sections: PATH, mise version, tools (via assert-tools.sh — same source of
 # truth as CI), Nerd Font, chezmoi drift, active theme, login shell, zellij plugin.
 # One OK/WARN/FAIL line per check; exits non-zero iff any FAIL.
-# Usage: scripts/doctor.sh [--tools TOOLS_YAML]  (or the `doctor` shell function)
-#   --tools  passed to assert-tools.sh (tests use a small catalog)
+# Usage: scripts/doctor.sh [--local LOCAL_YML] [--tools TOOLS_YAML]
+#   (or the `doctor` shell function). Both are passed to assert-tools.sh:
+#   --local  per-machine vars (default: ansible/local.yml; shared_home)
+#   --tools  tool catalog (tests use a small one)
 set -eu
 
 repo_root="$(CDPATH='' cd "$(dirname "$0")/.." && pwd)"
-tools_arg=""
-case "${1:-}" in
---tools)
-	[ $# -ge 2 ] || {
-		echo "usage: doctor.sh [--tools TOOLS_YAML]" >&2
-		exit 2
-	}
-	tools_arg="$2"
-	;;
-"") ;;
-*)
-	echo "usage: doctor.sh [--tools TOOLS_YAML]" >&2
+local_yml="$repo_root/ansible/local.yml"
+tools_yaml="$repo_root/home/.chezmoidata/tools.yaml"
+usage() {
+	echo "usage: doctor.sh [--local LOCAL_YML] [--tools TOOLS_YAML]" >&2
 	exit 2
-	;;
-esac
+}
+while [ $# -gt 0 ]; do
+	[ $# -ge 2 ] || usage
+	case "$1" in
+	--local) local_yml="$2" ;;
+	--tools) tools_yaml="$2" ;;
+	*) usage ;;
+	esac
+	shift 2
+done
+case "$(uname -s)" in Darwin) os=darwin ;; *) os=linux ;; esac
+# resolve, remove_hint (use $os and $tools_yaml)
+# shellcheck source=remove-hint.sh
+. "$repo_root/scripts/remove-hint.sh"
 # Run from / so that tools resolved through mise shims (chezmoi, jq) answer
 # with the dotfiles' home pins, never a project mise.toml such as the repo's.
 cd /
@@ -48,27 +54,47 @@ case ":$PATH:" in
 esac
 
 # --- mise ------------------------------------------------------------------
-# The bootstrap binary is pinned in ansible/group_vars (tasks/mise.yml).
+# The bootstrap binary is pinned in ansible/group_vars (tasks/mise.yml) and
+# installed into the local bin dir (per-arch under shared_home). It must be
+# the right version AND the mise that PATH runs: the playbook cannot fix a
+# different mise ahead of it (Homebrew's, a distro package).
 want_mise="$(sed -nE 's/^mise_version:[[:space:]]*"?([^"[:space:]]+)"?.*/\1/p' "$repo_root/ansible/group_vars/all.yml")"
-if mise_bin="$(command -v mise 2>/dev/null)"; then
-	have_mise="$(mise --version 2>/dev/null | awk 'NR == 1 { print $1 }')"
-	if [ "$have_mise" = "$want_mise" ]; then
-		ok "mise $have_mise (ansible/group_vars mise_version)"
-	else
-		bad "mise ${have_mise:-?} at $mise_bin, but ansible/group_vars pins mise_version $want_mise (rerun the playbook: --tags mise)"
-	fi
+lbin="$HOME/.local/bin"
+if [ -f "$local_yml" ] && grep -Eq '^[[:space:]]*shared_home:[[:space:]]*true' "$local_yml"; then
+	lbin="$HOME/.local/bin-$arch"
+fi
+pinned_mise="$lbin/mise"
+mise_ver() { "$1" --version 2>/dev/null | awk 'NR == 1 { print $1 }'; }
+if [ ! -x "$pinned_mise" ]; then
+	bad "pinned mise missing at $pinned_mise (mise_version $want_mise; rerun the playbook: --tags mise)"
+elif [ "$(mise_ver "$pinned_mise")" = "$want_mise" ]; then
+	ok "mise $want_mise at $pinned_mise (ansible/group_vars mise_version)"
 else
-	bad "mise not on PATH (ansible/group_vars pins mise_version $want_mise)"
+	bad "mise $(mise_ver "$pinned_mise") at $pinned_mise, but ansible/group_vars pins mise_version $want_mise (rerun the playbook: --tags mise)"
+fi
+if ! mise_bin="$(command -v mise 2>/dev/null)"; then
+	bad "mise not on PATH (add $lbin to PATH)"
+elif [ "$mise_bin" != "$pinned_mise" ] && [ "$(resolve "$mise_bin")" != "$(resolve "$pinned_mise")" ]; then
+	other="$(mise_ver "$mise_bin")"
+	hint="$(remove_hint mise "$mise_bin")"
+	hint="${hint:-take its dir off PATH, or put $lbin ahead of it}"
+	if [ "$other" = "$want_mise" ]; then
+		warn "mise $other at $mise_bin shadows the pinned $pinned_mise; remove it with: $hint"
+	else
+		bad "mise ${other:-?} at $mise_bin shadows the pinned $pinned_mise (mise_version $want_mise); remove it with: $hint"
+	fi
 fi
 
 # --- Tools -----------------------------------------------------------------
 # assert-tools resolves the home pins from / with the user's global mise config
 # masked; its WARN lines (non-mise copies shadowed on PATH) are surfaced here.
-if tools_out="$("$repo_root/.github/scripts/assert-tools.sh" ${tools_arg:+--tools "$tools_arg"} 2>&1)"; then
+if tools_out="$("$repo_root/.github/scripts/assert-tools.sh" --local "$local_yml" --tools "$tools_yaml" 2>&1)"; then
 	ok "selected tools all present and runnable"
 else
 	bad "tool assertion failed:"
-	printf '%s\n' "$tools_out" | grep -E '^FAIL' | sed 's/^/      /'
+	# Everything but OK/SKIP/WARN: FAIL lines, and any error output (a crash
+	# of select-tools or yq) that would otherwise leave this list empty.
+	printf '%s\n' "$tools_out" | grep -Ev '^(OK|SKIP|WARN):|^All tool assertions|^Tool assertions FAILED' | sed 's/^/      /'
 fi
 printf '%s\n' "$tools_out" | sed -n 's/^WARN: //p' | while IFS= read -r w; do warn "$w"; done
 

@@ -78,6 +78,20 @@ assert_contains "$out" "FAIL: fzf" "pin_not_installed_fails: names the tool"
 catalog 0.67.0
 pins 0.67.0
 
+# stale_install_dir_fails: an old install dir (left on PATH by a stale
+# activated shell) runs 0.66.0 though mise which reports the pin
+run "$HOME" "$HOME/tbin:$data/installs/aqua-junegunn-fzf/0.66.0:$data/shims:/usr/bin:/bin"
+assert_eq 1 "$rc" "stale_install_dir_fails: exit 1 ($out)"
+assert_contains "$out" "FAIL: fzf -> 'fzf' resolves to $data/installs/aqua-junegunn-fzf/0.66.0/fzf" \
+	"stale_install_dir_fails: names the stale install"
+
+# a mise warning on stderr does not break the version comparison
+mkdir -p "$HOME/noisy"
+printf '#!/bin/sh\necho "mise WARN  a newer mise is available" >&2\nexec "%s" "$@"\n' "$real_mise" >"$HOME/noisy/mise"
+chmod +x "$HOME/noisy/mise"
+run "$HOME" "$HOME/noisy:$HOME/tbin:/usr/bin:/bin"
+assert_eq 0 "$rc" "stderr_noise_ignored: exit 0 ($out)"
+
 # shadowed_copy_warns: a Homebrew fzf behind mise's on PATH
 mkdir -p "$HOME/brew/bin"
 fake "$HOME/brew/Cellar/fzf/0.60.0/bin/fzf" 0.60.0
