@@ -25,6 +25,10 @@ while [ $# -gt 0 ]; do
 	esac
 	shift 2
 done
+# Absolute paths: both are read after the cd / below.
+abspath() { case "$1" in /*) printf '%s' "$1" ;; *) printf '%s/%s' "$PWD" "$1" ;; esac }
+local_yml="$(abspath "$local_yml")"
+tools_yaml="$(abspath "$tools_yaml")"
 case "$(uname -s)" in Darwin) os=darwin ;; *) os=linux ;; esac
 # resolve, remove_hint (use $os and $tools_yaml)
 # shellcheck source=remove-hint.sh
@@ -74,7 +78,9 @@ else
 fi
 if ! mise_bin="$(command -v mise 2>/dev/null)"; then
 	bad "mise not on PATH (add $lbin to PATH)"
-elif [ "$mise_bin" != "$pinned_mise" ] && [ "$(resolve "$mise_bin")" != "$(resolve "$pinned_mise")" ]; then
+# Only when the pinned one exists: a missing pin already FAILed above, and
+# nothing can shadow a binary that is not there.
+elif [ -x "$pinned_mise" ] && [ "$mise_bin" != "$pinned_mise" ] && [ "$(resolve "$mise_bin")" != "$(resolve "$pinned_mise")" ]; then
 	other="$(mise_ver "$mise_bin")"
 	hint="$(remove_hint mise "$mise_bin")"
 	hint="${hint:-take its dir off PATH, or put $lbin ahead of it}"

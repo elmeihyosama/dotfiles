@@ -23,9 +23,10 @@ if command -v mise >/dev/null 2>&1; then
   _mise_line=""
   [[ -s "$_mise_activate" ]] && read -r _mise_line <"$_mise_activate"
   if [[ "$_mise_line" != "$_mise_key" || "$_mise_activate" -ot ${commands[mise]:A} ]]; then
-    # Only a successful, non-empty generation replaces the cache: a key line
-    # over nothing would match next time and leave every shell unactivated.
-    rm -f "$_mise_activate"
+    # Only a successful, non-empty generation replaces the cache (written to
+    # a temp file, then renamed over it): a key line over nothing would match
+    # next time and leave every shell unactivated. On failure the previous
+    # cache stays and is sourced below; its stale key retries next shell.
     if _mise_out="$(env -u MISE_SHELL -u __MISE_DIFF -u __MISE_SESSION -u __MISE_ORIG_PATH \
         -u __MISE_ZSH_ACTIVATE_PATH -u __MISE_ZSH_ACTIVATE_ENV mise activate zsh)" &&
       [[ -n "$_mise_out" ]]; then

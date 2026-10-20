@@ -62,6 +62,31 @@ run
 assert_contains "$out" "FAIL  pinned mise missing at $HOME/.local/bin/mise" "mise_missing_fails: names the pinned path"
 assert_contains "$out" "FAIL  mise not on PATH" "mise_missing_fails: none on PATH"
 
+# pinned_missing_brew_mise: an existing Mac after chezmoi apply, before the
+# playbook: only the Homebrew mise. One FAIL for the missing pin; no
+# "shadows the pinned <nonexistent>" line on top.
+stub_mise 2000.1.1 "$HOME/brew/Cellar/mise/2000.1.1/bin/mise"
+mkdir -p "$HOME/brew/bin"
+ln -s ../Cellar/mise/2000.1.1/bin/mise "$HOME/brew/bin/mise"
+run "$HOME/brew/bin"
+assert_contains "$out" "FAIL  pinned mise missing at $HOME/.local/bin/mise" "pinned_missing_brew_mise: names the missing pin"
+assert_not_contains "$out" "shadows the pinned" "pinned_missing_brew_mise: no shadow line for a missing pin"
+rm -rf "$HOME/brew"
+
+# relative_local_and_tools: --local / --tools relative to the caller's cwd
+# still resolve after doctor's cd / (a lost --local means "all groups").
+stub_mise "$want"
+printf -- '---\nshared_home: true\n' >"$HOME/rel-local.yml"
+stub_mise "$want" "$HOME/.local/bin-$(uname -m)/mise"
+out="$(cd "$HOME" && env -i HOME="$HOME" PATH="$HOME/.local/bin-$(uname -m):$HOME/tbin:/usr/bin:/bin" \
+	sh "$doctor" --local rel-local.yml 2>&1)"
+assert_contains "$out" "OK    mise $want at $HOME/.local/bin-$(uname -m)/mise" "relative_local: shared_home read from a relative --local"
+printf 'tool_groups: [core]\ntools:\n  nosuchtool: {group: core, native_only: true, bin: nosuchtool-bin}\n' >"$HOME/rel-tools.yaml"
+out="$(cd "$HOME" && env -i HOME="$HOME" PATH="$HOME/.local/bin:$HOME/tbin:/usr/bin:/bin" \
+	sh "$doctor" --local /nonexistent --tools rel-tools.yaml 2>&1)"
+assert_contains "$out" "nosuchtool-bin" "relative_tools: the relative --tools catalog is the one checked"
+rm -rf "$HOME/.local/bin-$(uname -m)" "$HOME/rel-local.yml" "$HOME/rel-tools.yaml" "$HOME/.local/bin/mise"
+
 # Shadowed copies: with a real mise and the assert-tools fixture layout.
 real_mise="$(command -v mise 2>/dev/null)" || {
 	echo "SKIP: no mise on PATH (shadow case)" >&2
