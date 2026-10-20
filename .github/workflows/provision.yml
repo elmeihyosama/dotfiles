@@ -6,6 +6,7 @@ on:
       - 'home/**'
       - 'scripts/select-tools.sh'
       - 'scripts/cleanup-ubi.sh'
+      - 'scripts/doctor.sh'
       - '.github/scripts/provision-ci.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'
@@ -17,6 +18,7 @@ on:
       - 'home/**'
       - 'scripts/select-tools.sh'
       - 'scripts/cleanup-ubi.sh'
+      - 'scripts/doctor.sh'
       - '.github/scripts/provision-ci.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'
@@ -226,3 +228,9 @@ jobs:
             echo "doctor reported unexpected FAIL lines (above)" >&2
             exit 1
           fi
+          # The Homebrew fzf preinstalled above sits behind mise's on PATH:
+          # doctor must name it as shadowed, with the brew removal hint.
+          grep -qF 'WARN  fzf also installed at /opt/homebrew/bin/fzf (shadowed); remove with: brew uninstall fzf' "$RUNNER_TEMP/doctor.log" || {
+            echo "doctor did not report the shadowed Homebrew fzf" >&2
+            exit 1
+          }
