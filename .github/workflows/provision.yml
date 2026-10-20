@@ -29,14 +29,12 @@ on:
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'
       - '.github/workflows/provision.yml'
-  # Weekly run catches upstream drift (new tool releases, base images) between PRs.
+  # Weekly: catches upstream drift (tool releases, base images) between PRs.
   schedule:
     - cron: "17 5 * * 1"
   workflow_dispatch:
 
-# Read-only ephemeral token: GITHUB_TOKEN is passed into the container only to
-# raise mise's GitHub API rate limit; contents:read keeps it minimal so exposure
-# to the (same-repo) provisioning script carries negligible risk.
+# GITHUB_TOKEN goes into the container only to raise mise's API rate limit.
 permissions:
   contents: read
 
@@ -46,8 +44,7 @@ concurrency:
 
 jobs:
   provision:
-    # Short, stable check name ("debian (sudo)", "rocky10 (nosudo)", …) instead
-    # of the full image URL; the image itself rides in matrix.image below.
+    # Short check name; the image rides in matrix.image.
     name: ${{ matrix.distro }} (${{ matrix.mode }})
     runs-on: ubuntu-24.04
     strategy:
@@ -55,20 +52,11 @@ jobs:
       matrix:
         distro: [debian, ubuntu, arch, fedora, rocky9, rocky10]
         mode: [sudo, nosudo]
-        # Pull from mirror.gcr.io (Google's Docker Hub mirror) + quay.io, not
-        # Docker Hub directly — GitHub Actions' shared runner IPs hit Docker
-        # Hub's anonymous pull limit and the daemon times out. Same images;
-        # provision-ci.sh detects the distro by package manager, not image name.
-        # `include` attaches each distro's image to its two (sudo/nosudo) combos.
-        # Images are pinned to the multi-arch INDEX digest (tag kept for
-        # readers), so a re-pushed tag cannot change what CI runs. Dependabot's
-        # docker ecosystem does not read workflow matrices; Renovate does
-        # (renovate.json, customManagers): it bumps these tags/digests and
-        # bootstrap.yml's ubuntu/fedora copies in the same "pins" PR
-        # (tests/ci-pins.test.sh fails if they diverge). To bump by hand:
+        # mirror.gcr.io and quay.io, not Docker Hub: shared runner IPs hit its
+        # anonymous pull limit. Images are pinned to the multi-arch index
+        # digest; Renovate bumps them with bootstrap.yml's copies in one PR
+        # (tests/ci-pins.test.sh fails if they diverge). By hand:
         #   docker buildx imagetools inspect <image:tag>   # "Digest:" line
-        # Renovate also bumps the mise `version:` pins (here and in
-        # setup-lint); their sha256s come from scripts/relock.sh on that PR.
         include:
           - distro: debian
             image: mirror.gcr.io/library/debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587 # bookworm-slim
@@ -88,18 +76,12 @@ jobs:
           persist-credentials: false
       - name: Provision (${{ matrix.image }} / ${{ matrix.mode }})
         run: |
-          # Retry up to 3× (fresh container each) to absorb transient network
-          # blips — mise GitHub-API/download hiccups and dnf makecache timeouts
-          # across a 12-job network-heavy matrix. The provisioning is idempotent
-          # (mise skips installed tools, package managers too), so a retry mostly
-          # re-checks and only redoes what actually failed.
+          # Retry up to 3x, fresh container each, to absorb network blips;
+          # provisioning is idempotent, so a retry mostly re-checks.
           for attempt in 1 2 3; do
             echo "::group::provision attempt $attempt"
-            # timeout: a wedged attempt (hung image pull / stalled download)
-            # must fail into the retry loop instead of eating the whole job —
-            # healthy runs finish well under 10 minutes. timeout kills the
-            # docker CLIENT only, so also kill the orphaned container: it
-            # shares the /repo mount with the next attempt.
+            # timeout: a hung attempt must fail into the retry. It kills only
+            # the docker client, so kill the container too (it shares /repo).
             if timeout 900 docker run --rm \
               -e MODE='${{ matrix.mode }}' \
               -e GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
@@ -116,10 +98,8 @@ jobs:
           exit 1
 
   macos:
-    # The real playbook on a real Mac (Apple Silicon): Homebrew, chezmoi apply
-    # into the runner's HOME, macOS defaults, then a convergent second run.
-    # macos-26 is a versioned runner label (no floating alias). Casks are
-    # skipped: GUI apps are slow, large and need no CI signal.
+    # The real playbook on Apple Silicon, then a convergent second run. Casks
+    # are skipped: slow, large, no CI signal.
     name: macos
     runs-on: macos-26
     timeout-minutes: 30
@@ -127,16 +107,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # ansible-core comes from the repo toolchain (mise.toml + mise.lock), the
-      # same pins the lint jobs use. Only the mise binary and ansible go on
-      # PATH: the playbook installs the home tools itself (its own pinned mise,
-      # the dotfiles pins); "Expose the dotfiles mise shims" adds them after.
+      # ansible-core from the repo toolchain (mise.toml + mise.lock). Only mise
+      # and ansible go on PATH: the playbook installs the home tools itself.
       - name: Install mise
         uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
         with:
           version: 2026.10.11
-          # sha256 of mise-v2026.10.11-macos-arm64 (macos-26 is arm64;
-          # update together with `version` and setup-lint's linux-x64 sha).
+          # sha256 of mise-v2026.10.11-macos-arm64; bump with `version` and
+          # setup-lint's linux-x64 sha.
           sha256: 62e86e51f834899610e9bd0ee37580cfe01fac5fff03002318e714fbdb86faeb
           install: false
           cache: false
@@ -145,7 +123,7 @@ jobs:
           env: false
       - name: Install the locked toolchain; put ansible (only) on PATH
         env:
-          # Raises mise's GitHub API limit for the aqua/github tool downloads.
+          # Raises mise's GitHub API limit.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mise install --locked
@@ -153,8 +131,7 @@ jobs:
           echo "$bin" >>"$GITHUB_PATH"
           echo "ANSIBLE_BIN=$bin" >>"$GITHUB_ENV"
           "$bin/ansible-playbook" --version
-      # Review focus: a Homebrew copy of a pinned tool already on the machine
-      # must not win over the dotfiles' mise one (asserted after provisioning).
+      # A Homebrew copy of a pinned tool must not win over mise's (asserted below).
       - name: Preinstall a Homebrew fzf
         run: brew install fzf
       - name: Install Ansible collections
@@ -165,13 +142,12 @@ jobs:
       - name: Provision (first run)
         working-directory: ansible
         env:
-          # mise reads it to raise its GitHub API limit.
+          # Raises mise's GitHub API limit.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ansible-playbook site.yml --skip-tags casks
       - name: Expose the dotfiles mise shims
         run: |
-          # Shims, then ansible again ahead of them (each GITHUB_PATH line is
-          # prepended), so later steps resolve the home tools through mise.
+          # Each GITHUB_PATH line is prepended: ansible ends up ahead of the shims.
           echo "$HOME/.local/share/mise/shims" >>"$GITHUB_PATH"
           echo "$ANSIBLE_BIN" >>"$GITHUB_PATH"
           echo "MISE_SYSTEM_CONFIG_DIR=$HOME/.config/mise-dotfiles" >>"$GITHUB_ENV"
@@ -184,14 +160,11 @@ jobs:
             exit 1
           }
           want="$(yq '.tools.fzf.version' home/.chezmoidata/tools.yaml)"
-          # A hostile inherited PATH, as a shell or IDE started from a
-          # brew-first environment passes down: Homebrew and ~/.local/bin
-          # ahead of the (already present) mise shims. The pre-fix .zshenv left
-          # the shims where they were, so zsh -c ran brew's fzf.
+          # A hostile inherited PATH (brew-first shell or IDE): Homebrew and
+          # ~/.local/bin ahead of the mise shims.
           hostile="/opt/homebrew/bin:$HOME/.local/bin:$HOME/.local/share/mise/shims:/usr/bin:/bin"
           for flags in -c -ic; do
-            # From / (no repo mise.toml), through the deployed ~/.zshenv
-            # (plus ~/.zshrc for -i).
+            # From / (no repo mise.toml), through the deployed ~/.zshenv.
             path="$(cd / && env PATH="$hostile" zsh "$flags" 'command -v fzf' 2>/dev/null | tail -n1)"
             ver="$(cd / && env PATH="$hostile" zsh "$flags" 'fzf --version' 2>/dev/null | tail -n1 | awk '{print $1}')"
             echo "zsh $flags: fzf -> $path ($ver)"
@@ -219,14 +192,13 @@ jobs:
           ./.github/scripts/assert-idempotent.sh "$RUNNER_TEMP/run2.log"
       - name: Doctor (health check)
         run: |
-          # scripts/doctor.sh exits non-zero on any FAIL line. Run it, then fail
-          # on every FAIL line except those matching ALLOW (explicit allow-list;
-          # each entry needs a reason). Empty = no FAIL tolerated.
+          # Fail on every doctor FAIL line not matching ALLOW (each entry
+          # needs a reason; empty = none tolerated).
           ALLOW='^NONE$'
           set +e
           sh scripts/doctor.sh | tee "$RUNNER_TEMP/doctor.log"
           set -e
-          # The summary line proves doctor actually ran to the end.
+          # The summary line proves doctor ran to the end.
           grep -q '^doctor: ' "$RUNNER_TEMP/doctor.log" || {
             echo "doctor did not run to completion" >&2
             exit 1
@@ -235,8 +207,7 @@ jobs:
             echo "doctor reported unexpected FAIL lines (above)" >&2
             exit 1
           fi
-          # The Homebrew fzf preinstalled above sits behind mise's on PATH:
-          # doctor must name it as shadowed, with the brew removal hint.
+          # The preinstalled Homebrew fzf must be reported as shadowed.
           grep -qF 'WARN  fzf also installed at /opt/homebrew/bin/fzf (shadowed); remove with: brew uninstall fzf' "$RUNNER_TEMP/doctor.log" || {
             echo "doctor did not report the shadowed Homebrew fzf" >&2
             exit 1

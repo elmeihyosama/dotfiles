@@ -1,6 +1,5 @@
 {{- $p := index .themes .theme -}}
-# zsh-autosuggestions tuning (plugin sourced by sheldon at 30).
-# Suggest from history first, fall back to the completion engine.
+# History first, then the completion engine.
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
-# Quiet ghost text in the theme's muted tone (base03), matching the design system.
+# Ghost text in the muted tone (base03).
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg={{ $p.base03 }}"

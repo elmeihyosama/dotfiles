@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# lazy-lock.json is tracked in the repo (as a dotfile chezmoi skips) and exposed
-# at ~/.config/nvim/lazy-lock.json through a chezmoi symlink, so LazyVim's
-# runtime rewrites land in the repo and show up in `git status`.
+# lazy-lock.json lives in the repo, symlinked to ~/.config/nvim/lazy-lock.json,
+# so LazyVim's rewrites show up in `git status`.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -34,8 +33,7 @@ else
 	fail "data file missing or jq not installed: $data"
 fi
 
-# Sandboxed apply: temp destination + temp config + this worktree as source.
-# Never touches the real $HOME or the user's real chezmoi config/state.
+# Sandboxed apply: never the real $HOME or chezmoi config/state.
 mk_home
 dest="$HOME/dest"
 mkdir -p "$dest"

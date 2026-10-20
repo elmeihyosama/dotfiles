@@ -1,8 +1,7 @@
 #!/bin/sh
 # Back up pre-existing config to <path>.pre-dotfiles.bak before the first
-# `chezmoi apply --force`, so the force is recoverable.
-# Idempotent: run_once (per machine) + skip any item already backed up.
-# NOTE: this list must track the chezmoi source tree — add new managed paths here.
+# `chezmoi apply --force`, skipping anything already backed up. This list must
+# track the managed paths in the source tree.
 set -eu
 
 any=0

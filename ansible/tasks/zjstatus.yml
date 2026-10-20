@@ -1,6 +1,5 @@
 ---
-# zjstatus — zellij status-bar plugin, one wasm file in the user home. The
-# release is chosen from the INSTALLED zellij minor (zellij-tile ABI): see
+# zjstatus wasm, picked by the INSTALLED zellij minor (zellij-tile ABI): see
 # zjstatus_by_zellij_minor in group_vars/all.yml.
 - name: Ensure zellij plugin directory
   ansible.builtin.file:
@@ -20,7 +19,7 @@
     msg: "zellij not found — the packages task must run before zjstatus."
   when: _zellij_v.rc != 0
 
-# "zellij 0.43.1" -> "0.43". regex_findall: no version-sensitive '\1' argument.
+# "zellij 0.43.1" -> "0.43"
 - name: Derive the zellij minor (major.minor) from `zellij --version`
   ansible.builtin.set_fact:
     _zellij_minor: >-
@@ -34,7 +33,7 @@
       the zjstatus tag's Cargo.toml and pin the wasm's sha256 — then re-run.
   when: _zellij_minor not in zjstatus_by_zellij_minor
 
-# get_url checks the existing dest's checksum, so a plugin from another minor is replaced.
+# get_url checks the dest's checksum, so another minor's plugin is replaced.
 - name: Install zjstatus for zellij {{ _zellij_minor }}
   ansible.builtin.get_url:
     url: "https://github.com/dj95/zjstatus/releases/download/{{ zjstatus_by_zellij_minor[_zellij_minor].version }}/zjstatus.wasm"

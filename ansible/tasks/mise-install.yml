@@ -1,9 +1,7 @@
 ---
-# Locked install of the dotfiles mise pins (~/.config/mise-dotfiles), and only
-# those: mise_install_env masks the user's global config, -C / keeps any cwd
-# mise.toml out. Imported twice: by packages.yml for the bootstrap pins and by
-# site.yml after chezmoi deployed the full selection. `ls --missing` first, so
-# the install (and `changed`) happens only when a pinned tool is absent.
+# Locked install of only the dotfiles pins (global config masked, -C /).
+# Imported by packages.yml (bootstrap pins) and site.yml (full selection);
+# `ls --missing` first, so it installs (and reports changed) only when needed.
 - name: List pinned tools that are not installed yet
   ansible.builtin.command: "{{ local_bin }}/mise -C / ls --missing --json"
   environment: "{{ mise_install_env }}"

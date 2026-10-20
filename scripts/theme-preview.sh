@@ -1,8 +1,6 @@
 #!/bin/sh
-# theme-preview.sh — render a base16 theme as a mock terminal for the `theme`
-# fzf picker preview (à la terminalcolors.com): background, prompt, ls, a code
-# snippet, and the 16-color palette, all painted in the theme's colors.
-# Usage: theme-preview.sh <path/to/theme.toml>
+# theme-preview.sh: render a base16 theme as a mock terminal for the `theme`
+# picker preview. Usage: theme-preview.sh <path/to/theme.toml>
 set -eu
 
 f=${1:-}

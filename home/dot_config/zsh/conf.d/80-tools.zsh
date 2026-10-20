@@ -1,24 +1,20 @@
-# Zoxide (guarded). `z <dir>` to jump by frecency; `zz` for interactive (see aliases).
+# Zoxide (guarded): `z <dir>` jumps by frecency; `zz` is interactive.
 if command -v zoxide >/dev/null 2>&1; then
   eval "$(zoxide init zsh --cmd z)"
 fi
 
-# navi cheatsheets are available as the `navi` command (no key widget, by preference).
 
-# dotfiles — front end for this repo's tooling (list, doctor, ...). The script
-# lives in the repo; resolve it like `theme` does.
+# dotfiles: this repo's CLI; resolve the script like `theme` does.
 dotfiles() {
   local src
   src=$(chezmoi source-path 2>/dev/null) || { echo "dotfiles: chezmoi not found" >&2; return 1; }
   sh "${src:h}/scripts/dotfiles.sh" "$@"
 }
 
-# doctor — read-only health check of this machine's provisioning (tools, font,
-# chezmoi drift, theme, login shell). Same as `dotfiles doctor`.
+# doctor: same as `dotfiles doctor`.
 doctor() { dotfiles doctor "$@" }
 
-# Tab completion: subcommands first; add/remove then complete tool and group
-# names from the catalog (read with the pinned yq on PATH via the mise shims).
+# Completion: subcommands, then tool/group names for add/remove.
 _dotfiles() {
   local src
   local -a subs names

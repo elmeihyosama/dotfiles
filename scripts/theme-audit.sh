@@ -1,15 +1,11 @@
 #!/bin/sh
-# theme-audit.sh — verify vendored themes against tinted-theming/schemes and
-# report per-theme quirks. Sections:
+# theme-audit.sh: check vendored themes against tinted-theming/schemes.
 #   DRIFT:        vendored TOML differs from freshly-converted upstream
 #   COLLISION:    accent slots (base08–base0E) sharing one colour
-#   LOWCONTRAST:  text/bg < 3.0, or a chip (text ON an accent slot) whose best
-#                 on-color (base00/base05, see gen-on-colors.sh) still can't reach 3.0
+#   LOWCONTRAST:  text/bg < 3.0, or an accent chip whose best on-color
+#                 (gen-on-colors.sh) still can't reach 3.0
 # Usage: scripts/theme-audit.sh [--ref REF]   (default: upstream HEAD)
-#
-# Note: the COLLISION/LOWCONTRAST pass runs awk once per theme file (END,
-# not ENDFILE) because macOS ships a one-true-awk without ENDFILE support;
-# this keeps the script POSIX-portable without depending on gawk.
+# awk runs once per theme (END, not ENDFILE): macOS awk lacks ENDFILE.
 set -eu
 REPO_ROOT=$(CDPATH='' cd "$(dirname "$0")/.." && pwd)
 THEMES_DIR="$REPO_ROOT/home/.chezmoidata/themes"
@@ -19,9 +15,7 @@ REF=HEAD
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
-# Cache the upstream clone under $XDG_CACHE_HOME so re-runs reuse it and an
-# offline run still works (fetch is best-effort). The rest of the script keeps
-# using "$tmp/schemes" via a symlink into the cache.
+# The upstream clone is cached so re-runs reuse it and offline runs work.
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/tinted-schemes"
 if [ -d "$CACHE/.git" ]; then
 	if git -C "$CACHE" fetch --quiet --depth 1 origin "$REF" 2>/dev/null; then
@@ -91,11 +85,8 @@ for f in "$THEMES_DIR"/*.toml; do
 				printf "COLLISION %s: %s == %s (%s)\n", slug, i, j, v[i]
 		if (ratio(v["base05"], v["base00"]) < 3.0)
 			printf "LOWCONTRAST %s: text/bg %.2f\n", slug, ratio(v["base05"], v["base00"])
-		# Chrome chips put text ON an accent slot (zellij pills, lualine block,
-		# delta emph, yazi hover). The foreground is on-color = base00 or base05,
-		# whichever contrasts more (scripts/gen-on-colors.sh). Report slots where
-		# even the best on-color stays < 3.0 — inherently marginal, unfixable by
-		# token choice. This is the guardrail for the fg-on-accent bug class.
+		# Accent chips whose best on-color (base00/base05) stays < 3.0 are
+		# inherently marginal: no token choice fixes them.
 		split("base08 base0A base0B base0C base0D base0E", chips, " ")
 		for (c = 1; c <= 6; c++) {
 			s = chips[c]

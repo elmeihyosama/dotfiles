@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# scripts/doctor.sh: the pinned mise (~/.local/bin/mise) must be the group_vars
-# mise_version and must be the one on PATH (another mise ahead of it: FAIL, or
-# WARN when it happens to match the pin), and assert-tools' shadowed-copy
-# warnings surface as doctor WARN lines. --local /nonexistent keeps a repo
-# ansible/local.yml (shared_home) out of the tests.
+# scripts/doctor.sh: the pinned mise must be mise_version and the one on PATH
+# (another ahead: FAIL, or WARN if it matches), and assert-tools' shadowed
+# warnings surface. --local /nonexistent keeps a real local.yml out.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -32,8 +30,7 @@ run
 assert_contains "$out" "OK    mise $want at $HOME/.local/bin/mise (ansible/group_vars mise_version)" "mise_version_ok"
 assert_not_contains "$out" "shadows" "mise_version_ok: nothing shadows it"
 
-# A Homebrew mise ahead of the pinned one: the playbook cannot fix that, so
-# doctor names both binaries and the removal command.
+# A Homebrew mise ahead of the pinned one: doctor names both and the fix.
 stub_mise 2000.1.1 "$HOME/brew/Cellar/mise/2000.1.1/bin/mise"
 mkdir -p "$HOME/brew/bin"
 ln -s ../Cellar/mise/2000.1.1/bin/mise "$HOME/brew/bin/mise"
@@ -62,9 +59,8 @@ run
 assert_contains "$out" "FAIL  pinned mise missing at $HOME/.local/bin/mise" "mise_missing_fails: names the pinned path"
 assert_contains "$out" "FAIL  mise not on PATH" "mise_missing_fails: none on PATH"
 
-# pinned_missing_brew_mise: an existing Mac after chezmoi apply, before the
-# playbook: only the Homebrew mise. One FAIL for the missing pin; no
-# "shadows the pinned <nonexistent>" line on top.
+# pinned_missing_brew_mise: only Homebrew's mise (before the playbook): one
+# FAIL for the missing pin, no "shadows" line on top.
 stub_mise 2000.1.1 "$HOME/brew/Cellar/mise/2000.1.1/bin/mise"
 mkdir -p "$HOME/brew/bin"
 ln -s ../Cellar/mise/2000.1.1/bin/mise "$HOME/brew/bin/mise"
@@ -73,8 +69,7 @@ assert_contains "$out" "FAIL  pinned mise missing at $HOME/.local/bin/mise" "pin
 assert_not_contains "$out" "shadows the pinned" "pinned_missing_brew_mise: no shadow line for a missing pin"
 rm -rf "$HOME/brew"
 
-# relative_local_and_tools: --local / --tools relative to the caller's cwd
-# still resolve after doctor's cd / (a lost --local means "all groups").
+# relative_local_and_tools: relative paths still resolve after doctor's cd /
 stub_mise "$want"
 printf -- '---\nshared_home: true\n' >"$HOME/rel-local.yml"
 stub_mise "$want" "$HOME/.local/bin-$(uname -m)/mise"

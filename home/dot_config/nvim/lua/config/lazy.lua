@@ -16,12 +16,10 @@ vim.opt.rtp:prepend(lazypath)
 
 require("lazy").setup({
   spec = {
-    -- add LazyVim and import its plugins
     { "LazyVim/LazyVim", import = "lazyvim.plugins" },
-    -- Shared LazyVim extras, declared here rather than in lazyvim.json so every
-    -- machine gets the same plugin set and the symlinked lazy-lock.json does not
-    -- churn (lazyvim.json stays ignored: LazyVim rewrites it for news state).
-    -- Must come after the LazyVim import and before the user plugins.
+    -- Extras here, not in lazyvim.json (ignored: LazyVim rewrites it), so every
+    -- machine gets the same set and lazy-lock.json doesn't churn. After the
+    -- LazyVim import, before the user plugins.
     { import = "lazyvim.plugins.extras.lang.python" },
     { import = "lazyvim.plugins.extras.lang.clangd" },
     { import = "lazyvim.plugins.extras.lang.docker" },
@@ -29,15 +27,12 @@ require("lazy").setup({
     { import = "lazyvim.plugins.extras.lang.yaml" },
     { import = "lazyvim.plugins.extras.lang.toml" },
     { import = "lazyvim.plugins.extras.lang.markdown" },
-    -- import/override with your plugins
     { import = "plugins" },
   },
   defaults = {
-    -- By default, only LazyVim plugins will be lazy-loaded. Your custom plugins will load during startup.
-    -- If you know what you're doing, you can set this to `true` to have all your custom plugins lazy-loaded by default.
+    -- Only LazyVim plugins lazy-load by default.
     lazy = false,
-    -- It's recommended to leave version=false for now, since a lot the plugin that support versioning,
-    -- have outdated releases, which may break your Neovim install.
+    -- Many plugins' releases are outdated: track git HEAD.
     version = false, -- always use the latest git commit
     -- version = "*", -- try installing the latest stable version for plugins that support semver
   },

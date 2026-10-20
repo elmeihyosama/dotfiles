@@ -1,8 +1,6 @@
-# Hand-rolled line-editor widgets. Bound in viins (+ vicmd for movement) since
-# the shell is vi-mode. Loads after 60-keybinds; owns no history keys (atuin does).
+# Line-editor widgets, bound in viins (+ vicmd for movement); no history keys.
 
-# --- Ctrl-arrows: word movement. Alt-arrows are reserved for zellij tab/pane
-#     nav, so word-jump lives on Ctrl-arrows (zellij passes these through). ---
+# --- Ctrl-arrows: word movement (Alt-arrows belong to zellij) ---
 for _km in viins vicmd; do
   bindkey -M $_km '^[[1;5C' forward-word    # Ctrl-Right
   bindkey -M $_km '^[[1;5D' backward-word   # Ctrl-Left
@@ -32,7 +30,7 @@ bindkey -M viins '^X^E' edit-command-line
 bindkey -M vicmd '^X^E' edit-command-line
 
 # --- Path-segment-aware word ops: stop at / and . ---
-# Default WORDCHARS makes word-delete swallow whole paths; trim separators.
+# Default WORDCHARS makes word-delete swallow whole paths.
 WORDCHARS='*?_-[]~&;!#$%^(){}<>'
 
 # --- take: mkdir -p then cd into it ---
@@ -41,8 +39,7 @@ take() {
   mkdir -p -- "$1" && cd -- "$1"
 }
 
-# --- Ctrl-F: sessionizer (fuzzy project → zellij session). Safe key — plain
-#     self-insert otherwise; zellij passes Ctrl-F through in normal mode. ---
+# --- Ctrl-F: sessionizer (zellij passes it through in normal mode) ---
 _sessionize() {
   sz </dev/tty
   zle reset-prompt

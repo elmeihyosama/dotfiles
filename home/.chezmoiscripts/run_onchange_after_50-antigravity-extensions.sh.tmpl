@@ -1,17 +1,13 @@
 #!/bin/sh
-# Install missing Antigravity IDE extensions from the managed list. Re-runs
-# whenever the list changes (content hash below rides the template). No-op
-# when the `antigravity-ide` CLI is absent (Linux boxes without it, pre-shim
-# macOS). Per-extension failures are non-fatal: the list was exported from
-# VS Code and forks install from Open VSX, which lacks some MS-licensed
-# extensions — those get skipped, not aborted on.
+# Install missing Antigravity extensions from the managed list (re-runs when
+# its hash below changes). No-op without the CLI. Failures are non-fatal: Open
+# VSX lacks some MS-licensed extensions.
 # extensions.txt sha256: {{ include "dot_config/antigravity-ide/extensions.txt" | sha256sum }}
 set -eu
 command -v antigravity-ide >/dev/null 2>&1 || exit 0
 ext_file="$HOME/.config/antigravity-ide/extensions.txt"
 [ -f "$ext_file" ] || exit 0
-# List first, un-piped: a failing CLI must abort here (set -e), not be masked
-# by the pipeline into an empty "nothing installed" result.
+# Un-piped: a failing CLI must abort here (set -e), not look like an empty list.
 installed="$(antigravity-ide --list-extensions)"
 installed="$(printf '%s\n' "$installed" | tr '[:upper:]' '[:lower:]')"
 while IFS= read -r ext; do

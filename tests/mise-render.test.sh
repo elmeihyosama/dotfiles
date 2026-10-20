@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# The dotfiles mise pins template (home/dot_config/mise-dotfiles/config.toml.tmpl):
-# renders [tools] for selected_tools, falls back to "every mise-capable tool on
-# this OS" when selected_tools is absent, and that fallback matches
-# scripts/select-tools.sh's default selection.
+# The mise pins template (home/dot_config/mise-dotfiles/config.toml.tmpl):
+# selected_tools, and the fallback, which must equal select-tools' default.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

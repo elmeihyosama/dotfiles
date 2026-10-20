@@ -1,16 +1,13 @@
 #!/usr/bin/env sh
-# remove-hint.sh — sourced (POSIX sh) by .github/scripts/assert-tools.sh and
-# scripts/doctor.sh: how to remove a copy of a tool that is not mise's.
-# The caller sets $os (darwin|linux) and $tools_yaml (the catalog, for
-# native_pkg names).
+# remove-hint.sh: sourced by assert-tools.sh and doctor.sh; how to remove a
+# non-mise copy of a tool. The caller sets $os and $tools_yaml.
 # shellcheck disable=SC2154 # os, tools_yaml: set by the sourcing script
 
 # resolve PATH: the file a path finally points at (or the path itself)
 resolve() { realpath "$1" 2>/dev/null || printf '%s\n' "$1"; }
 # pkg_name TOOL MANAGER: tools.yaml native_pkg.<manager>, else the tool name
 pkg_name() { yq ".tools.\"$1\".native_pkg.$2 // \"$1\"" "$tools_yaml"; }
-# remove_hint TOOL PATH: how to remove a non-mise copy of TOOL at PATH; prints
-# nothing for a file macOS owns (SIP: cannot, and need not, be removed).
+# remove_hint TOOL PATH: prints nothing for a file macOS owns (SIP).
 remove_hint() {
 	_real="$(resolve "$2")"
 	case "$_real" in */Cellar/*)

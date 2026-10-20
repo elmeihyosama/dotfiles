@@ -9,6 +9,5 @@
     git_name = "Your Name"
     git_email = "you@example.com"
     # theme = "rose-pine-moon"   # uncomment to override the repo default
-    # selected_tools = ["fzf", "jq"]   # normally written by the playbook (names from scripts/select-tools.sh whose
-    #                                  # source is "mise"). Omit it and ALL tools with a backend are pinned
-    #                                  # (except those native on this OS); that is the default selection.
+    # selected_tools = ["fzf", "jq"]   # written by the playbook; omit it to pin
+    #                                  # every tool with a backend (minus native ones)

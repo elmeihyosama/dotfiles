@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# scripts/dotfiles.sh add/remove: edits of local.yml (groups, tools_add,
-# tools_remove), idempotence, comment/flow-style preservation, validation,
-# native-remove hint, and the apply / mise uninstall calls (stubbed).
+# scripts/dotfiles.sh add/remove: local.yml edits, idempotence, comment and
+# style preservation, validation, native hints, apply/uninstall (stubbed).
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

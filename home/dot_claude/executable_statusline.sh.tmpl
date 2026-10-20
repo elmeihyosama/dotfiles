@@ -1,17 +1,13 @@
 #!/usr/bin/env bash
-# Claude Code statusline — sectioned (Direction C). Colours resolve against
-# the active base16 theme (currently {{ .theme }}) via home/.chezmoidata/design.toml
-# roles where the usage is "chrome" (cwd, branch, context/effort/plan badges);
-# purely informational accents (dirty flag, cost, muted text, dividers) read
-# straight base16 slots per design.toml's own "content vs chrome" convention.
-# Reads the statusLine JSON on stdin. Dependency-free beyond jq/git (both provisioned).
-# Glyphs are raw UTF-8 byte escapes so they render in any bash/sh (macOS bash 3.2
-# lacks printf \U). Missing JSON fields just omit their segment.
+# Claude Code statusline. Chrome colours use design.toml roles, informational
+# accents raw base16 slots (theme: {{ .theme }}). Reads the statusLine JSON on
+# stdin; needs jq/git. Glyphs are UTF-8 byte escapes: macOS bash 3.2 lacks
+# printf \U. A missing field omits its segment.
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"
 input=$(cat)
 
 C() { printf '\033[38;2;%sm' "$1"; }
-# Repo-root-relative cwd (symlink-safe via git's own --show-prefix), else full ~ path.
+# Repo-root-relative cwd (git's --show-prefix is symlink-safe), else ~ path.
 pretty_cwd() {
 	local d r p
 	d="$1"
@@ -53,7 +49,6 @@ SUBTLE=$(C '{{ template "hex2rgb" $p.base04 }}')
 DIM=$(C '{{ template "hex2rgb" $p.base03 }}')
 RST=$'\033[0m'
 CLAUDE=$(C '217;119;87') # Claude terracotta (brand colour, not base16)
-# Nerd Font glyphs as UTF-8 byte escapes (bash-3.2 safe).
 BR=$(printf '\xee\x82\xa0')
 CTX=$(printf '\xf3\xb0\xa7\x91')
 CLK=$(printf '\xef\x80\x97')
@@ -64,8 +59,8 @@ EFFORT=$(printf '\xef\x83\xa7')
 RESET_GLYPH=$(printf '\xe2\x86\xbb') # ↻ (plain Unicode, not Nerd Font)
 DIV="${DIM} │ ${RST}"
 
-# Countdown to a Unix-epoch reset time: "3d4h" / "2h15m" / "7m" / "now".
-# Pure bash arithmetic, so no GNU `date -d` vs BSD `date -r` split.
+# Countdown to a Unix-epoch reset: "3d4h" / "2h15m" / "7m" / "now". Pure bash
+# arithmetic sidesteps GNU vs BSD `date`.
 fmt_reset() {
 	local secs d h m
 	[ -n "$1" ] || return 0
@@ -87,7 +82,7 @@ fmt_reset() {
 	fi
 }
 
-# One jq pass for every field (cheaper than a process per field).
+# One jq pass for every field.
 IFS=$'\037' read -r cwd model ostyle cost effort ctx h5 d7 h5r d7r rl < <(
 	printf '%s' "$input" | jq -r '[
 		(.workspace.current_dir // .cwd // ""),

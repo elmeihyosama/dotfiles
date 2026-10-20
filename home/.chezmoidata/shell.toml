@@ -1,9 +1,6 @@
-# Shell feature flags. Override per-machine in ~/.config/chezmoi/chezmoi.toml
-# ([data] atuin_sync = true). Default false → atuin is fully local, nothing
-# leaves the machine. Enable only on personal machines you want history synced
-# across; the work machine must stay false.
+# Override per machine in ~/.config/chezmoi/chezmoi.toml [data]. atuin_sync
+# false keeps history local; the work machine must stay false.
 atuin_sync = false
 
-# Roots the sessionizer scans for projects (space-separated). Per-machine
-# override in ~/.config/chezmoi/chezmoi.toml. Nonexistent roots are skipped.
+# Sessionizer roots (space-separated); nonexistent ones are skipped.
 sessionize_roots = "~/workspace ~/workspaces ~/projects"

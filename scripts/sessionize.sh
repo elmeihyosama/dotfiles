@@ -1,7 +1,6 @@
 #!/bin/sh
-# sessionize.sh — fuzzy-pick a project and open/attach/switch a zellij session
-# named for it. Sources: `fd` over $SESSIONIZE_ROOTS (git repos / immediate
-# subdirs) merged with zoxide frecency, deduped. Standalone-testable:
+# sessionize.sh: fuzzy-pick a project (fd over $SESSIONIZE_ROOTS plus zoxide)
+# and open/attach/switch a zellij session named for it.
 #   sessionize.sh            interactive (fzf) → create/attach/switch
 #   sessionize.sh --list     print deduped candidate paths, no fzf
 #   sessionize.sh --name P   print the sanitized session name for path P
@@ -10,15 +9,12 @@ set -eu
 
 : "${SESSIONIZE_ROOTS:=$HOME/workspace $HOME/workspaces $HOME/projects}"
 
-# Fold a string into a zellij-legal name fragment: zellij rejects '.' '/' and
-# whitespace, so map junk to '-', strip leading dots, trim dashes.
+# zellij rejects '.', '/' and whitespace in names.
 _sanitize() {
 	printf '%s' "$1" | sed -e 's/^\.*//' -e 's/[^A-Za-z0-9_-]/-/g' -e 's/--*/-/g' -e 's/^-*//' -e 's/-*$//'
 }
 
-# Sanitize a path's basename into a zellij session name. Resolve to a real
-# absolute path first so '.'/'..' become the actual directory name; guarantee a
-# non-empty, flag-safe result by falling back to 'session'.
+# Resolve first so '.'/'..' become the real name; never empty or flag-like.
 session_name() {
 	path=$(cd "$1" 2>/dev/null && pwd || printf '%s' "$1")
 	path=${path%/}
@@ -27,7 +23,7 @@ session_name() {
 	printf '%s\n' "$name"
 }
 
-# Sanitized basename of a path's PARENT dir — used to disambiguate name clashes.
+# The PARENT dir's sanitized name, to disambiguate clashes.
 parent_component() {
 	p=$(cd "$1" 2>/dev/null && pwd || printf '%s' "$1")
 	p=${p%/}
@@ -36,8 +32,7 @@ parent_component() {
 }
 
 list_candidates() {
-	# fd (fallback find) for directories at depth 1-2 under each existing root,
-	# preferring those that are git repos; merge with zoxide frecency; dedup.
+	# Dirs at depth 1-2 under each root, git repos first; plus zoxide; dedup.
 	{
 		for root in $SESSIONIZE_ROOTS; do
 			[ -d "$root" ] || continue
@@ -54,10 +49,8 @@ list_candidates() {
 	} | sed 's#/$##' | awk 'NF && !seen[$0]++'
 }
 
-# Emit "NAME<TAB>PATH" for every candidate. When two candidates' base names
-# collide (e.g. ~/a/docs and ~/b/docs both → "docs"), prefix the colliding ones
-# with their parent-dir component ("a-docs" / "b-docs") so a picked project
-# always maps to its own session instead of hijacking another dir's session.
+# Colliding base names (~/a/docs, ~/b/docs) get their parent prefixed
+# ("a-docs"), so a project never hijacks another dir's session.
 candidate_table() {
 	list_candidates | while IFS= read -r p; do
 		[ -n "$p" ] || continue
@@ -93,8 +86,6 @@ case "${1:-}" in
 	;;
 esac
 
-# Interactive default path (no args): fuzzy-pick a project (showing the
-# collision-aware name), then create/attach/switch a zellij session for it.
 choose() {
 	candidate_table | fzf --prompt='project ❯ ' --height=40% --reverse \
 		--delimiter='\t' --with-nth=1 \
@@ -118,18 +109,15 @@ main() {
 	[ -n "$path" ] || exit 0
 
 	if [ -z "${ZELLIJ:-}" ]; then
-		# Not inside zellij: attach-or-create. New session inherits cwd; glow is
-		# the default_layout, so no explicit --layout needed.
+		# Not inside zellij: attach-or-create (glow is the default layout).
 		cd "$path" || {
 			echo "sessionize: cannot cd to '$path' (stale entry?)" >&2
 			exit 1
 		}
 		exec zellij attach -c "$name"
 	else
-		# Inside zellij: switch-session's create-on-missing behaviour is
-		# condition-dependent (observed both no-op and auto-create); we
-		# create-first (idempotent) so this is correct either way. The cd seeds
-		# the created (attach -b) session's initial cwd; --cwd re-affirms it.
+		# Inside zellij: switch-session's create-on-missing is unreliable, so
+		# create first (idempotent). The cd seeds the new session's cwd.
 		cd "$path" || {
 			echo "sessionize: cannot cd to '$path' (stale entry?)" >&2
 			exit 1

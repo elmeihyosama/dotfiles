@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Every sheldon plugin fetched from the network (github / git / remote) is
-# pinned: github/git take a 40-hex `rev` or a `tag`; a remote (raw URL) plugin
-# must carry a commit SHA or version tag in its URL, never a branch name.
+# Every networked sheldon plugin is pinned: a 40-hex `rev` or a `tag`, or for a
+# remote URL a commit SHA or version tag in it, never a branch.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

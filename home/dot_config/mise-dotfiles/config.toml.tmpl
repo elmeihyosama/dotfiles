@@ -1,16 +1,12 @@
-{{- /* Dotfiles-managed mise pins. NOT ~/.config/mise/config.toml: that file is
-the user's (`mise use -g` writes there). mise reads this dir as its "system"
-config scope via MISE_SYSTEM_CONFIG_DIR=$HOME/.config/mise-dotfiles (set in
-.zshenv/.bashrc/.bash_profile, Raycast scripts and Ansible), and the lock lives
-next to it as mise.lock. Install with
+{{- /* Dotfiles-managed mise pins, apart from the user's ~/.config/mise/config.toml
+(`mise use -g` writes there). mise reads this dir as its "system" scope via
+MISE_SYSTEM_CONFIG_DIR, with mise.lock beside it. Install with
   MISE_GLOBAL_CONFIG_FILE=/nonexistent/mise-user.toml mise -C / install --locked
-Never set `locked = true` in [settings] here: it makes `mise use -g` fail.
+Never set `locked = true` here: it makes `mise use -g` fail.
 
-Tool set: `selected_tools` (written by ansible/tasks/chezmoi.yml from
-scripts/select-tools.sh) or, when absent, every tool with a backend. Either way
-tools native on this OS, missing_on this OS-arch, bootstrap tools (mise itself) and
-provided_by tools are skipped; an unknown selected_tools name fails the render. `mise_pins_all = true` (scripts/relock.sh) renders every backend
-tool regardless of OS so the shipped lock covers them all. */ -}}
+Tools: `selected_tools` (from ansible/tasks/chezmoi.yml), else every tool with
+a backend, minus native_on / missing_on / bootstrap / provided_by; an unknown
+name fails the render. `mise_pins_all` (relock.sh) renders all of them. */ -}}
 {{- $os := .chezmoi.os -}}
 {{- $arch := ternary "arm64" "x64" (eq .chezmoi.arch "arm64") -}}
 {{- $plat := printf "%s-%s" (ternary "macos" "linux" (eq $os "darwin")) $arch -}}

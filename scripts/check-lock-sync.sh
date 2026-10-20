@@ -1,18 +1,13 @@
 #!/usr/bin/env bash
 # check-lock-sync.sh: the locks must cover what the pins say. Fails (exit 1) when
-#   (a) a tool with a backend+version in tools.yaml is missing from the home lock
-#       (home/dot_config/mise-dotfiles/mise.lock) at that version,
-#   (a2) per locked platform (macos-arm64, linux-x64, linux-arm64), a tool that
-#       select-tools installs from mise there (so missing_on / native_on are
-#       respected) lacks, in that version's lock entry: a url, a url whose
-#       asset name names the platform's OS, or a checksum (unless the tool's
-#       no_checksum_on lists the platform; listed but present also fails); for
-#       macos-arm64 also a url naming an x86_64 build (x86_64/amd64/x64/intel,
-#       not universal), no exceptions: it needs Rosetta 2, which a fresh Apple
-#       Silicon Mac lacks,
-#   (b) a tool in the repo mise.toml is missing from mise.lock at that version,
-#   (c) a .mise/locks/pipx-*/<ver>/ dir (a pipx tool's hash-pinned uv.lock) is not
-#       referenced by the repo mise.lock any more (orphaned after a bump).
+#   (a) a tools.yaml backend+version is missing from the home lock,
+#   (a2) per locked platform, a tool select-tools installs from mise there
+#       lacks a url, a url naming the platform's OS, or a checksum (unless in
+#       its no_checksum_on; listed but present fails too), or on macos-arm64
+#       has an x86_64 url (needs Rosetta 2, absent on a fresh Mac; no
+#       exceptions),
+#   (b) a repo mise.toml tool is missing from mise.lock,
+#   (c) a .mise/locks/pipx-*/<ver>/ uv.lock dir is no longer referenced.
 # On mismatch it prints `run scripts/relock.sh`. Needs yq (mikefarah) and jq.
 # Options override the default paths (used by tests):
 #   --root DIR --tools FILE --home-lock FILE --mise-toml FILE --repo-lock FILE
@@ -68,24 +63,17 @@ have() { jq -e --arg k "$2" --arg v "$3" '(.[$k] // []) | index($v) != null' <<<
 home_json="$(lock_json "$home_lock")" || exit 2
 repo_json="$(lock_json "$repo_lock")" || exit 2
 
-# (a) tools.yaml backend+version rows, TSV. Same skips as the pins template:
-# bootstrap and provided_by tools are never pinned.
+# (a) Same skips as the pins template: bootstrap and provided_by tools.
 while IFS=$'\t' read -r name backend version; do
 	[ -n "$backend" ] || continue
 	have "$home_json" "$backend" "$version" ||
 		bad "tools.yaml: $name ($backend@$version) is not in $home_lock"
 done < <(yq -o json '.tools' "$tools" | jq -r 'to_entries[] | select(.value.backend != null and .value.version != null and .value.bootstrap != true and .value.provided_by == null) | [.key, .value.backend, .value.version] | @tsv')
 
-# (a2) platform coverage: every tool select-tools marks source "mise" on a locked
-# platform (default selection) needs, in its version's lock entry for that
-# platform, a url to an asset named for the platform's OS (a man page or the
-# other OS's build passes a plain url check) and a checksum. An upstream with
-# no asset for a platform goes in tools.yaml (native_on / missing_on); one that
-# publishes no checksum in its no_checksum_on. On macos-arm64 the asset must
-# not be an x86_64 build: it runs only under Rosetta 2, which a fresh Apple
-# Silicon Mac does not have (universal and arch-less names pass). Use
-# native_on: [darwin] (brew) instead. Linux arches are not checked (no Linux
-# asset here names the wrong one).
+# (a2) The url must name the OS: a man page or the other OS's build passes a
+# plain url check. Universal and arch-less macOS names pass the x86_64 check;
+# use native_on: [darwin] (brew) for an Intel-only upstream. Linux arches are
+# not checked (no Linux asset here names the wrong one).
 intel_re='x86[_-]?64|amd64|intel|(^|[^a-z0-9])x64([^a-z0-9]|$)'
 home_all="$(yq -p toml -o json '.tools // {}' "$home_lock")" || exit 2
 tools_json="$(yq -o json '.tools' "$tools")" || exit 2
@@ -124,14 +112,14 @@ for plat in macos-arm64 linux-x64 linux-arm64; do
 			| [.name, .backend, .version, ((($t[.name].no_checksum_on // []) | index($p)) != null)] | @tsv')
 done
 
-# (b) repo mise.toml tools; the value is a version string or a table with .version
+# (b) the value is a version string or a table with .version
 while IFS=$'\t' read -r key version; do
 	[ -n "$key" ] || continue
 	have "$repo_json" "$key" "$version" ||
 		bad "mise.toml: $key@$version is not in $repo_lock"
 done < <(yq -p toml -o json '.tools // {}' "$mise_toml" | jq -r 'to_entries[] | [.key, (.value | if type == "object" then .version else . end)] | @tsv')
 
-# (c) orphaned pipx uv.lock dirs (paths in the lock are relative to the repo root)
+# (c) paths in the lock are relative to the repo root
 refs="$(grep -o 'path = "[^"]*"' "$repo_lock" | sed -e 's/^path = "//' -e 's/"$//')"
 for d in "$root"/.mise/locks/pipx-*/*/; do
 	[ -d "$d" ] || continue

@@ -1,5 +1,4 @@
-# Run the SAME checks as CI locally. Opt in per machine: `pre-commit install`.
-# (Requires the lint tools on PATH — see README.)
+# The same checks as CI; opt in per machine with `pre-commit install`.
 repos:
   - repo: local
     hooks:

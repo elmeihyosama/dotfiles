@@ -110,16 +110,14 @@ assert_eq 1 "$rc" "stale_no_checksum_on_fails: exit 1"
 assert_contains "$out" "fzf (aqua:junegunn/fzf@0.67.0) now has a linux-x64 checksum: remove linux-x64 from its no_checksum_on" "stale_no_checksum_on_fails: says to remove it"
 cp "$d/tools.yaml.orig" "$d/tools.yaml"
 
-# platform_url_wrong_os_fails: the macos-arm64 url is a Linux asset (or a man
-# page, or anything without the platform's OS in its name)
+# platform_url_wrong_os_fails: the macos-arm64 url is a Linux asset
 sed 's|"https://example.invalid/x-darwin_arm64.tar.gz"|"https://example.invalid/x-linux_amd64.tar.gz"|' "$d/home.lock.orig" >"$d/home.lock"
 run
 assert_eq 1 "$rc" "platform_url_wrong_os_fails: exit 1"
 assert_contains "$out" "the macos-arm64 url does not look like a macos asset" "platform_url_wrong_os_fails: says why"
 cp "$d/home.lock.orig" "$d/home.lock"
 
-# platform_url_wrong_arch_fails: the macos-arm64 url is an Intel build, which
-# needs Rosetta 2 (absent on a fresh Apple Silicon Mac)
+# platform_url_wrong_arch_fails: an Intel macOS build needs Rosetta 2
 for a in x-x86_64-apple-darwin.tar.gz x_Darwin_amd64.tar.gz x-macos-intel.zip x-macos-x64.tar.gz; do
 	sed "s|\"https://example.invalid/x-darwin_arm64.tar.gz\"|\"https://example.invalid/$a\"|" "$d/home.lock.orig" >"$d/home.lock"
 	run

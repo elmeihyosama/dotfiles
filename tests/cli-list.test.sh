@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# scripts/dotfiles.sh: list --json shape and sort, selected/installed/actual
-# fields, the mismatch marker in the table, and doctor delegation.
-# mise is a stub printing fixed `ls --json`; yq/jq are the real ones.
+# scripts/dotfiles.sh: list --json shape and fields, the table's mismatch
+# marker, doctor delegation. mise is a stub; yq/jq are real.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -9,8 +8,7 @@ set -uo pipefail
 script="$TESTS_REPO/scripts/dotfiles.sh"
 mk_home
 mkdir -p "$HOME/bin" "$HOME/nbin"
-# real binaries, not mise shims (a shim needs mise and its config at run time):
-# the first PATH entry that is not a shims dir
+# real binaries, not mise shims (a shim needs mise and its config at run time)
 real_bin() {
 	local d IFS=:
 	for d in $PATH; do
@@ -104,8 +102,8 @@ run doctor --bogus
 assert_eq 2 "$rc" "doctor_delegates: exit status of doctor.sh"
 assert_contains "$out" "usage: doctor.sh" "doctor_delegates: doctor.sh ran"
 
-# mise_masked: called as `mise -C / ls --json` with the dotfiles pins dir and the
-# user's global config masked, even when the caller's env says otherwise
+# mise_masked: `mise -C / ls --json` with the pins dir and global config masked,
+# whatever the caller's env says
 run list --json
 assert_eq "-C / ls --json|$HOME/.config/mise-dotfiles|/nonexistent/mise-user.toml" "$(cat "$STUB_MISE_CALL")" "mise_masked: args and masking env"
 out="$(env -i HOME="$HOME" PATH="$HOME/bin:$HOME/nbin:/usr/bin:/bin" STUB_MISE_LS="$STUB_MISE_LS" STUB_MISE_CALL="$STUB_MISE_CALL" \

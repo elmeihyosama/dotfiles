@@ -1,35 +1,29 @@
 #!/bin/sh
-# Sync the rendered Alacritty palette to the Windows side of a WSL install:
-# Alacritty on Windows reads %APPDATA%\alacritty\, outside chezmoi's tree, so
-# `theme` could never repaint it.
-#
-# run_onchange: the palette is embedded so a theme switch retriggers this.
+# Sync the rendered Alacritty palette to Windows on WSL (%APPDATA%\alacritty\
+# is outside chezmoi's tree). The embedded palette retriggers it on a switch.
 # theme: {{ .theme }}
 # palette: {{ (index .themes .theme) | toJson }}
 set -eu
 
-# WSL only — a no-op everywhere else.
+# WSL only.
 grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null || exit 0
 command -v wslpath >/dev/null 2>&1 || exit 0
 
 src="$HOME/.config/alacritty/colors.toml"
 [ -f "$src" ] || exit 0
 
-# cmd.exe warns and falls back to C:\Windows when its cwd is a Linux path, so
-# run it from /mnt/c. Output is CRLF-terminated.
+# cmd.exe falls back to C:\Windows from a Linux cwd; output is CRLF.
 appdata_win=$(cd /mnt/c 2>/dev/null && cmd.exe /c "echo %APPDATA%" 2>/dev/null | tr -d '\r\n') || exit 0
 [ -n "$appdata_win" ] || exit 0
 
 dest_dir="$(wslpath -u "$appdata_win")/alacritty"
-# Absent means Alacritty isn't set up on the Windows side — nothing to paint.
 [ -d "$dest_dir" ] || exit 0
 
 cp -f "$src" "$dest_dir/colors.toml"
 echo "alacritty: synced {{ .theme }} palette to $dest_dir/colors.toml"
 
-# Alacritty never loads colors.toml on its own. Create a minimal Windows-side
-# alacritty.toml (absolute import + this distro as shell) only if none exists;
-# an existing one is the user's — only check it for the import.
+# Alacritty never loads colors.toml on its own: create a minimal alacritty.toml
+# only if none exists; an existing one is the user's, only checked.
 cfg="$dest_dir/alacritty.toml"
 if [ ! -f "$cfg" ]; then
 	distro=${WSL_DISTRO_NAME:-}

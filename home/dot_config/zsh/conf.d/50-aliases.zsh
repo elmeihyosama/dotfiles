@@ -3,7 +3,7 @@ alias ..="cd .."
 alias ...="cd ../.."
 alias ....="cd ../../.."
 
-# Listing via eza (guarded). Standard commands (grep/find/cat/top) are NOT shadowed.
+# eza listing (guarded); grep/find/cat/top are NOT shadowed.
 command -v eza >/dev/null 2>&1 && {
   alias ls="eza --icons=always --group-directories-first"
   alias ll="eza -la --icons=always --group-directories-first"
@@ -29,11 +29,11 @@ alias gd="git diff" gds="git diff --staged" gb="git branch" gsw="git switch" \
       gst="git stash" gf="git fetch" gpl="git pull" grs="git restore" \
       glg="git log --graph --all --oneline --decorate"
 
-# git-absorb: stage changes (git add -p / fga), then `gab` folds each into the
-# ancestor commit that introduced those lines (pairs with rebase.autosquash).
+# git-absorb: `gab` folds staged changes into the commits that introduced
+# those lines (pairs with rebase.autosquash).
 command -v git-absorb >/dev/null 2>&1 && alias gab="git absorb --and-rebase"
 
-# System info — non-shadowing names (do NOT override df/du/top)
+# System info, non-shadowing names (do NOT override df/du/top)
 command -v duf  >/dev/null 2>&1 && alias dfh="duf"
 command -v dust >/dev/null 2>&1 && alias duh="dust"
 command -v btop >/dev/null 2>&1 && alias bt="btop"
@@ -47,8 +47,7 @@ command -v gh-dash >/dev/null 2>&1 && alias ghd="gh-dash"
 # lazydocker container TUI (guarded)
 command -v lazydocker >/dev/null 2>&1 && alias lzd="lazydocker"
 
-# sz — fuzzy project → zellij session (sessionizer). Resolves the repo script
-# via chezmoi like the `theme` function does.
+# sz: fuzzy project → zellij session (resolves the repo script like `theme`).
 sz() {
   emulate -L zsh
   local src script
@@ -66,9 +65,8 @@ if command -v fastfetch >/dev/null 2>&1; then
     fastfetch --config "$cfg" "$@"
   }
 
-  # Splash rules: inside zellij, only the first pane of a session (flag file
-  # in tmp, so a reboot naturally resets it); outside zellij, every new
-  # top-level shell (SHLVL guard keeps splits/subshells quiet).
+  # Inside zellij only the session's first pane (flag in tmp, reset by a
+  # reboot); outside, every top-level shell (SHLVL keeps subshells quiet).
   if [[ -o interactive ]]; then
     if [[ -n $ZELLIJ ]]; then
       () {

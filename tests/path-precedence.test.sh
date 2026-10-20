@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# PATH precedence: the dotfiles' mise tools outrank ~/.local/bin and Homebrew,
-# in `zsh -c` (shims from .zshenv) and `zsh -i` (00-env, then `mise activate`
-# in 49-mise). A fake fzf sits in a Homebrew-like dir, in ~/.local/bin and in
-# the mise shims dir; with a real mise on PATH, also in a fake mise install.
+# PATH precedence: mise tools outrank ~/.local/bin and Homebrew in `zsh -c`
+# (.zshenv shims) and `zsh -i` (00-env, then 49-mise's `mise activate`).
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -33,16 +31,15 @@ run_fzf() {
 		zsh "$@" 'fzf' 2>/dev/null)
 }
 
-# The inherited PATH an interactive parent shell passes down: ~/.local/bin and
-# brew ahead of the (already present) shims.
+# An inherited PATH with ~/.local/bin and brew ahead of the shims.
 inherited="$HOME/.local/bin:$HOME/brew/bin:$shims:/usr/bin:/bin"
 assert_eq mise-shim "$(run_fzf "$inherited" -c)" "zsh -c: mise shim wins over ~/.local/bin and brew"
 assert_eq mise-shim "$(run_fzf "$HOME/brew/bin:/usr/bin:/bin" -c)" "zsh -c (fresh PATH): mise shim wins over brew"
 assert_eq mise-shim "$(run_fzf "$HOME/brew/bin:/usr/bin:/bin" -i -c)" "zsh -i (no mise binary): mise shim wins"
 assert_eq mise-shim "$(run_fzf "$inherited" -i -c)" "zsh -i (inherited PATH): mise shim wins"
 
-# bash (e.g. non-interactive `ssh host cmd`, which reads ~/.bashrc): the
-# shims move to the front before the interactive guard.
+# bash (`ssh host cmd` reads ~/.bashrc): shims move to the front before the
+# interactive guard.
 render_tmpl "$TESTS_REPO/home/dot_bashrc.tmpl" >"$HOME/.bashrc" || fail "render .bashrc"
 # shellcheck disable=SC2016 # expanded by the inner bash
 got="$(cd "$HOME" && env -i HOME="$HOME" PATH="$inherited" bash -c '. "$HOME/.bashrc"; fzf' 2>/dev/null)"

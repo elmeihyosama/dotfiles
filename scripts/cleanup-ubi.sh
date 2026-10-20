@@ -1,28 +1,15 @@
 #!/usr/bin/env sh
-# cleanup-ubi.sh — one-time removal of what the old ubi install path left
-# behind, now that CLI tools come from mise.
+# cleanup-ubi.sh: one-time removal of the old ubi install's leftovers.
 # Usage: cleanup-ubi.sh LOCAL_BIN LOCAL_OPT TOOLS_YAML SELECTION_JSON   (needs jq)
-#   SELECTION_JSON: scripts/select-tools.sh output for this host (the JSON
-#   text itself, not a path).
+#   SELECTION_JSON: select-tools.sh output (the JSON text, not a path).
 #
-# One-shot: it runs only while a legacy marker exists — LOCAL_BIN/ubi (every
-# old install path bootstrapped ubi: the no-sudo path, macOS for gh-dash and
-# sudo Linux for the force_ubi tools) or the LOCAL_OPT/neovim tree. It deletes
-# both markers last, so later runs are no-ops and a binary the user puts in
-# LOCAL_BIN afterwards is never touched. A marker instead of a stamp file: no
-# extra state to keep, and a host that never had ubi is never scanned.
-#
-# Scope: only bins of tools that select-tools reports with source "mise" on
-# this host (or "bundled" with a mise provider, e.g. age-keygen) — the locked
-# mise install replaces exactly those. Native, deselected and bootstrap tools
-# (mise itself) are never touched, nor uv (install.sh puts its own pinned uv
-# in LOCAL_BIN; ubi never installed it). For each such name in LOCAL_BIN it deletes:
-#   - a regular file, unless it is a mise shim (mentions `mise`);
-#   - a legacy rename symlink: target named batcat/fdfind (apt) or
-#     editorconfig-checker (brew), or into LOCAL_OPT/neovim.
-# Foreign symlinks and every other file stay. TOOLS_YAML is accepted for the
-# interface's sake (the selection already carries each bin).
-# Prints one `removed: PATH` line per deletion; nothing when clean. Exit 0.
+# Runs only while a legacy marker exists (LOCAL_BIN/ubi or LOCAL_OPT/neovim)
+# and deletes the markers last, so later runs never touch a binary the user
+# adds. Only bins of tools select-tools sources from mise (or bundled with a
+# mise provider), never uv: a regular file unless it is a mise shim, or a
+# legacy rename symlink (batcat/fdfind, editorconfig-checker, into
+# LOCAL_OPT/neovim). TOOLS_YAML is unused (kept for the interface).
+# Prints one `removed: PATH` line per deletion. Exit 0.
 set -eu
 
 [ $# -eq 4 ] || {

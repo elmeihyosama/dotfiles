@@ -1,17 +1,13 @@
 #!/usr/bin/env sh
-# Smoke-test the fresh-machine bootstrap: run install.sh end-to-end in a clean
-# Ubuntu or Fedora container — the surface the provision matrix does not cover. This
-# exercises the self-clone (curl | sh) path, promptless local.yml generation,
-# ensure_ansible (pinned uv -> pinned ansible-core, every mode), the FULL
-# playbook (every tag, not just packages), and second-run idempotence.
-# MODE=sudo|nosudo, same contract as provision-ci.sh.
+# Smoke-test install.sh end-to-end in a clean Ubuntu or Fedora container: the
+# curl | sh self-clone, promptless local.yml, the full playbook, idempotence.
+# MODE=sudo|nosudo, as in provision-ci.sh.
 set -eu
 
 MODE="${MODE:?set MODE=sudo|nosudo}"
 
-# The first full apply must not hit a tool before it is installed (chezmoi's
-# run_onchange scripts need jq/bat; the playbook prints chezmoi's output).
-# bash/zsh say "command not found"; dash (#!/bin/sh) says "sh: 1: x: not found".
+# The first full apply must not hit a tool before it is installed. bash/zsh
+# say "command not found"; dash says "sh: 1: x: not found".
 assert_no_command_not_found() {
 	if grep -iE 'command not found|: [0-9]+: [^:]+: not found' "$1"; then
 		echo "FAIL: the first run logged 'command not found' (above)"
@@ -19,9 +15,7 @@ assert_no_command_not_found() {
 	fi
 }
 
-# Base deps a stock cloud image ships; deliberately NOT python or ansible —
-# install.sh must provide those itself (pinned uv -> ansible-core). apt
-# (Ubuntu) or dnf (Fedora), whichever the image has.
+# Deliberately no python or ansible: install.sh must provide them.
 if command -v apt-get >/dev/null 2>&1; then
 	export DEBIAN_FRONTEND=noninteractive
 	apt-get update -qq
@@ -33,16 +27,12 @@ else
 	exit 1
 fi
 
-# mise reads GITHUB_TOKEN to raise its API rate limit; empty is fine.
+# Raises mise's API rate limit; empty is fine.
 export GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
-# In CI the mounted checkout sits at a detached HEAD; cloning that yields no
-# checkout. Pin a branch and point HEAD at it so install.sh's plain
-# `git clone` of /repo gets this exact tree. Skip when HEAD is already on a
-# branch (retry attempts reuse the same checkout, local runs mount a clone).
-# Both paths: git resolves a non-bare source repo to its .git dir when cloning
-# from a local path, and on CI runners /repo belongs to the runner uid, not
-# container root (Docker Desktop's uid mapping masks this locally).
+# A detached HEAD clones to no checkout: point HEAD at a branch so install.sh's
+# `git clone` of /repo gets this tree. Both safe.directory paths: git resolves
+# a local non-bare source to its .git dir, and /repo belongs to the runner uid.
 git config --global --add safe.directory /repo
 git config --global --add safe.directory /repo/.git
 if ! git -C /repo symbolic-ref -q HEAD >/dev/null; then
@@ -50,8 +40,7 @@ if ! git -C /repo symbolic-ref -q HEAD >/dev/null; then
 	git -C /repo symbolic-ref HEAD refs/heads/_bootstrap-smoke
 fi
 
-# Run a COPY of install.sh from outside any checkout so it takes the
-# self-clone + exec path, exactly like `curl ... | sh` on a fresh box.
+# A copy run from outside any checkout takes the self-clone path, as curl | sh.
 cp /repo/install.sh /tmp/install.sh
 
 if [ "$MODE" = "sudo" ]; then
@@ -65,9 +54,7 @@ if [ "$MODE" = "sudo" ]; then
 	cat /tmp/run1.log
 	assert_no_command_not_found /tmp/run1.log
 	export PATH="$HOME/.local/bin:$PATH"
-	# Distro btop packages may carry cap_perfmon, which a container's bounding
-	# set can't grant — exec fails with EPERM. Container-only artifact; strip it
-	# so --version runs (same workaround as provision-ci.sh).
+	# Strip btop's cap_perfmon (container-only EPERM), as in provision-ci.sh.
 	if command -v setcap >/dev/null 2>&1 && command -v btop >/dev/null 2>&1; then
 		setcap -r "$(command -v btop)" 2>/dev/null || true
 	fi
@@ -87,10 +74,9 @@ if [ "$MODE" = "sudo" ]; then
 	cat /tmp/run2.log
 	sh /repo/.github/scripts/assert-idempotent.sh /tmp/run2.log
 else
-	# Genuine unprivileged user, no sudoers entry -> install.sh's uv fallback.
+	# Unprivileged, no sudoers entry -> install.sh's uv fallback.
 	useradd -m tester
-	# Both paths: git's dubious-ownership check resolves a non-bare source
-	# repo to its .git dir when cloning from a local path.
+	# Both paths: git resolves a local non-bare source to its .git dir.
 	su tester -c "git config --global --add safe.directory /repo"
 	su tester -c "git config --global --add safe.directory /repo/.git"
 	su tester -c "git config --global user.name ci-smoke"

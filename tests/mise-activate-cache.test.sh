@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# conf.d/49-mise.zsh caches `mise activate zsh`. The raw output embeds the
-# generating shell's PATH (`export PATH='...'`, `export __MISE_ORIG_PATH='...'`),
-# so a cached copy would reset every later shell to that snapshot and drop
-# its own entries (per-session dirs, a venv, ...). The cache must not carry
-# PATH, and must be regenerated when the mise binary changes.
+# conf.d/49-mise.zsh caches `mise activate zsh`, whose raw output embeds the
+# generating shell's PATH: the cache must not carry PATH, and must be
+# regenerated when the mise binary changes.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -42,16 +40,13 @@ assert_contains "$got" "ACTIVATED" "cached activation still defines the mise hoo
 assert_contains "$got" "/fresh/session-B" "cached activation keeps this shell's PATH entries"
 assert_not_contains "$got" "/stale/session-A" "cached activation does not replay the generating shell's PATH"
 
-# A cache from before this fix (raw output with a PATH snapshot, newer than
-# the binary) is regenerated, not replayed.
+# A pre-fix cache (raw output, newer than the binary) is regenerated.
 printf "export PATH='/stale/legacy:/usr/bin:/bin'\n" >"$cache"
 got="$(shell "/fresh/session-C:$HOME/misebin:/usr/bin:/bin")"
 assert_contains "$got" "/fresh/session-C" "legacy cache: PATH kept"
 assert_not_contains "$got" "/stale/legacy" "legacy cache: regenerated"
 
-# A failed regeneration (here: a different binary whose `mise activate`
-# fails) keeps the previous cache, so the shell is not left unactivated, and
-# leaves no temp file behind.
+# A failed regeneration keeps the previous cache and leaves no temp file.
 shell "$HOME/misebin:/usr/bin:/bin" >/dev/null
 before="$(cat "$cache")"
 mkdir -p "$HOME/flaky"
@@ -61,9 +56,8 @@ shell "$HOME/flaky:/usr/bin:/bin" >/dev/null
 assert_eq "$before" "$(cat "$cache" 2>/dev/null)" "failed regeneration keeps the previous cache"
 assert_eq "" "$(find "$HOME/cache/mise" -name 'activate.zsh.*' 2>/dev/null)" "failed regeneration leaves no temp file"
 
-# A failed generation (mise activate exits non-zero or prints nothing) leaves
-# no cache: otherwise the key line alone would match, and every later shell
-# would source it and silently stay unactivated until the binary changed.
+# A failed first generation leaves no cache: a key line alone would match and
+# leave every later shell unactivated.
 rm -f "$cache"
 shell "$HOME/flaky:/usr/bin:/bin" >/dev/null
 [ -e "$cache" ] && fail "failed generation: no cache written"
@@ -72,8 +66,7 @@ ln -s "$real_mise" "$HOME/flaky/mise" # same path, now working (and older)
 got="$(shell "$HOME/flaky:/usr/bin:/bin")"
 assert_contains "$got" "ACTIVATED" "after a failed generation the next shell activates"
 
-# A different mise binary (e.g. Homebrew's vs the dotfiles' one) regenerates
-# the cache: it embeds the binary's absolute path.
+# A different mise binary regenerates the cache (it embeds the absolute path).
 cp "$real_mise" "$HOME/misebin2/mise"
 touch -t 200001010000 "$HOME/misebin2/mise" # older than the cache
 shell "$HOME/misebin2:/usr/bin:/bin" >/dev/null

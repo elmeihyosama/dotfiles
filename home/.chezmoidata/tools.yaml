@@ -1,7 +1,5 @@
-# Tool catalog: the single source of truth for the CLI tools. Consumed by
-# scripts/select-tools.sh, the Ansible playbook (loaded as `tool_catalog`, see
-# ansible/site.yml), chezmoi templates (as .tools / .tool_groups), the doctor
-# and assert scripts, and the `dotfiles` CLI/TUI.
+# Tool catalog: the one source of truth for the CLI tools (select-tools.sh,
+# the playbook as `tool_catalog`, chezmoi templates, doctor, the dotfiles CLI).
 #
 # Per-tool fields:
 #   group         one of tool_groups
@@ -9,33 +7,22 @@
 #   backend       mise backend string (omitted for native_only / bootstrap)
 #   version       exact pinned version, never "latest" (omitted for native_only)
 #   native_on     OSes that use brew/native packages instead of mise
-#   missing_on    locked platforms (<os>-<arch>: macos-arm64, linux-x64, linux-arm64)
-#                 where upstream ships no release asset: select-tools reports
-#                 source "native" there (best effort, like native_only)
+#   missing_on    locked platforms (<os>-<arch>) with no upstream release asset:
+#                 native there, best effort
 #   native_only   never installed via mise (no usable release binary)
 #   no_checksum_on locked platforms where upstream publishes no checksum, with a
 #                 trailing # reason (check-lock.sh fails once one appears)
 #   native_pkg    per-manager package name when it differs from the tool name
-#   native_bin    informational: the binary name a distro package ships when it
-#                 differs (apt: batcat/fdfind). Nothing reads it; these tools
-#                 come from mise, which installs them under `bin`.
+#   native_bin    informational only: a distro package's binary name
 #   smoke         command that must exit 0 and print nothing
 #   mise_options  extra options for the mise entry (e.g. rename_exe)
-#   provided_by   this bin ships in another tool's package (age-keygen in age):
-#                 never installed on its own, follows the provider's selection;
-#                 doctor still checks the bin
-#   bootstrap     installed by Ansible, not by mise (mise itself): select-tools
-#                 reports source "bootstrap", the pins template skips it,
-#                 doctor still checks it
+#   provided_by   ships in another tool's package (age-keygen in age) and
+#                 follows its selection; doctor still checks the bin
+#   bootstrap     installed by Ansible, not mise (mise itself)
 #
-# eza, git-absorb, gh-dash, editorconfig-checker use the github: backend (no
-# aqua registry entry); atuin and yazi too, for its matching_regex (musl on
-# Linux); everything else prefers aqua:.
-# Pins are the versions installed on the maintainer's Mac when this was
-# written, except tools that also appear in the repo root mise.toml (chezmoi,
-# yq, uv, gitleaks, editorconfig-checker): those take the mise.toml version
-# (tests/select-tools.test.sh enforces equality). 4.x editorconfig-checker
-# names its binary editorconfig-checker, hence rename_exe.
+# github: backend where aqua has no entry or for matching_regex (musl);
+# otherwise aqua:. Tools also in the repo mise.toml take its version
+# (tests/select-tools.test.sh).
 tool_groups: [core, git, files, containers, system, media, dev]
 
 tools:

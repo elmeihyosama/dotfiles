@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
-# Tests run from a git hook inherit GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE
-# pointing at the real repo. With those set at a decoy repo (whose origin is a
-# temp bare repo), the decoy and its origin must come out untouched:
-#   - tests/run.sh drops them centrally, shown with a probe test that has no
-#     guard of its own and commits and pushes via upward discovery;
-#   - cli-update.test.sh (the test that once pushed to the real main) drops
-#     them itself when run standalone.
+# Tests run from a git hook inherit GIT_DIR etc. pointing at the real repo.
+# With those aimed at a decoy, the decoy and its origin must stay untouched:
+# run.sh drops them centrally, and cli-update.test.sh (which once pushed to
+# the real main) drops them itself when run standalone.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

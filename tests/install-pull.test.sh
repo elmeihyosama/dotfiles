@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
-# install.sh reusing an existing clone: a dirty clone is never pulled (so never
-# stashed, even with merge/rebase.autostash = true in the user's git config,
-# which this repo's own git config sets) and the run goes on; a clean clone
-# fast-forwards; a failed pull is non-fatal.
-# install.sh is fed on stdin (the `curl | sh` path), DOTFILES_DIR is a temp
-# clone of a temp bare repo, and the clone's own install.sh, which the real one
-# execs, is a stub that logs and exits.
+# install.sh reusing a clone: a dirty clone is never pulled (so never
+# autostashed) and the run goes on; a clean one fast-forwards; a failed pull is
+# non-fatal. install.sh runs from stdin (`curl | sh`); the clone's install.sh,
+# which it execs, is a logging stub.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-# run from a git hook, GIT_DIR / GIT_INDEX_FILE point at the real repo
+# Under a git hook GIT_DIR etc. point at the real repo.
 for _v in $(git rev-parse --local-env-vars); do unset "$_v"; done
 mk_home # also sets GIT_CEILING_DIRECTORIES: no repo discovery above $HOME
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t

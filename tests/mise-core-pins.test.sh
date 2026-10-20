@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# The fresh-machine bootstrap pins Ansible writes before chezmoi exists
-# (ansible/templates/mise-pins.toml.j2, core tools only) are byte-identical
-# to what chezmoi renders from config.toml.tmpl for the same selection, so the
-# first `chezmoi apply` changes nothing for the core set.
+# Ansible's bootstrap pins (mise-pins.toml.j2, core only) are byte-identical to
+# chezmoi's render for the same selection, so the first apply changes nothing.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

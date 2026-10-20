@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# CI supply-chain pins: every action/runner is pinned, every workflow declares
-# permissions, the lint tool cache is keyed on mise.lock, and nothing under
-# .github/ floats on "latest".
+# CI supply-chain pins: actions and images pinned, permissions declared, the
+# lint cache keyed on mise.lock, nothing under .github/ on "latest".
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -73,8 +72,7 @@ assert_not_contains "$dep" "directory: /" "dependabot uses directories:, not a s
 latest="$(grep -nE '\blatest\b' "${gh_files[@]}" | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' | sed -E 's/[[:space:]]+#.*$//' | grep -E '\blatest\b' || true)"
 assert_eq "" "$latest" "no 'latest' under .github/ outside comments"
 
-# images_pinned_by_digest: every container image a workflow pulls (matrix
-# `image:` entries and any registry reference) is `name:tag@sha256:<64 hex>`.
+# images_pinned_by_digest: every image a workflow pulls is name:tag@sha256:<64 hex>.
 imgs="$(grep -hnE '(^[[:space:]]*-?[[:space:]]*image:|(mirror\.gcr\.io|quay\.io|docker\.io)/)' .github/workflows/*.yml)"
 assert_contains "$imgs" "image:" "workflows declare container images"
 unpinned="$(printf '%s\n' "$imgs" | grep -vE '^[0-9]+:[[:space:]]*#' | grep -vE '[a-z0-9./_-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}' || true)"

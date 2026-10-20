@@ -26,6 +26,5 @@ github = "zdharma-continuum/fast-syntax-highlighting"
 rev = "3d574ccf48804b10dca52625df13da5edae7f553"
 
 [templates]
-# Optional defer template — apply per-plugin with `apply = ["defer"]`. NOTE: it
-# uses `zsh-defer`, which is NOT loaded by default; install/source it before use.
+# Optional defer template (`apply = ["defer"]`); needs zsh-defer, not loaded.
 defer = "{{ hooks?.pre | nl }}{% for file in files %}zsh-defer source \"{{ file }}\"{% endfor %}{{ hooks?.post | nl }}"

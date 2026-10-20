@@ -1,18 +1,14 @@
 #!/usr/bin/env bash
-# scripts/dotfiles.sh update [--check]: refuses a dirty repo, runs the seven
-# steps in order and stops at the first failure, sheldon lock --update only when
-# plugins.toml changed, doctor's exit code is update's, and --check changes
-# nothing, survives a failed fetch, and never prompts (no tty, no colour).
-# The repo is a temp clone of a temp bare repo with scripts/ committed into it,
-# so the script finds its repo from its own path exactly as in real use.
-# ansible-playbook, chezmoi, sheldon, nvim, mise and doctor.sh are stubs that
-# log their calls; git, yq and jq are the real ones.
+# scripts/dotfiles.sh update [--check]: dirty repo refused, steps in order,
+# first failure stops it, sheldon --update only when plugins.toml changed,
+# doctor's exit code wins, --check writes nothing and never prompts. A temp
+# clone of a temp bare repo; the tools are logging stubs, git/yq/jq are real.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-# run from a git hook (pre-commit) GIT_DIR / GIT_INDEX_FILE point at the real
-# repo; the temp repos below must never see them
+# Under a git hook (pre-commit) GIT_DIR etc. point at the real repo; the temp
+# repos must never see them.
 for _v in $(git rev-parse --local-env-vars); do unset "$_v"; done
 mk_home # also sets GIT_CEILING_DIRECTORIES: no repo discovery above $HOME
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
@@ -72,15 +68,13 @@ printf '%s\n' '{tool_groups: [core, dev], tools: {' \
 	'hx: {group: dev, backend: "aqua:x/hx", version: "3.0.0"}}}' >"$HOME/tools.yaml"
 printf 'tool_groups: [core, dev]\n' >"$HOME/local.yml"
 
-# die MSG: setup failed; stop the whole test rather than run git against a
-# path that is not the temp repo we meant
+# die MSG: stop the test rather than run git against the wrong repo.
 die() {
 	echo "FATAL: $1" >&2
 	exit 1
 }
-# fresh_repo: new bare + clone ("$clone") with scripts/ committed and pushed,
-# a stub doctor.sh, and plugins.toml / .lazy-lock.json tracked. Every git
-# step must succeed, and pushes name the bare repo by path, never `origin`.
+# fresh_repo: bare + clone ("$clone") with scripts/ committed; pushes name the
+# bare repo by path, never `origin`.
 fresh_repo() {
 	rm -rf "$HOME/bare.git" "$HOME/clone" "$HOME/other"
 	git init -q --bare "$HOME/bare.git" || die "git init --bare"
@@ -175,15 +169,13 @@ upstream_commit home/dot_config/sheldon/plugins.toml v2 "bump pins"
 run update
 assert_eq 0 "$rc" "sheldon_update: exit 0"
 assert_contains "$(steps_only)" "sheldon lock --update" "sheldon_update: pins changed"
-# unrelated commit, then plugins.toml untouched: plain lock (covered above); and
-# already up to date with no new commits: plain lock too
+# plugins.toml untouched or no new commits: plain lock too
 fresh_repo
 run update
 assert_contains "$(steps_only)" "sheldon lock" "up_to_date: runs"
 assert_not_contains "$(steps_only)" "--update" "up_to_date: plain sheldon lock"
 
-# plain sheldon lock fails (a pin moved by a pull outside update, rev not
-# fetched yet): retried once with --update, and the run goes on
+# plain lock fails (pin moved, rev not fetched): one retry with --update
 fresh_repo
 STUB_FAIL_CMD="sheldon lock" run update
 assert_eq 0 "$rc" "sheldon_retry: exit 0 ($out)"

@@ -1,17 +1,13 @@
 ---
-# Packages. CLI tools come from mise (pinned, checksum-locked); the OS package
-# manager only provides the bootstrap essentials and the few tools mise
-# cannot (tools.yaml native_on / native_only / missing_on). Runs after
-# tasks/mise.yml (the pinned mise binary). Fresh-machine order, since chezmoi
-# is itself a mise tool and cannot render the first pins:
+# CLI tools come from mise; the OS package manager provides only essentials
+# and what mise cannot (native_on / native_only / missing_on). chezmoi is
+# itself a mise tool, so a fresh machine goes:
 #   1. essentials (sudo Linux)
-#   2. CORE-only pins + the repo lock into ~/.config/mise-dotfiles (only when
-#      absent: on a re-run the chezmoi-deployed full pins and lock are a
-#      consistent pair, and rewriting them would ping-pong with chezmoi)
-#   3. locked install of those pins (tasks/mise-install.yml)
-#   4. select-tools, one-time legacy ubi cleanup, native tools
-# then tasks/chezmoi.yml deploys the full pins and site.yml runs the locked
-# install again for the full selection.
+#   2. CORE pins + the repo lock (only when absent: rewriting chezmoi's full
+#      pair would ping-pong with chezmoi)
+#   3. locked install of those pins
+#   4. select-tools, one-time ubi cleanup, native tools
+# then chezmoi deploys the full pins and site.yml installs them.
 - name: Set package-manager facts
   ansible.builtin.set_fact:
     _pkgmgr: "{{ 'dnf' if ansible_facts.pkg_mgr == 'dnf5' else ansible_facts.pkg_mgr }}"
@@ -31,10 +27,8 @@
   changed_when: false
   when: _native_linux and _pkgmgr == 'pacman'
 
-# Only the commands that are missing: EL9/EL10 images ship curl-minimal, which
-# provides the curl command but conflicts with the curl package, and asking dnf
-# for `curl` there fails the run. Each package is named after its command.
-# shell, not command: `command -v` is a shell builtin (see chezmoi.yml).
+# Only missing commands: EL's curl-minimal conflicts with the curl package.
+# shell, not command: `command -v` is a builtin (see chezmoi.yml).
 - name: Find missing bootstrap essentials  # noqa command-instead-of-shell
   ansible.builtin.shell: |
     for c in git curl zsh unzip tar; do
@@ -53,9 +47,8 @@
   when: _native_linux and _missing_essentials.stdout_lines | length > 0
 
 # ---- 2. Core pins + lock (fresh machine only) ----------------------------
-# No mode: chezmoi owns this dir after the first apply and creates it with the
-# user's umask (0775 under umask 002); forcing 0755 here would flip it back
-# and forth on every run.
+# No mode: chezmoi owns this dir after the first apply (user's umask); forcing
+# one would flip it on every run.
 - name: Ensure the dotfiles mise config dir  # noqa risky-file-permissions
   ansible.builtin.file:
     path: "{{ mise_config_root }}"
@@ -100,11 +93,8 @@
   changed_when: false
   check_mode: false
 
-# Before mise, tools were ubi binaries in local_bin (plus rename symlinks and
-# the neovim tree in local_opt). One-shot (the script runs only while the
-# legacy ubi binary or neovim tree exists, and removes them last) and limited
-# to the bins this host now gets from mise, so user binaries for native or
-# deselected tools are never touched.
+# Pre-mise ubi leftovers in local_bin/local_opt; one-shot and limited to bins
+# this host now gets from mise (scripts/cleanup-ubi.sh).
 - name: Remove legacy ubi installs (one-time migration)
   ansible.builtin.command:
     argv:
@@ -125,7 +115,7 @@
   ansible.builtin.set_fact:
     _native_tools: "{{ _tool_selection.stdout | from_json | selectattr('source', 'equalto', 'native') | map(attribute='name') | list }}"
 
-# shell, not command: `command -v` is a shell builtin (see chezmoi.yml).
+# shell, not command: `command -v` is a builtin (see chezmoi.yml).
 - name: Check for Homebrew (macOS)  # noqa command-instead-of-shell
   ansible.builtin.shell: command -v brew
   register: _brew
@@ -144,8 +134,7 @@
     - _brew.rc != 0
     - _native_tools | length > 0
 
-# A missing package is a warning, not a failure: native tools are the
-# best-effort ones (source-only upstreams, no asset for this platform).
+# A missing package is a warning: native tools are best effort.
 - name: Install native tools via Homebrew (macOS)
   community.general.homebrew:
     name: "{{ (tool_catalog.tools[item].native_pkg | default({})).brew | default(item) }}"

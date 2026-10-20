@@ -3,29 +3,22 @@
 #
 #   curl -fsSL https://elmeihyosama.github.io/dotfiles/install.sh | sh
 #
-# Clones (or reuses) the repo, installs Ansible, prompts once for per-machine
-# values, then runs the playbook. Idempotent: an existing clone is
-# fast-forwarded (never clobbered), a saved ansible/local.yml is reused unless
-# --reconfigure is passed, and the playbook only changes what has drifted.
-#
-# Run from anywhere (it self-clones) or from inside a checkout (./install.sh).
-# Override the source repo with DOTFILES_REPO and the destination with
-# DOTFILES_DIR.
+# Clones or fast-forwards the repo, installs Ansible, prompts once for
+# ansible/local.yml (reused unless --reconfigure), then runs the playbook.
+# DOTFILES_REPO and DOTFILES_DIR override the source repo and destination.
 set -eu
 
 REPO_URL="${DOTFILES_REPO:-https://github.com/elmeihyosama/dotfiles.git}"
 DEST="${DOTFILES_DIR:-$HOME/workspace/dotfiles}"
 
-# Set to "true" on hosts that share one $HOME across CPU arches (e.g. a mounted
-# home reachable from both x86_64 and aarch64 login nodes). ensure_local_vars
-# resolves the real value from the prompt or an existing local.yml; kept in
-# sync with ansible/group_vars/all.yml's shared_home logic.
+# "true" when one $HOME is shared across CPU arches; ensure_local_vars sets the
+# real value. Matches shared_home in ansible/group_vars/all.yml.
 SHARED_HOME=false
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
-# User-local bin/share dirs, arch-suffixed under a shared $HOME so ARM and x86
-# binaries don't collide. Mirror ansible/group_vars/all.yml exactly.
+# Arch-suffixed under a shared $HOME so binaries don't collide; mirrors
+# ansible/group_vars/all.yml.
 local_bin_dir() {
 	if [ "$SHARED_HOME" = "true" ]; then
 		printf '%s' "$HOME/.local/bin-$(uname -m)"
@@ -41,21 +34,16 @@ local_share_dir() {
 	fi
 }
 
-# gv_pin KEY FILE: the quoted value of a top-level `KEY: "X.Y.Z"` line in
-# group_vars (read with sed: this runs before Ansible exists).
+# gv_pin KEY FILE: the value of `KEY: "X"` in group_vars (sed: no Ansible yet).
 gv_pin() { sed -nE "s/^$1:[[:space:]]*\"([^\"]*)\".*/\\1/p" "$2"; }
 
-# sha256_of FILE: its sha256, hex (sha256sum on Linux, shasum on macOS).
 sha256_of() {
 	if have sha256sum; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{print $1}'
 }
 
-# Install Ansible, the same way on every OS: a pinned uv (the release's
-# installer, sha256-checked) into the local bin dir, then `uv tool install` of
-# the pinned ansible-core on the pinned uv-managed Python. Versions come from
-# ansible/group_vars/all.yml (uv_version, ansible_core_version,
-# python_version), which equal the repo mise.toml pins. Dirs match
-# ansible/tasks/python.yml.
+# Install a pinned, sha256-checked uv, then the pinned ansible-core on the
+# pinned uv Python (versions from ansible/group_vars/all.yml; dirs match
+# ansible/tasks/python.yml).
 ensure_ansible() {
 	_gv=ansible/group_vars/all.yml
 	_uv_version="$(gv_pin uv_version "$_gv")"
@@ -70,17 +58,15 @@ ensure_ansible() {
 	if "$_lbin/ansible-playbook" --version 2>/dev/null | head -n1 | grep -qF "[core $_ansible_version]"; then
 		return
 	fi
-	# Under a shared $HOME a `uv` on PATH may be the other arch's binary (or
-	# another version), so use the arch-local pinned one.
+	# Under a shared $HOME a `uv` on PATH may be the other arch's binary.
 	_uv="$_lbin/uv"
 	if ! "$_uv" --version 2>/dev/null | grep -qF "uv $_uv_version"; then
 		have curl || {
 			echo "curl is required to install uv; install it and re-run." >&2
 			exit 1
 		}
-		# The release's installer, checked against uv_installer_sha256 (uv
-		# publishes no checksum for it; scripts/relock.sh records one). The
-		# installer checks the uv archive against its own embedded sha256.
+		# uv publishes no installer checksum; scripts/relock.sh records one. The
+		# installer then checks the uv archive against its embedded sha256.
 		_uv_sha="$(gv_pin uv_installer_sha256 "$_gv")"
 		_uv_inst="$(mktemp)"
 		curl -LsSf "https://github.com/astral-sh/uv/releases/download/$_uv_version/uv-installer.sh" -o "$_uv_inst"
@@ -89,8 +75,7 @@ ensure_ansible() {
 			echo "uv $_uv_version installer does not match uv_installer_sha256 in $_gv (run scripts/relock.sh after a uv bump)." >&2
 			exit 1
 		fi
-		# UV_NO_MODIFY_PATH: chezmoi owns the shell rc files; uv's PATH edits
-		# would be drift that every apply reverts.
+		# UV_NO_MODIFY_PATH: chezmoi owns the shell rc files.
 		env XDG_BIN_HOME="$_lbin" UV_NO_MODIFY_PATH=1 sh "$_uv_inst"
 		rm -f "$_uv_inst"
 	fi
@@ -101,12 +86,11 @@ ensure_ansible() {
 	export PATH="$_lbin:$HOME/.local/bin:$PATH"
 }
 
-# True only when the terminal can actually be opened: `[ -r /dev/tty ]` passes in
-# CI/cron yet the open fails ("Device not configured").
+# `[ -r /dev/tty ]` passes in CI/cron yet the open fails, so try opening it.
 have_tty() { (exec >/dev/tty) 2>/dev/null; }
 
-# ask "Question" "default" -> echoes the chosen value. Prompts via the tty, since
-# under `curl | sh` stdin is the script, not the keyboard.
+# ask "Question" "default": prompts via the tty, since under `curl | sh` stdin
+# is the script.
 ask() {
 	_q="$1"
 	_def="${2:-}"
@@ -122,8 +106,7 @@ ask() {
 	printf '%s' "${_ans:-$_def}"
 }
 
-# Single-quoted YAML scalar: no escapes except '' for a literal quote, so any
-# name (quotes, backslashes, colons) round-trips.
+# Single-quoted YAML: only '' needs escaping, so any name round-trips.
 yaml_quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/''/g")"; }
 
 ensure_local_vars() {
@@ -150,7 +133,6 @@ ensure_local_vars() {
 	_sudo_answer="$(ask "Allow sudo for native package installs? (yes/no)" "$_sudo_default")"
 	case "$_sudo_answer" in [Yy]*) _allow_sudo="true" ;; *) _allow_sudo="false" ;; esac
 
-	# Only relevant on the rare shared-$HOME multi-arch host; default no.
 	_shared_answer="$(ask "Is this \$HOME shared across CPU arches (arm+x86)? (yes/no)" "no")"
 	case "$_shared_answer" in [Yy]*) SHARED_HOME="true" ;; *) SHARED_HOME="false" ;; esac
 
@@ -165,9 +147,8 @@ EOF
 	echo "Wrote ansible/local.yml."
 }
 
-# --- Acquire the repo (skipped when already running from inside a checkout) ---
-# Under `curl | sh` $0 is just "sh", and dirname would wrongly resolve to the
-# caller's cwd; only trust $0 when it names this script.
+# --- Acquire the repo (skipped when run from inside a checkout) ---
+# Under `curl | sh` $0 is "sh"; only trust $0 when it names this script.
 case "$0" in
 *install.sh) self_dir="$(CDPATH='' cd "$(dirname "$0")" && pwd)" ;;
 *) self_dir="" ;;
@@ -179,9 +160,8 @@ if [ -z "$self_dir" ] || [ ! -f "$self_dir/ansible/site.yml" ]; then
 	}
 	if [ -d "$DEST/.git" ]; then
 		echo "Reusing existing clone at $DEST"
-		# Never pull over local changes: the repo's own git config sets
-		# merge/rebase.autostash, so a pull would stash them and could leave
-		# conflict markers. Same rule as `dotfiles update`; non-fatal here.
+		# Never pull over local changes: the repo's git config autostashes,
+		# which could leave conflict markers. Same rule as `dotfiles update`.
 		_dirty="$(git -C "$DEST" status --porcelain 2>/dev/null | cut -c4- | paste -sd, - | sed 's/,/, /g')"
 		if [ -n "$_dirty" ]; then
 			echo "  (skipping update; local changes in: $_dirty; commit or discard them, then run \`dotfiles update\` once installed)"
@@ -201,7 +181,7 @@ fi
 cd "$self_dir"
 
 # --- Provision (running from inside the repo) ---
-# Filter out our own flags, leaving any extra args for ansible-playbook.
+# Our own flags out; the rest goes to ansible-playbook.
 reconfigure=0
 n=$#
 while [ "$n" -gt 0 ]; do
@@ -214,28 +194,27 @@ while [ "$n" -gt 0 ]; do
 	n=$((n - 1))
 done
 
-# local_vars first: it resolves SHARED_HOME, which decides uv's install dirs.
-# PATH before ensure_ansible, or a prior uv install isn't found and re-runs.
+# local_vars first: it sets SHARED_HOME, which decides uv's dirs. PATH before
+# ensure_ansible, or a prior uv install isn't found.
 ensure_local_vars
 _lbin="$(local_bin_dir)"
 export PATH="$_lbin:$HOME/.local/bin:$PATH"
 ensure_ansible
 
-# Ansible modules run on the target's python3, which minimal hosts lack; fall
-# back to the uv python behind ansible-core (here, so reruns get it too).
+# Modules need the target's python3, which minimal hosts lack: fall back to
+# the uv python behind ansible-core.
 _uv_ansible_py="$(local_share_dir)/uv/tools/ansible-core/bin/python"
 if ! have python3 && [ -x "$_uv_ansible_py" ]; then
 	export ANSIBLE_PYTHON_INTERPRETER="$_uv_ansible_py"
 fi
 
-# Bare ansible-core ships no collections, and the playbook fails at parse time
-# without community.general. Already-installed collections are skipped.
+# Bare ansible-core has no collections; the playbook needs community.general.
 ansible-galaxy collection install -r "$self_dir/ansible/requirements.yml" >/dev/null
 
-# Run from ansible/ so its ansible.cfg is loaded (ansible reads it from cwd).
+# ansible reads ansible.cfg from cwd.
 (cd "$self_dir/ansible" && ansible-playbook site.yml "$@")
 
-# Wire up the repo's pre-commit hook (binary installed by the playbook). Non-fatal.
+# Non-fatal: the hook binary comes from the playbook.
 if have pre-commit; then
 	(cd "$self_dir" && pre-commit install) ||
 		echo "warning: 'pre-commit install' failed — run it manually in the repo later" >&2

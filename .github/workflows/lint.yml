@@ -3,12 +3,12 @@ on:
   pull_request:
   push:
     branches: [main]
-  # Weekly run catches upstream drift (new tool releases, base images) between PRs.
+  # Weekly: catches upstream drift (tool releases, base images) between PRs.
   schedule:
     - cron: "17 5 * * 1"
   workflow_dispatch:
 
-# Read-only ephemeral token — lint jobs only read the repo (they never push).
+# Lint jobs only read the repo.
 permissions:
   contents: read
 
@@ -18,11 +18,8 @@ concurrency:
 
 jobs:
   lint:
-    # Stable check name = just the area ("shell", "config", …), so the
-    # required-status-check contexts (a repo ruleset pins them) don't change
-    # when the install/run commands change. Without an explicit name the matrix
-    # appends the full command string to the job name, so every command edit
-    # silently renames the checks and breaks the ruleset.
+    # Explicit name = just the area: the matrix would otherwise append the
+    # command, renaming the checks the repo ruleset requires.
     name: ${{ matrix.area }}
     runs-on: ubuntu-24.04
     strategy:
@@ -45,7 +42,7 @@ jobs:
           - area: test
             run: ./.github/scripts/lint.sh test
           - area: zizmor
-            # Online audits (e.g. impostor-commit, ref-confusion) need a token.
+            # Online audits (e.g. impostor-commit) need a token.
             run: ZIZMOR_ONLINE=1 ./.github/scripts/lint.sh zizmor
           - area: actionlint
             run: ./.github/scripts/lint.sh actionlint
@@ -56,16 +53,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Quote the operands: GH Actions `&&`/`||` return the operand and 0 is
-          # FALSY, so `&& 0` would fall through to `|| 1` and secret-scan would get
-          # a shallow clone (gitleaks needs full history). '0'/'1' are truthy.
+          # Quoted: in Actions `&& 0` is falsy and would fall through to `|| 1`;
+          # secret-scan needs full history for gitleaks.
           fetch-depth: ${{ matrix.area == 'secret-scan' && '0' || '1' }}
           persist-credentials: false
-      # zizmor's self-repository rule wants `$/.github/...`, but actionlint
-      # 1.7.12 rejects that syntax as an invalid action reference. The checkout
-      # above is persist-credentials:false from this same repo, so the
-      # workspace-relative form carries no extra risk; revisit when actionlint
-      # learns `$/`.
+      # zizmor wants `$/.github/...`, which actionlint 1.7.12 rejects; the
+      # same-repo, credential-less checkout makes this form safe.
       - uses: ./.github/actions/setup-lint # zizmor: ignore[self-repository]
       - name: Install ${{ matrix.area }} extras
         if: matrix.install
@@ -77,6 +70,6 @@ jobs:
         shell: bash
         env:
           RUN: ${{ matrix.run }}
-          # Read-only token for zizmor's online audits; the zizmor area only.
+          # zizmor's online audits only.
           GH_TOKEN: ${{ matrix.area == 'zizmor' && github.token || '' }}
         run: eval "$RUN"

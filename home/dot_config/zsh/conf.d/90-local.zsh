@@ -1,3 +1,2 @@
-# Machine-local secrets/overrides (git-ignored + chezmoi-ignored). Optional.
-# Put per-machine secrets/exports here; this file is never committed.
+# Machine-local secrets/overrides (git- and chezmoi-ignored). Optional.
 [[ -f ~/.config/zsh/local.zsh ]] && source ~/.config/zsh/local.zsh

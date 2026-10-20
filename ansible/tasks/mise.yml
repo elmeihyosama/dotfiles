@@ -1,15 +1,12 @@
 ---
-# Pinned mise binary in {{ local_bin }} (per-arch under shared_home). Downloaded
-# from the release with a sha256 check; skipped when the installed mise already
-# reports mise_version. Linux uses the static musl asset. Homebrew's mise, if any,
-# is left alone (PATH precedence is handled elsewhere).
+# Pinned, sha256-checked mise binary in {{ local_bin }}; skipped when it already
+# reports mise_version. Homebrew's mise, if any, is left alone.
 - name: Map platform to mise release asset
   ansible.builtin.set_fact:
     _mise_os: "{{ {'Darwin': 'macos', 'Linux': 'linux'}[ansible_facts.system] | default('unsupported') }}"
     _mise_arch: "{{ {'x86_64': 'x64', 'amd64': 'x64', 'aarch64': 'arm64', 'arm64': 'arm64'}[ansible_facts.architecture] | default('unsupported') }}"
 
-# Intel Macs are deliberately out: the pinned tools are locked (checksums)
-# for these three platforms only (README, "Supported platforms").
+# Intel Macs are out: the tools are checksum-locked for these three platforms.
 - name: Fail clearly on a platform outside the locked set
   ansible.builtin.fail:
     msg: >-

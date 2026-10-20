@@ -1,10 +1,7 @@
-{#- Bootstrap copy of the dotfiles mise pins, written by tasks/packages.yml on
-a fresh machine before chezmoi (itself a mise tool) exists. Must render
-byte-identically to home/dot_config/mise-dotfiles/config.toml.tmpl for the
-same names (tests/mise-core-pins.test.sh). Inputs: tool_catalog (tools.yaml),
-mise_pin_names (list), mise_pin_os (darwin|linux), mise_pin_plat
-(<os>-<arch>, e.g. macos-arm64). Same skips as the chezmoi template:
-bootstrap, provided_by, native_on this OS, missing_on this platform. -#}
+{#- Bootstrap pins, written by tasks/packages.yml before chezmoi (a mise tool)
+exists. Must render byte-identically to
+home/dot_config/mise-dotfiles/config.toml.tmpl (tests/mise-core-pins.test.sh),
+with the same skips. -#}
 [tools]
 {%- for name in mise_pin_names %}
 {%-   set t = tool_catalog.tools[name] %}

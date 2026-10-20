@@ -1,5 +1,4 @@
--- Highlight chezmoi `*.tmpl` files as their base filetype (e.g. starship.toml.tmpl →
--- toml). Without this, nvim sees only `.tmpl` and applies no syntax highlighting.
+-- Highlight chezmoi `*.tmpl` files as their base filetype (starship.toml.tmpl → toml).
 vim.filetype.add({
   pattern = {
     [".*%.tmpl"] = function(path)

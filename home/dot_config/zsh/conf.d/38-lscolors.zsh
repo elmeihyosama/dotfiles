@@ -1,6 +1,5 @@
-# LS_COLORS via vivid (a binary fork) — cached to a file; regenerate only when
-# the rendered theme changes (rides `chezmoi apply`, bumping mtime) or vivid is
-# upgraded. Colors file types in eza/fd listings and fzf-tab completion.
+# LS_COLORS via vivid (a fork), cached; regenerated when the rendered theme or
+# vivid changes.
 if command -v vivid >/dev/null 2>&1; then
   _vivid_cache="${XDG_CACHE_HOME:-$HOME/.cache}/vivid/ls_colors"
   _vivid_theme="${XDG_CONFIG_HOME:-$HOME/.config}/vivid/themes/base16-active.yml"

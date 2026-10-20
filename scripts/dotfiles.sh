@@ -1,69 +1,31 @@
 #!/usr/bin/env sh
-# dotfiles.sh — front end for managing this dotfiles repo (the `dotfiles` shell
-# function and, later, a TUI call it).
+# dotfiles.sh: front end for this repo (the `dotfiles` shell function).
 # Usage: dotfiles.sh <subcommand> [args]
-#   list [--json]   tools in the catalog, whether this machine selects them,
-#                   and what is installed
-#   add <tool|group>... [--no-apply]
-#                   select tools/groups in ansible/local.yml, then apply
-#   remove <tool|group>... [--no-apply]
-#                   deselect them; mise tools are uninstalled after the apply,
-#                   native ones get the command to run (never run for you)
-#   update [--check]
-#                   git pull --ff-only, ansible-playbook, chezmoi apply,
-#                   sheldon lock, nvim plugin restore, then doctor; --check
-#                   only reports what an update would do
-#   doctor [args]   run scripts/doctor.sh (read-only health check)
-#   help            print this usage
+#   list [--json]       catalog tools, selection and install state
+#   add|remove <tool|group>... [--no-apply]
+#                       edit ansible/local.yml, then apply; remove uninstalls
+#                       mise tools and only prints how to remove native ones
+#   update [--check]    pull, playbook, chezmoi, sheldon, nvim, then doctor
+#   doctor [args]       scripts/doctor.sh
+#   help
 # Exit codes: 0 ok, 1 an operation failed, 2 usage or validation error.
 #
-# add/remove edit only tool_groups, tools_add and tools_remove in local.yml
-# as a line edit of just those keys' own lines (yq only reads; every other byte,
-# comment and CRLF stays; an unsupported shape exits 2 with nothing written; the
-# result is verified, then moved into place atomically). An add of
-# a selected tool or a remove of an unselected one changes nothing, judged
-# against select-tools' computed selection. Every argument is validated before
-# anything is written. Apply = ansible-playbook site.yml --tags
-# mise,chezmoi,packages; if it fails local.yml stays edited and re-running the
-# printed command is safe.
+# add/remove line-edit only tool_groups/tools_add/tools_remove in local.yml, so
+# every other byte (comments, CRLF) stays; an unsupported shape exits 2 with
+# nothing written. A failed apply leaves local.yml edited; re-running is safe.
 #
-# update: each step prints `==> <step>`; the first failure stops it (exit 1).
-# It never stashes, resets or force-pulls: a dirty repo is refused. Step order:
-# git pull --ff-only; (cd ansible && ansible-playbook site.yml); chezmoi apply;
-# sheldon lock --update when home/dot_config/sheldon/plugins.toml differs between
-# the pre- and post-pull HEAD (plugins are pinned by rev, so --update only moves
-# them to the pinned revs), else sheldon lock; nvim --headless "+Lazy! restore"
-# +qa; dotfiles doctor (its exit code is update's). sheldon and nvim are skipped
-# with a notice when not installed. Nothing may prompt (it runs from Raycast
-# without a tty): GIT_TERMINAL_PROMPT=0, ssh BatchMode, no colour, no progress.
-# The playbook only uses sudo when allow_sudo is true (local.yml, else the
-# `sudo -n true` probe in site.yml); a password-needing sudo fails the task, it
-# does not wait. --check: git fetch (a failure is a warning), incoming commits,
-# `chezmoi diff --exclude scripts` (first 200 lines), and selected mise tools
-# whose pinned version is not installed (from `list --json`). It writes nothing.
+# update never stashes, resets or force-pulls (a dirty repo is refused), stops
+# at the first failing step and never prompts: it runs from Raycast without a
+# tty. --check writes nothing.
 #
-# Environment (tests): DOTFILES_LOCAL_YML overrides ansible/local.yml (when the
-# file is missing, select-tools' defaults apply: every group); DOTFILES_TOOLS_YAML
-# overrides home/.chezmoidata/tools.yaml.
+# Tests: DOTFILES_LOCAL_YML and DOTFILES_TOOLS_YAML override the default paths.
 #
-# `list --json` is a stable contract (the TUI parses it). One array element per
-# catalog tool, sorted by group order in tools.yaml `tool_groups`, then by name:
-#   name      string       tool name (catalog key)
-#   group     string       tools.yaml group
-#   bin       string       command name (default: name)
-#   source    string       "mise" | "native" | "bootstrap" | "bundled"; the
-#                          select-tools.sh enum, unchanged. A tool that is not
-#                          selected gets the source it would have here.
-#   selected  boolean      true when select-tools picks it for this host; false
-#                          for a tool outside the selection (still listed)
-#   installed boolean      mise tools: some version is installed (mise -C / ls);
-#                          all others: `bin` resolves on PATH
-#   pinned    string|null  tools.yaml version for mise tools, else null
-#   actual    string|null  installed version for mise tools (the active one,
-#                          else the newest installed), else null
-# The mise lookup runs as `mise -C /` with the dotfiles pins and the user's
-# global config masked, exactly as .github/scripts/assert-tools.sh does, so the
-# repo's own mise.toml can never answer.
+# `list --json` is a contract (the TUI parses it): one object per catalog tool,
+# sorted by tool_groups order then name: name, group, bin, source (select-tools'
+# enum; an unselected tool gets the one it would have), selected, installed
+# (mise: some version installed; else bin on PATH), pinned and actual (mise
+# tools, else null). mise runs as `mise -C /` with the global config masked, as
+# in assert-tools.sh, so the repo's own mise.toml never answers.
 set -eu
 
 repo_root="$(CDPATH='' cd "$(dirname "$0")/.." && pwd)"
@@ -214,12 +176,12 @@ cmd_update() {
 		echo "dotfiles update: git not on PATH" >&2
 		exit 1
 	}
-	# no tty may be present (Raycast): nothing below may prompt
+	# no tty (Raycast): nothing below may prompt
 	export GIT_TERMINAL_PROMPT=0
 	[ -n "${GIT_SSH_COMMAND:-}" ] || export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=10"
 	export NO_COLOR=1
-	# a bare environment lacks the pinned tools; look in the usual places last,
-	# mise's shims ahead of ~/.local/bin (mise tools outrank it, as in the shell)
+	# a bare environment lacks the pinned tools; mise's shims go ahead of
+	# ~/.local/bin, as in the shell
 	# shellcheck source=mise-env.sh
 	. "$repo_root/scripts/mise-env.sh"
 	_data="${MISE_DATA_DIR:-$HOME/.local/share$(mise_sfx "${DOTFILES_LOCAL_YML:-$repo_root/ansible/local.yml}")/mise}"
@@ -285,8 +247,7 @@ cmd_update() {
 	(cd "$repo_root/ansible" && ansible-playbook site.yml) || upd_fail "ansible-playbook site.yml"
 	echo "==> chezmoi apply"
 	command -v chezmoi >/dev/null 2>&1 || upd_fail "chezmoi apply (chezmoi not on PATH)"
-	# never --force: a managed file edited since chezmoi last wrote it would be
-	# overwritten silently. With no tty chezmoi cannot ask and fails instead.
+	# never --force: it would silently overwrite a managed file edited since.
 	if ! chezmoi apply; then
 		if [ ! -t 0 ]; then
 			echo "dotfiles: if chezmoi says a file has changed since it last wrote it (or \"could not open a new TTY\"), run \`chezmoi diff\`, then \`chezmoi apply\` in a terminal to choose, and re-run" >&2
@@ -300,11 +261,8 @@ cmd_update() {
 	fi
 	echo "==> $_sh"
 	if command -v sheldon >/dev/null 2>&1; then
-		# sheldon reads ~/.config/sheldon/plugins.toml (chezmoi, just applied);
-		# no SHELDON_* variables are set anywhere, so no zsh is needed
-		# A plain lock fails when a pin moved by a pull outside update (a
-		# manual pull, install.sh, or an update that failed after its pull)
-		# names a rev sheldon has not fetched: retry once with --update.
+		# A plain lock fails when a pull outside update moved a pin to a rev
+		# sheldon has not fetched: retry once with --update.
 		# shellcheck disable=SC2086 # _sh is a fixed command line
 		if ! $_sh; then
 			[ "$_sh" = "sheldon lock" ] || upd_fail "$_sh"
@@ -314,8 +272,7 @@ cmd_update() {
 	else
 		echo "  (sheldon not installed; skipped)"
 	fi
-	# nvim exits 0 even when Lazy reports a failed restore, so this step only
-	# fails when nvim itself cannot run
+	# nvim exits 0 even when Lazy's restore fails; only nvim itself can fail this
 	echo "==> nvim Lazy! restore"
 	if command -v nvim >/dev/null 2>&1; then
 		nvim --headless "+Lazy! restore" +qa || upd_fail "nvim Lazy! restore"
@@ -463,7 +420,6 @@ cmd_edit() {
 		exit 2
 	}
 
-	# every name must be a tool or a group (nothing is written otherwise)
 	for a in $names; do
 		if ! printf '%s\n' "$catalog" | jq -e --arg n "$a" '(.tools[$n] != null) or (.tool_groups | index($n)) != null' >/dev/null; then
 			echo "dotfiles: unknown tool: $a" >&2
@@ -473,8 +429,7 @@ cmd_edit() {
 		fi
 	done
 
-	# Temp files: scratch holds select-tools probes (no user content); tmp/tmpn
-	# live next to local.yml so the final mv is atomic. All removed on any exit.
+	# tmp/tmpn sit next to local.yml so the final mv is atomic.
 	scratch="$(mktemp -d)" || exit 1
 	tmp="$(mktemp "$local_yml.XXXXXX")" || exit 1
 	tmpn="$tmp.n"
@@ -489,8 +444,7 @@ cmd_edit() {
 		# shellcheck disable=SC2086 # sel_args: no spaces in the values we pass
 		"$repo_root/scripts/select-tools.sh" $sel_args --local "$1" || return 2
 	}
-	# sel_has STATE_JSON NAME: is NAME in select-tools' selection for that state?
-	# (select-tools is the only place the selection rules live.)
+	# sel_has STATE_JSON NAME: is NAME selected? (the rules live in select-tools)
 	sel_has() {
 		printf '%s' "$1" >"$scratch/s.json" || exit 1
 		_o="$(sel_run "$scratch/s.json")" || exit 2
@@ -610,8 +564,6 @@ dotfiles: deselected $n"
 	fi
 	mv -f "$tmp" "$local_yml" || exit 1
 
-	# tools that stop being installed: native ones get a hint, mise ones are
-	# uninstalled after the apply
 	gone="$(jq -n --argjson b "$before" --argjson a "$after" \
 		'$b | map(select(.name as $n | ($a | map(.name) | index($n)) == null))')" || exit 1
 	if [ "$verb" = remove ]; then

@@ -1,4 +1,2 @@
-# ansible-lint config — full ruleset, no skips.
-# community.general (homebrew/pacman modules) must be present in the lint env;
-# CI installs it via `ansible-galaxy collection install -r requirements.yml`.
+# Full ruleset, no skips. Needs community.general (requirements.yml) installed.
 profile: production

@@ -1,9 +1,7 @@
 #!/usr/bin/env sh
-# mise-env.sh — sourced (POSIX sh) by .github/scripts/assert-tools.sh,
-# scripts/doctor.sh and scripts/dotfiles.sh: the mise environment the dotfiles
-# pins are read with. Same layout as ansible/group_vars/all.yml (mise_env).
-# Keeping it in one place matters: it masks the user's global mise config, and
-# drift would let a project mise.toml or `mise use -g` answer for a home tool.
+# mise-env.sh: sourced by assert-tools.sh, doctor.sh and dotfiles.sh; the mise
+# env the dotfiles pins are read with (as group_vars mise_env). One place on
+# purpose: drift would let a project mise.toml or `mise use -g` answer.
 
 # mise_sfx LOCAL_YML: "-<arch>" under shared_home, else nothing
 mise_sfx() {
@@ -12,11 +10,9 @@ mise_sfx() {
 	fi
 }
 
-# mise_env LOCAL_YML: set sfx and user_global, and export MISE_SYSTEM_CONFIG_DIR
-# (dotfiles pins), MISE_DATA_DIR (per-arch under shared_home) and
-# MISE_GLOBAL_CONFIG_FILE (masked). user_global is the user's own global config
-# (what `mise use -g` writes) before masking, so an override there can be
-# reported as such. Callers run mise as `mise -C /`.
+# mise_env LOCAL_YML: set sfx and user_global (the global config before
+# masking, so an override there can be reported), export the MISE_* vars.
+# Callers run mise as `mise -C /`.
 # shellcheck disable=SC2034 # sfx, user_global: read by the sourcing script
 mise_env() {
 	sfx="$(mise_sfx "$1")"

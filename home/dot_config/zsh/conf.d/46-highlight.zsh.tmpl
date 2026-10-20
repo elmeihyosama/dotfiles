@@ -1,6 +1,5 @@
 {{- $p := index .themes .theme -}}
-# Palette-driven styles for fast-syntax-highlighting (loaded via sheldon;
-# reads FAST_HIGHLIGHT_STYLES, not ZSH_HIGHLIGHT_STYLES).
+# fast-syntax-highlighting reads FAST_HIGHLIGHT_STYLES, not ZSH_HIGHLIGHT_STYLES.
 typeset -gA FAST_HIGHLIGHT_STYLES
 FAST_HIGHLIGHT_STYLES[command]='fg={{ index $p .design.ok }}'
 FAST_HIGHLIGHT_STYLES[builtin]='fg={{ index $p .design.ok }}'
