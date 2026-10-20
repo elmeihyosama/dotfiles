@@ -179,13 +179,15 @@ if [ -z "$self_dir" ] || [ ! -f "$self_dir/ansible/site.yml" ]; then
 	}
 	if [ -d "$DEST/.git" ]; then
 		echo "Reusing existing clone at $DEST"
-		if ! git -C "$DEST" pull --ff-only; then
-			_dirty="$(git -C "$DEST" status --porcelain 2>/dev/null | cut -c4- | paste -sd, - | sed 's/,/, /g')"
-			if [ -n "$_dirty" ]; then
-				echo "  (skipping update; local changes in: $_dirty; commit or discard them, then run \`dotfiles update\` once installed)"
-			else
-				echo "  (skipping update; the pull failed; \`dotfiles update\` retries it once installed)"
-			fi
+		# Never pull over local changes: the repo's own git config sets
+		# merge/rebase.autostash, so a pull would stash them and could leave
+		# conflict markers. Same rule as `dotfiles update`; non-fatal here.
+		_dirty="$(git -C "$DEST" status --porcelain 2>/dev/null | cut -c4- | paste -sd, - | sed 's/,/, /g')"
+		if [ -n "$_dirty" ]; then
+			echo "  (skipping update; local changes in: $_dirty; commit or discard them, then run \`dotfiles update\` once installed)"
+		elif ! git -C "$DEST" -c merge.autostash=false -c rebase.autostash=false \
+			pull --no-rebase --ff-only; then
+			echo "  (skipping update; the pull failed; \`dotfiles update\` retries it once installed)"
 		fi
 	elif [ -e "$DEST" ]; then
 		echo "$DEST exists but is not a git clone; move it aside or set DOTFILES_DIR." >&2

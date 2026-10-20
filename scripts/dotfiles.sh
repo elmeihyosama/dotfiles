@@ -216,13 +216,14 @@ cmd_update() {
 	}
 	# no tty may be present (Raycast): nothing below may prompt
 	export GIT_TERMINAL_PROMPT=0
-	[ -n "${GIT_SSH_COMMAND:-}" ] || export GIT_SSH_COMMAND="ssh -o BatchMode=yes"
+	[ -n "${GIT_SSH_COMMAND:-}" ] || export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=10"
 	export NO_COLOR=1
-	# a bare environment lacks the pinned tools; look in the usual places last
+	# a bare environment lacks the pinned tools; look in the usual places last,
+	# mise's shims ahead of ~/.local/bin (mise tools outrank it, as in the shell)
 	# shellcheck source=mise-env.sh
 	. "$repo_root/scripts/mise-env.sh"
 	_data="${MISE_DATA_DIR:-$HOME/.local/share$(mise_sfx "${DOTFILES_LOCAL_YML:-$repo_root/ansible/local.yml}")/mise}"
-	PATH="$PATH:$HOME/.local/bin:$_data/shims"
+	PATH="$PATH:$_data/shims:$HOME/.local/bin"
 	export PATH
 	cd / || exit 1
 
@@ -239,7 +240,7 @@ cmd_update() {
 		fi
 		echo "==> chezmoi diff"
 		if command -v chezmoi >/dev/null 2>&1; then
-			chezmoi diff --exclude scripts 2>/dev/null | head -200
+			chezmoi diff --exclude scripts | head -200
 		else
 			echo "dotfiles: warning: chezmoi not on PATH; cannot show the diff" >&2
 		fi
@@ -255,6 +256,7 @@ cmd_update() {
 		return 0
 	fi
 
+	echo "==> check working tree"
 	_st="$(git -C "$repo_root" status --porcelain)" || {
 		echo "dotfiles: cannot read the repo status of $repo_root" >&2
 		exit 1
@@ -274,13 +276,23 @@ cmd_update() {
 	}
 	echo "==> git pull --ff-only"
 	_old="$(git -C "$repo_root" rev-parse HEAD)" || upd_fail "git pull --ff-only"
-	git -C "$repo_root" pull --ff-only || upd_fail "git pull --ff-only"
+	# the user's git config autostashes (home/dot_config/git/config.tmpl); a
+	# pull here must never stash or rebase, whatever the config says
+	git -C "$repo_root" -c merge.autostash=false -c rebase.autostash=false \
+		pull --no-rebase --ff-only || upd_fail "git pull --ff-only"
 	echo "==> ansible-playbook site.yml"
 	command -v ansible-playbook >/dev/null 2>&1 || upd_fail "ansible-playbook site.yml (ansible-playbook not on PATH)"
 	(cd "$repo_root/ansible" && ansible-playbook site.yml) || upd_fail "ansible-playbook site.yml"
 	echo "==> chezmoi apply"
 	command -v chezmoi >/dev/null 2>&1 || upd_fail "chezmoi apply (chezmoi not on PATH)"
-	chezmoi apply || upd_fail "chezmoi apply"
+	# never --force: a managed file edited since chezmoi last wrote it would be
+	# overwritten silently. With no tty chezmoi cannot ask and fails instead.
+	if ! chezmoi apply; then
+		if [ ! -t 0 ]; then
+			echo "dotfiles: if chezmoi says a file has changed since it last wrote it (or \"could not open a new TTY\"), run \`chezmoi diff\`, then \`chezmoi apply\` in a terminal to choose, and re-run" >&2
+		fi
+		upd_fail "chezmoi apply"
+	fi
 	if git -C "$repo_root" diff --quiet "$_old" HEAD -- home/dot_config/sheldon/plugins.toml; then
 		_sh="sheldon lock"
 	else
@@ -290,11 +302,20 @@ cmd_update() {
 	if command -v sheldon >/dev/null 2>&1; then
 		# sheldon reads ~/.config/sheldon/plugins.toml (chezmoi, just applied);
 		# no SHELDON_* variables are set anywhere, so no zsh is needed
+		# A plain lock fails when a pin moved by a pull outside update (a
+		# manual pull, install.sh, or an update that failed after its pull)
+		# names a rev sheldon has not fetched: retry once with --update.
 		# shellcheck disable=SC2086 # _sh is a fixed command line
-		$_sh || upd_fail "$_sh"
+		if ! $_sh; then
+			[ "$_sh" = "sheldon lock" ] || upd_fail "$_sh"
+			echo "  (sheldon lock failed; retrying with --update)"
+			sheldon lock --update || upd_fail "sheldon lock --update"
+		fi
 	else
 		echo "  (sheldon not installed; skipped)"
 	fi
+	# nvim exits 0 even when Lazy reports a failed restore, so this step only
+	# fails when nvim itself cannot run
 	echo "==> nvim Lazy! restore"
 	if command -v nvim >/dev/null 2>&1; then
 		nvim --headless "+Lazy! restore" +qa || upd_fail "nvim Lazy! restore"
