@@ -1,12 +1,31 @@
 #!/usr/bin/env sh
 # doctor.sh — read-only health check for a provisioned machine.
-# Sections: PATH, tools (via assert-tools.sh — same source of truth as CI),
-# Nerd Font, chezmoi drift, active theme, login shell, zellij plugin.
+# Sections: PATH, mise version, tools (via assert-tools.sh — same source of
+# truth as CI), Nerd Font, chezmoi drift, active theme, login shell, zellij plugin.
 # One OK/WARN/FAIL line per check; exits non-zero iff any FAIL.
-# Usage: scripts/doctor.sh  (or the `doctor` shell function)
+# Usage: scripts/doctor.sh [--tools TOOLS_YAML]  (or the `doctor` shell function)
+#   --tools  passed to assert-tools.sh (tests use a small catalog)
 set -eu
 
 repo_root="$(CDPATH='' cd "$(dirname "$0")/.." && pwd)"
+tools_arg=""
+case "${1:-}" in
+--tools)
+	[ $# -ge 2 ] || {
+		echo "usage: doctor.sh [--tools TOOLS_YAML]" >&2
+		exit 2
+	}
+	tools_arg="$2"
+	;;
+"") ;;
+*)
+	echo "usage: doctor.sh [--tools TOOLS_YAML]" >&2
+	exit 2
+	;;
+esac
+# Run from / so that tools resolved through mise shims (chezmoi, jq) answer
+# with the dotfiles' home pins, never a project mise.toml such as the repo's.
+cd /
 fail=0
 ok() { printf 'OK    %s\n' "$1"; }
 warn() { printf 'WARN  %s\n' "$1"; }
@@ -28,13 +47,30 @@ case ":$PATH:" in
 	;;
 esac
 
+# --- mise ------------------------------------------------------------------
+# The bootstrap binary is pinned in ansible/group_vars (tasks/mise.yml).
+want_mise="$(sed -nE 's/^mise_version:[[:space:]]*"?([^"[:space:]]+)"?.*/\1/p' "$repo_root/ansible/group_vars/all.yml")"
+if mise_bin="$(command -v mise 2>/dev/null)"; then
+	have_mise="$(mise --version 2>/dev/null | awk 'NR == 1 { print $1 }')"
+	if [ "$have_mise" = "$want_mise" ]; then
+		ok "mise $have_mise (ansible/group_vars mise_version)"
+	else
+		bad "mise ${have_mise:-?} at $mise_bin, but ansible/group_vars pins mise_version $want_mise (rerun the playbook: --tags mise)"
+	fi
+else
+	bad "mise not on PATH (ansible/group_vars pins mise_version $want_mise)"
+fi
+
 # --- Tools -----------------------------------------------------------------
-if tools_out="$("$repo_root/.github/scripts/assert-tools.sh" 2>&1)"; then
+# assert-tools resolves the home pins from / with the user's global mise config
+# masked; its WARN lines (non-mise copies shadowed on PATH) are surfaced here.
+if tools_out="$("$repo_root/.github/scripts/assert-tools.sh" ${tools_arg:+--tools "$tools_arg"} 2>&1)"; then
 	ok "selected tools all present and runnable"
 else
 	bad "tool assertion failed:"
-	printf '%s\n' "$tools_out" | grep -v '^SKIP' | sed 's/^/      /'
+	printf '%s\n' "$tools_out" | grep -E '^FAIL' | sed 's/^/      /'
 fi
+printf '%s\n' "$tools_out" | sed -n 's/^WARN: //p' | while IFS= read -r w; do warn "$w"; done
 
 # --- Nerd Font -------------------------------------------------------------
 if [ "$(uname -s)" = "Darwin" ]; then

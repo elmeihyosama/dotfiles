@@ -1,30 +1,64 @@
 #!/usr/bin/env sh
 # Assert every tool this machine selects resolves, runs, and passes its smoke test.
-# Usage: .github/scripts/assert-tools.sh [LOCAL_YML]   (default: ansible/local.yml)
-# The tool set comes from scripts/select-tools.sh over home/.chezmoidata/tools.yaml
-# (one source of truth with the playbook). mise / bootstrap / bundled tools are
-# required; native tools are required on macOS (brew) and checked only when
-# present on Linux (distro packages, best effort). Runs from / so no repo
-# mise.toml shadows the dotfiles pins.
+# Usage: .github/scripts/assert-tools.sh [--local LOCAL_YML] [--tools TOOLS_YAML]
+#   --local  per-machine vars (default: ansible/local.yml)
+#   --tools  tool catalog (default: home/.chezmoidata/tools.yaml; for tests)
+#
+# The tool set comes from scripts/select-tools.sh over the catalog (one source
+# of truth with the playbook). Per source:
+#   mise       `mise which --version <bin>` must be the exact tools.yaml version,
+#              and `command -v <bin>` must point inside mise's data dir (a shim
+#              or an install). Other copies further back on PATH get a WARN
+#              (shadowed) with a removal hint; a copy AHEAD of mise's is a FAIL.
+#   bundled    ships inside its provider (age-keygen in age): as above when the
+#              provider comes from mise, at the provider's version.
+#   bootstrap  (mise itself) must resolve and run.
+#   native     must resolve: required on macOS (brew), best effort (SKIP) on Linux.
+# `smoke` (tools.yaml) runs when set. Output lines: OK: / WARN: / SKIP: / FAIL:.
+#
+# The home pins are resolved from outside any project: mise runs as `mise -C /`
+# with MISE_SYSTEM_CONFIG_DIR at the dotfiles pins and the user's global config
+# masked (as the playbook's mise_install_env does), so neither the repo's own
+# mise.toml (the lint toolchain) nor `mise use -g` answers for a home tool.
 set -eu
 
 repo="$(CDPATH='' cd "$(dirname "$0")/../.." && pwd)"
-local_yml="${1:-$repo/ansible/local.yml}"
+local_yml="$repo/ansible/local.yml"
+tools_yaml="$repo/home/.chezmoidata/tools.yaml"
+usage() {
+	echo "usage: assert-tools.sh [--local LOCAL_YML] [--tools TOOLS_YAML]" >&2
+	exit 2
+}
+while [ $# -gt 0 ]; do
+	[ $# -ge 2 ] || usage
+	case "$1" in
+	--local) local_yml="$2" ;;
+	--tools) tools_yaml="$2" ;;
+	*) usage ;;
+	esac
+	shift 2
+done
 
 # Same layout as ansible/group_vars/all.yml (mise_env): the dotfiles pins dir
-# and the (per-arch under shared_home) shims first, then the local bin.
-shared_home=false
+# and the (per-arch under shared_home) data dir and local bin.
+sfx=""
 if [ -f "$local_yml" ] && grep -Eq '^[[:space:]]*shared_home:[[:space:]]*true' "$local_yml"; then
-	shared_home=true
-fi
-if [ "$shared_home" = true ]; then
 	sfx="-$(uname -m)"
-else
-	sfx=""
 fi
 export MISE_SYSTEM_CONFIG_DIR="${MISE_SYSTEM_CONFIG_DIR:-$HOME/.config/mise-dotfiles}"
 export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share$sfx/mise}"
-export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin$sfx:$HOME/.local/bin:$PATH"
+export MISE_GLOBAL_CONFIG_FILE=/nonexistent/mise-user.toml
+# A shell that never read the dotfiles' .zshenv/.bashrc (a CI step, a fresh
+# container) lacks the shims: put them in front, as those files do. The local
+# bin (mise itself) is appended when missing, never moved ahead of anything.
+# Entries already on PATH keep the caller's order: that order is what this
+# check is about.
+on_path() { case ":$PATH:" in *":$1:"*) return 0 ;; *) return 1 ;; esac }
+for d in "$HOME/.local/bin$sfx" "$HOME/.local/bin"; do
+	on_path "$d" || PATH="$PATH:$d"
+done
+on_path "$MISE_DATA_DIR/shims" || PATH="$MISE_DATA_DIR/shims:$PATH"
+export PATH
 cd /
 
 for t in yq jq; do
@@ -35,17 +69,83 @@ for t in yq jq; do
 done
 
 case "$(uname -s)" in Darwin) os=darwin ;; *) os=linux ;; esac
-sel="$("$repo/scripts/select-tools.sh" --os "$os" --local "$local_yml")"
-tools_yaml="$repo/home/.chezmoidata/tools.yaml"
+sel="$("$repo/scripts/select-tools.sh" --os "$os" --local "$local_yml" --tools "$tools_yaml")"
+
+# resolve PATH: the file a path finally points at (or the path itself)
+resolve() { realpath "$1" 2>/dev/null || printf '%s\n' "$1"; }
+data_real="$(resolve "$MISE_DATA_DIR")"
+in_mise() { # in_mise PATH: a shim or install under mise's data dir
+	case "$1" in "$MISE_DATA_DIR"/*) return 0 ;; esac
+	case "$(resolve "$1")" in "$data_real"/*) return 0 ;; esac
+	return 1
+}
+# copies BIN: every executable BIN on PATH, in PATH order, once per real dir
+copies() {
+	_seen=":"
+	_ifs="$IFS"
+	IFS=:
+	for _d in $PATH; do
+		[ -n "$_d" ] && [ -x "$_d/$1" ] && [ ! -d "$_d/$1" ] || continue
+		_r="$(CDPATH='' cd -P "$_d" 2>/dev/null && pwd -P)" || continue
+		case "$_seen" in *":$_r:"*) continue ;; esac
+		_seen="$_seen$_r:"
+		printf '%s\n' "$_d/$1"
+	done
+	IFS="$_ifs"
+}
+# pkg_name TOOL MANAGER: tools.yaml native_pkg.<manager>, else the tool name
+pkg_name() { yq ".tools.\"$1\".native_pkg.$2 // \"$1\"" "$tools_yaml"; }
+# remove_hint TOOL PATH: how to remove a non-mise copy of TOOL at PATH; prints
+# nothing for a file macOS owns (SIP: cannot, and need not, be removed).
+remove_hint() {
+	_real="$(resolve "$2")"
+	case "$_real" in */Cellar/*)
+		_f="${_real#*/Cellar/}"
+		echo "brew uninstall ${_f%%/*}"
+		return
+		;;
+	esac
+	for _p in ${HOMEBREW_PREFIX:-} /opt/homebrew /home/linuxbrew/.linuxbrew; do
+		case "$2" in "$_p"/*)
+			echo "brew uninstall $(pkg_name "$1" brew)"
+			return
+			;;
+		esac
+	done
+	case "$2" in /usr/bin/* | /bin/* | /usr/sbin/* | /sbin/*)
+		[ "$os" = darwin ] && return
+		if command -v dpkg >/dev/null 2>&1; then
+			_k="$(dpkg -S "$2" 2>/dev/null || dpkg -S "$_real" 2>/dev/null)" || _k=""
+			_k="${_k%%:*}"
+			echo "sudo apt remove ${_k:-$(pkg_name "$1" apt)}"
+		elif command -v rpm >/dev/null 2>&1; then
+			_k="$(rpm -qf --qf '%{NAME}\n' "$2" 2>/dev/null | head -n1)" || _k=""
+			echo "sudo dnf remove ${_k:-$(pkg_name "$1" dnf)}"
+		elif command -v pacman >/dev/null 2>&1; then
+			_k="$(pacman -Qoq "$2" 2>/dev/null)" || _k=""
+			echo "sudo pacman -R ${_k:-$(pkg_name "$1" pacman)}"
+		else
+			echo "your package manager"
+		fi
+		return
+		;;
+	esac
+	echo "rm $2"
+}
 
 fail=0
-for row in $(printf '%s\n' "$sel" | jq -r '.[] | "\(.name):\(.bin):\(.source)"'); do
-	tool="${row%%:*}"
-	rest="${row#*:}"
-	bin="${rest%%:*}"
-	source="${rest#*:}"
-
-	if ! command -v "$bin" >/dev/null 2>&1; then
+# name|bin|source|version|mise-managed (yes/no). A bundled tool takes its
+# provider's version and is mise-managed when its provider is.
+rows="$(printf '%s\n' "$sel" | jq -r '
+	(map({key: .name, value: .}) | from_entries) as $by
+	| .[]
+	| (if .source == "bundled" then $by[.provided_by] else . end) as $src
+	| [.name, .bin, .source, ($src.version // ""),
+		(if $src.source == "mise" then "yes" else "no" end)]
+	| join("|")')"
+while IFS='|' read -r tool bin source want managed; do
+	[ -n "$tool" ] || continue
+	if ! where="$(command -v "$bin" 2>/dev/null)"; then
 		# Native tools are best effort on Linux (the distro may lack the
 		# package, no-sudo hosts skip them) but required on macOS, where brew
 		# is always there and every native tool has a formula.
@@ -57,12 +157,40 @@ for row in $(printf '%s\n' "$sel" | jq -r '.[] | "\(.name):\(.bin):\(.source)"')
 		fi
 		continue
 	fi
-	# Native packages are best effort and not all take --version (cava -v).
-	if [ "$source" = native ]; then
-		echo "OK:   $tool -> $bin (native, present: $(command -v "$bin"))"
-		continue
+
+	if [ "$managed" = yes ]; then
+		if ! got="$(mise -C / which --version "$bin" 2>&1)"; then
+			echo "FAIL: $tool -> mise does not provide '$bin' from the dotfiles pins (want $want): $(printf '%s' "$got" | head -n1)"
+			fail=1
+			continue
+		fi
+		if [ "$got" != "$want" ]; then
+			echo "FAIL: $tool -> mise resolves '$bin' to $got, tools.yaml pins $want (run the playbook, or: mise -C / install --locked)"
+			fail=1
+			continue
+		fi
+		if ! in_mise "$where"; then
+			hint="$(remove_hint "$tool" "$where")"
+			echo "FAIL: $tool -> '$bin' resolves to $where, not mise's (under $MISE_DATA_DIR)${hint:+; remove with: $hint}"
+			fail=1
+			continue
+		fi
+		while IFS= read -r c; do
+			[ -n "$c" ] || continue
+			in_mise "$c" && continue
+			# install.sh's own pinned uv (it bootstraps ansible-core before
+			# mise exists, and reinstalls it when missing): expected, not stray.
+			[ "$c" = "$HOME/.local/bin$sfx/uv" ] && continue
+			hint="$(remove_hint "$tool" "$c")"
+			[ -n "$hint" ] || continue
+			echo "WARN: $bin also installed at $c (shadowed); remove with: $hint"
+		done <<C
+$(copies "$bin")
+C
 	fi
-	if ! out="$("$bin" --version 2>&1)"; then
+
+	# Native packages are best effort and not all take --version (cava -v).
+	if [ "$source" != native ] && ! out="$("$bin" --version 2>&1)"; then
 		echo "FAIL: $tool -> '$bin' did not run '--version': $(printf '%s' "$out" | head -n1)"
 		fail=1
 		continue
@@ -80,8 +208,14 @@ for row in $(printf '%s\n' "$sel" | jq -r '.[] | "\(.name):\(.bin):\(.source)"')
 			continue
 		fi
 	fi
-	echo "OK:   $tool -> $bin ($source: $(command -v "$bin"))"
-done
+	if [ "$managed" = yes ]; then
+		echo "OK:   $tool -> $bin $want ($source: $where)"
+	else
+		echo "OK:   $tool -> $bin ($source, present: $where)"
+	fi
+done <<EOF
+$rows
+EOF
 
 [ "$fail" -eq 0 ] && echo "All tool assertions passed." || echo "Tool assertions FAILED."
 exit "$fail"
