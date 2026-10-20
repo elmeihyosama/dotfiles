@@ -142,6 +142,7 @@ tools:
     group: files
     backend: aqua:bootandy/dust
     version: "1.2.4"
+    native_on: [darwin] # the macOS asset is x86_64 only (needs Rosetta 2, absent on a fresh Apple Silicon Mac); brew builds arm64
   duf:
     group: files
     backend: aqua:muesli/duf
