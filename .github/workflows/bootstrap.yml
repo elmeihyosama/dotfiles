@@ -8,6 +8,7 @@ on:
       - 'scripts/select-tools.sh'
       - 'scripts/cleanup-ubi.sh'
       - 'scripts/remove-hint.sh' # sourced by assert-tools.sh / doctor.sh
+      - 'scripts/mise-env.sh' # sourced by assert-tools.sh / doctor.sh / dotfiles.sh
       - '.github/scripts/bootstrap-smoke.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'
@@ -21,6 +22,7 @@ on:
       - 'scripts/select-tools.sh'
       - 'scripts/cleanup-ubi.sh'
       - 'scripts/remove-hint.sh' # sourced by assert-tools.sh / doctor.sh
+      - 'scripts/mise-env.sh' # sourced by assert-tools.sh / doctor.sh / dotfiles.sh
       - '.github/scripts/bootstrap-smoke.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'

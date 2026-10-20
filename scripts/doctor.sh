@@ -33,6 +33,8 @@ case "$(uname -s)" in Darwin) os=darwin ;; *) os=linux ;; esac
 # resolve, remove_hint (use $os and $tools_yaml)
 # shellcheck source=remove-hint.sh
 . "$repo_root/scripts/remove-hint.sh"
+# shellcheck source=mise-env.sh
+. "$repo_root/scripts/mise-env.sh"
 # Run from / so that tools resolved through mise shims (chezmoi, jq) answer
 # with the dotfiles' home pins, never a project mise.toml such as the repo's.
 cd /
@@ -64,9 +66,7 @@ esac
 # different mise ahead of it (Homebrew's, a distro package).
 want_mise="$(sed -nE 's/^mise_version:[[:space:]]*"?([^"[:space:]]+)"?.*/\1/p' "$repo_root/ansible/group_vars/all.yml")"
 lbin="$HOME/.local/bin"
-if [ -f "$local_yml" ] && grep -Eq '^[[:space:]]*shared_home:[[:space:]]*true' "$local_yml"; then
-	lbin="$HOME/.local/bin-$arch"
-fi
+[ -z "$(mise_sfx "$local_yml")" ] || lbin="$HOME/.local/bin-$arch"
 pinned_mise="$lbin/mise"
 mise_ver() { "$1" --version 2>/dev/null | awk 'NR == 1 { print $1 }'; }
 if [ ! -x "$pinned_mise" ]; then

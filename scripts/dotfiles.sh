@@ -34,9 +34,11 @@ set -eu
 
 repo_root="$(CDPATH='' cd "$(dirname "$0")/.." && pwd)"
 
-usage() {
-	echo "usage: dotfiles <subcommand> [args]" >&2
-	echo "subcommands: list [--json] | doctor [args] | help" >&2
+usage() { # usage [FD]: to stderr by default, stdout with 1
+	{
+		echo "usage: dotfiles <subcommand> [args]"
+		echo "subcommands: list [--json] | doctor [args] | help"
+	} >&"${1:-2}"
 }
 
 cmd_list() {
@@ -44,6 +46,10 @@ cmd_list() {
 	while [ $# -gt 0 ]; do
 		case "$1" in
 		--json) json=1 ;;
+		-h | --help)
+			echo "usage: dotfiles list [--json]"
+			return 0
+			;;
 		*)
 			echo "dotfiles list: unknown option: $1" >&2
 			usage
@@ -63,17 +69,10 @@ cmd_list() {
 	esac
 	plat="$([ "$os" = darwin ] && echo macos || echo linux)-$arch"
 
-	# Same mise environment as assert-tools.sh (layout of ansible group_vars
-	# mise_env): dotfiles pins, per-arch data dir under shared_home, global
-	# config masked.
-	sfx=""
-	if [ -f "$local_yml" ] && grep -Eq '^[[:space:]]*shared_home:[[:space:]]*true' "$local_yml"; then
-		sfx="-$(uname -m)"
-	fi
-	MISE_SYSTEM_CONFIG_DIR="${MISE_SYSTEM_CONFIG_DIR:-$HOME/.config/mise-dotfiles}"
-	MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share$sfx/mise}"
-	MISE_GLOBAL_CONFIG_FILE=/nonexistent/mise-user.toml
-	export MISE_SYSTEM_CONFIG_DIR MISE_DATA_DIR MISE_GLOBAL_CONFIG_FILE
+	# The dotfiles pins with the global config masked (scripts/mise-env.sh).
+	# shellcheck source=mise-env.sh
+	. "$repo_root/scripts/mise-env.sh"
+	mise_env "$local_yml"
 
 	for t in yq jq; do
 		command -v "$t" >/dev/null 2>&1 || {
@@ -86,27 +85,31 @@ cmd_list() {
 		exit 1
 	}
 
-	sel_args="--os $os --arch $arch --tools $tools_yaml"
-	[ -f "$local_yml" ] && sel_args="$sel_args --local $local_yml"
-	# shellcheck disable=SC2086 # sel_args is a deliberate word list (no spaces in values we control)
-	if ! sel="$("$repo_root/scripts/select-tools.sh" $sel_args)"; then
+	set -- --os "$os" --arch "$arch" --tools "$tools_yaml"
+	[ -f "$local_yml" ] && set -- "$@" --local "$local_yml"
+	if ! sel="$("$repo_root/scripts/select-tools.sh" "$@")"; then
 		echo "dotfiles list: select-tools failed" >&2
 		exit 1
 	fi
-	catalog="$(yq -o=json '.' "$tools_yaml")"
+	if ! catalog="$(yq -o=json '.' "$tools_yaml")"; then
+		echo "dotfiles list: cannot read $tools_yaml" >&2
+		exit 1
+	fi
 	mise_ls='{}'
 	if command -v mise >/dev/null 2>&1; then
 		mise_ls="$(cd / && mise -C / ls --json 2>/dev/null)" || mise_ls='{}'
-		[ -n "$mise_ls" ] || mise_ls='{}'
 	fi
+	# anything but a JSON object (empty, garbage, an array) counts as no answer
+	printf '%s' "$mise_ls" | jq -e 'type == "object"' >/dev/null 2>&1 || mise_ls='{}'
 	# bins that resolve on PATH (native/bootstrap/bundled "installed")
 	onpath="$(printf '%s\n' "$catalog" | jq -r '.tools | to_entries[] | .value.bin // .key' |
 		while IFS= read -r b; do
 			command -v "$b" >/dev/null 2>&1 && printf '%s\n' "$b"
 		done | jq -R . | jq -s .)"
 
-	rows="$(jq -n --argjson c "$catalog" --argjson sel "$sel" --argjson ls "$mise_ls" \
+	if ! rows="$(jq -n --argjson c "$catalog" --argjson sel "$sel" --argjson ls "$mise_ls" \
 		--argjson onpath "$onpath" --arg os "$os" --arg plat "$plat" '
+		def nz: if . == null or . == "" then null else . end;
 		($sel | map({key: .name, value: .source}) | from_entries) as $selsrc
 		| ($ls | to_entries | map({key: (.key | sub("\\[.*$"; "")), value: .value}) | from_entries) as $mls
 		| $c.tool_groups as $groups
@@ -119,15 +122,18 @@ cmd_list() {
 				else "mise" end) as $src
 			| ($t.bin // $n) as $bin
 			| (if $src == "mise" then
-					(($mls[$t.backend] // []) | map(select(.installed == true))) as $inst
+					(($mls[$t.backend // ""] // []) | map(select(.installed == true))) as $inst
 					| (($inst | map(select(.active == true)) | last) // ($inst | last))
 				else null end) as $hit
 			| {name: $n, group: $t.group, bin: $bin, source: $src,
 				selected: ($selsrc[$n] != null),
 				installed: (if $src == "mise" then $hit != null else ($onpath | index($bin)) != null end),
-				pinned: (if $src == "mise" then $t.version else null end),
-				actual: ($hit.version // null)}]
-		| sort_by(.group as $g | [($groups | index($g)), .name])')"
+				pinned: (if $src == "mise" then ($t.version | nz) else null end),
+				actual: ($hit.version | nz)}]
+		| sort_by(.group as $g | [($groups | index($g)), .name])')"; then
+		echo "dotfiles list: could not build the tool list" >&2
+		exit 1
+	fi
 
 	if [ "$json" -eq 1 ]; then
 		printf '%s\n' "$rows" | jq .
@@ -155,7 +161,7 @@ cmd_list() {
 sub="$1"
 shift
 case "$sub" in
-help | -h | --help) usage ;;
+help | -h | --help) usage 1 ;;
 list) cmd_list "$@" ;;
 doctor) exec sh "$repo_root/scripts/doctor.sh" "$@" ;;
 *)
