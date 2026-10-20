@@ -17,6 +17,8 @@ script="$TESTS_REPO/scripts/claude-merge-settings.sh"
 toml="$TESTS_REPO/home/.chezmoidata/claude.toml"
 tmpl="$TESTS_REPO/home/.chezmoiscripts/run_onchange_after_30-claude-settings.sh.tmpl"
 mk_home
+# Away from the repo, so mise shims never read its (maybe untrusted) mise.toml.
+cd "$HOME" || exit 1
 w="$HOME/w"
 mkdir -p "$w"
 
@@ -122,6 +124,13 @@ bash "$script" "$w/nb.json" "$w/badbase.json" 2>/dev/null
 assert_eq 2 "$?" "bad baseline: exit 2"
 [ ! -e "$w/nb.json" ] || fail "bad baseline: no file created"
 
+# symlink loop: give up, exit 0, leave things alone.
+ln -s lb.json "$w/la.json"
+ln -s la.json "$w/lb.json"
+out="$(merge "$w/la.json" 2>/dev/null)"
+assert_eq 0 "$?" "symlink loop: exit 0"
+assert_eq "skipped: symlink loop: $w/la.json" "$out" "symlink loop: message"
+
 # template end to end: a broken profile does not stop the next one.
 mkdir -p "$HOME/.claude" "$HOME/.claude-work"
 printf '{ nope' >"$HOME/.claude/settings.json"
@@ -134,6 +143,15 @@ assert_eq true "$(jq -c '.enabledPlugins["superpowers@claude-plugins-official"]'
 	"template: next profile merged"
 assert_eq "\"$HOME/.claude/statusline.sh\"" "$(jq -c .statusLine.command "$HOME/.claude-work/settings.json")" \
 	"template: statusLine command"
+# entries with quotes, $ and backticks survive the template
+# shellcheck disable=SC2016  # literal $ and backtick are the point
+render_tmpl "$tmpl" 'claude_baseline_allow=["Bash(echo '"'"'x y'"'"' $HOME `id`)"]' >"$w/apply2.sh" || fail "template renders (quotes)"
+mkdir -p "$HOME/.claude-work"
+printf '{}\n' >"$HOME/.claude-work/settings.json"
+bash "$w/apply2.sh" >/dev/null 2>&1
+assert_eq "Bash(echo 'x y' \$HOME \`id\`)" "$(jq -r '.permissions.allow[0]' "$HOME/.claude-work/settings.json")" \
+	"template: quotes, \$ and backticks pass through"
+assert_contains "$(bash "$w/apply.sh" 2>&1)" "$HOME/.claude-work: " "template: output names the profile"
 assert_contains "$(cat "$w/apply.sh")" "Bash(chezmoi diff)" "template: content carries the baseline"
 assert_contains "$(cat "$w/apply.sh")" "merge-settings sha256: $(shasum -a 256 "$script" | cut -d" " -f1)" "template: hashes the merge script"
 
@@ -166,6 +184,7 @@ allow_violation() {
 		echo "destructive/exec flag"
 		;;
 	esac
+	# Wildcards need a per-flag audit (global/negation flags too: --yes, --no-list).
 	# A wildcard over a command with pager/output/exec/pre/in-place flags.
 	case "$inner" in
 	"git log "* | "git diff "* | "git show "* | "chezmoi "*" *" | less\ * | man\ * | sort\ * | tree\ * | rg\ * | find\ * | fd\ * | yq\ *)
@@ -176,9 +195,9 @@ allow_violation() {
 	esac
 	# Only these reviewed forms; everything else needs a new review.
 	case "$inner" in
-	"git branch --list *" | "git branch --show-current") ;;
+	"git branch --show-current") ;;
 	"gh pr view *" | "gh pr list *" | "gh pr checks *" | "gh issue view *" | "gh run view *") ;;
-	"jq *" | "mise ls *" | "chezmoi diff" | "chezmoi status") ;;
+	"mise ls" | "chezmoi diff" | "chezmoi status") ;;
 	*) echo "not in the reviewed read-only set" ;;
 	esac
 }
@@ -191,11 +210,12 @@ for bad in 'Bash(rm *)' 'Bash(find *)' 'Bash(fd *)' 'Bash(yq *)' 'Bash(rg *)' 'B
 	'Bash(python3 *)' 'Bash(bash *)' 'Bash(*)' 'Bash(gh pr merge *)' 'Bash(gh api *)' 'Read(*)' \
 	'Bash(chezmoi diff *)' 'Bash(chezmoi status *)' 'Bash(chezmoi apply *)' 'Bash(chezmoi *)' \
 	'Bash(git log *)' 'Bash(git diff *)' 'Bash(git show *)' 'Bash(less *)' 'Bash(sort *)' 'Bash(/bin/rm *)' \
-	'Bash(FOO=1 rm *)' 'Bash(mise install *)'; do
+	'Bash(FOO=1 rm *)' 'Bash(mise install *)' 'Bash(git branch --list *)' 'Bash(git branch --list --no-l *)' \
+	'Bash(mise ls *)' 'Bash(jq *)' 'Bash(jq -n env)'; do
 	[ -n "$(allow_violation "$bad")" ] || fail "forbidden-check misses: $bad"
 done
 # ...and accept these.
-for ok in 'Bash(git branch --list *)' 'Bash(git branch --show-current)' 'Bash(gh pr view *)' 'Bash(jq *)' \
+for ok in 'Bash(git branch --show-current)' 'Bash(gh pr view *)' 'Bash(mise ls)' \
 	'Bash(chezmoi diff)' 'Bash(chezmoi status)'; do
 	[ -z "$(allow_violation "$ok")" ] || fail "forbidden-check rejects fine entry: $ok"
 done

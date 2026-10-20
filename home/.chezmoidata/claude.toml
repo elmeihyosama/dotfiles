@@ -5,21 +5,19 @@ claude_profiles = ["personal", "work"]
 
 # Merged into every profile's settings.json on apply. Additive: never removes
 # or reorders, but an entry you delete by hand is re-added on the next apply.
-# Only commands the built-in read-only set doesn't already approve; wildcards
-# only where no flag runs a command, writes a file or opens a pager. So chezmoi
-# is exact (--pager, -S), git branch is --list only, and gh --web merely opens
-# a browser.
+# Wildcards only where no flag (incl. global/negation ones like --yes, --no-list)
+# can write, exec, trust or dump env; else exact. gh: -R can name another host,
+# --web opens a browser. chezmoi diff prints decrypted contents of changed
+# encrypted files (revisit when secrets land).
 claude_baseline_plugins = ["superpowers@claude-plugins-official"]
 claude_baseline_allow = [
-  "Bash(git branch --list *)",
   "Bash(git branch --show-current)",
   "Bash(gh pr view *)",
   "Bash(gh pr list *)",
   "Bash(gh pr checks *)",
   "Bash(gh issue view *)",
   "Bash(gh run view *)",
-  "Bash(jq *)",
-  "Bash(mise ls *)",
+  "Bash(mise ls)",
   "Bash(chezmoi diff)",
   "Bash(chezmoi status)",
 ]

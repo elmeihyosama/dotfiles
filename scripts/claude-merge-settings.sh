@@ -15,7 +15,13 @@ jq -e 'type == "object"' "$baseline" >/dev/null 2>&1 || {
 }
 
 # Edit a symlink chain's final target, not a link.
+hops=0
 while [ -L "$settings" ]; do
+	hops=$((hops + 1))
+	if [ "$hops" -gt 40 ]; then
+		echo "skipped: symlink loop: $1"
+		exit 0
+	fi
 	link="$(readlink "$settings")"
 	case "$link" in /*) settings="$link" ;; *) settings="$(dirname "$settings")/$link" ;; esac
 done
