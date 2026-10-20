@@ -87,10 +87,10 @@ cp "$w/bad.json" "$w/bad1.json"
 out="$(merge "$w/bad.json" 2>/dev/null)"
 rc=$?
 assert_eq 0 "$rc" "invalid_json_untouched: exit 0"
-assert_eq "skipped: invalid JSON" "$out" "invalid_json_untouched: message"
+assert_eq "skipped: invalid JSON: $w/bad.json" "$out" "invalid_json_untouched: message names the file"
 assert_eq "$(cksum <"$w/bad1.json")" "$(cksum <"$w/bad.json")" "invalid_json_untouched: unchanged"
 printf '[]\n' >"$w/arr.json"
-assert_eq "skipped: invalid JSON" "$(merge "$w/arr.json" 2>/dev/null)" "non-object JSON skipped"
+assert_eq "skipped: invalid JSON: $w/arr.json" "$(merge "$w/arr.json" 2>/dev/null)" "non-object JSON skipped"
 assert_eq '[]' "$(cat "$w/arr.json")" "non-object JSON untouched"
 
 # mode kept, symlink target edited, no temp files left behind.
@@ -107,7 +107,20 @@ merge "$w/link.json" >/dev/null
 assert_eq '"x"' "$(jq -c .tui "$w/real/s.json")" "symlink: target kept its keys"
 assert_eq '["Bash(ls *)","Bash(cat *)","Bash(wc *)"]' "$(jq -c .permissions.allow "$w/real/s.json")" \
 	"symlink: target edited"
-assert_eq "" "$(find "$w" -name '*.tmp.*' -o -name 'tmp.*' | head -1)" "no temp files left"
+assert_eq "" "$(find "$w" -name '.settings.json.*' | head -1)" "no temp files left"
+
+# symlink chain: the final target is edited, links stay links.
+ln -s real/s.json "$w/l1.json"
+ln -s l1.json "$w/l2.json"
+printf '{}\n' >"$w/real/s.json"
+merge "$w/l2.json" >/dev/null
+[ -L "$w/l1.json" ] && [ -L "$w/l2.json" ] || fail "symlink chain replaced"
+assert_eq '["Bash(ls *)","Bash(cat *)","Bash(wc *)"]' "$(jq -c .permissions.allow "$w/real/s.json")" "symlink chain: target edited"
+# a bad baseline is an error, not a silent skip
+printf 'x' >"$w/badbase.json"
+bash "$script" "$w/nb.json" "$w/badbase.json" 2>/dev/null
+assert_eq 2 "$?" "bad baseline: exit 2"
+[ ! -e "$w/nb.json" ] || fail "bad baseline: no file created"
 
 # template end to end: a broken profile does not stop the next one.
 mkdir -p "$HOME/.claude" "$HOME/.claude-work"
@@ -121,12 +134,13 @@ assert_eq true "$(jq -c '.enabledPlugins["superpowers@claude-plugins-official"]'
 	"template: next profile merged"
 assert_eq "\"$HOME/.claude/statusline.sh\"" "$(jq -c .statusLine.command "$HOME/.claude-work/settings.json")" \
 	"template: statusLine command"
-assert_contains "$(cat "$w/apply.sh")" "Bash(git status *)" "template: content carries the baseline"
+assert_contains "$(cat "$w/apply.sh")" "Bash(chezmoi diff)" "template: content carries the baseline"
+assert_contains "$(cat "$w/apply.sh")" "merge-settings sha256: $(shasum -a 256 "$script" | cut -d" " -f1)" "template: hashes the merge script"
 
 # baseline_has_no_forbidden: the shipped allow list is read-only only.
 # allow_violation ENTRY: print why ENTRY is not allowed, nothing if fine.
 allow_violation() {
-	local e="$1" inner cmd sub
+	local e="$1" inner cmd
 	case "$e" in
 	"Bash("*")") inner="${e#Bash(}" inner="${inner%)}" ;;
 	*)
@@ -148,31 +162,24 @@ allow_violation() {
 	"mise exec"* | "mise run"* | "mise x"* | "mise r"*) echo "mise exec/run" ;;
 	esac
 	case "$inner" in
-	*"--force"* | *"--hard"* | *"--delete"* | *" -D"* | *" -d "* | *" -d" | *" -f"* | *"--output"* | *" -o "* | *" --exec"* | *" -exec"*)
-		[[ "$inner" == git\ diff* || "$inner" == git\ log* || "$inner" == git\ show* ]] && [[ "$inner" != *--force* ]] && [[ "$inner" != *--hard* ]] && [[ "$inner" != *--delete* ]] && [[ "$inner" != *" -D"* ]] || echo "write/destructive flag"
+	*--force* | *--hard* | *--delete* | *" -D"* | *" -d "* | *" -d" | *" -f"* | *" -exec"* | *" --exec"*)
+		echo "destructive/exec flag"
 		;;
 	esac
-	if [ "$cmd" = git ]; then
-		sub="${inner#git }"
-		sub="${sub%% *}"
-		case "$sub" in
-		status | log | diff | show) ;;
-		branch)
-			case "$inner" in
-			"git branch --list "* | "git branch --list" | "git branch --show-current") ;;
-			*) echo "git branch only with --list/--show-current" ;;
-			esac
-			;;
-		*) echo "git $sub is not a read subcommand" ;;
-		esac
-	fi
+	# A wildcard over a command with pager/output/exec/pre/in-place flags.
 	case "$inner" in
-	"gh "*)
+	"git log "* | "git diff "* | "git show "* | "chezmoi "*" *" | less\ * | man\ * | sort\ * | tree\ * | rg\ * | find\ * | fd\ * | yq\ *)
 		case "$inner" in
-		"gh pr view"* | "gh pr list"* | "gh pr checks"* | "gh pr diff"* | "gh issue view"* | "gh issue list"* | "gh run view"* | "gh run list"*) ;;
-		*) echo "gh subcommand not read-only" ;;
+		*" *") echo "wildcard over a command with --pager/--output/--exec/--pre/-i flags" ;;
 		esac
 		;;
+	esac
+	# Only these reviewed forms; everything else needs a new review.
+	case "$inner" in
+	"git branch --list *" | "git branch --show-current") ;;
+	"gh pr view *" | "gh pr list *" | "gh pr checks *" | "gh issue view *" | "gh run view *") ;;
+	"jq *" | "mise ls *" | "chezmoi diff" | "chezmoi status") ;;
+	*) echo "not in the reviewed read-only set" ;;
 	esac
 }
 
@@ -181,12 +188,15 @@ for bad in 'Bash(rm *)' 'Bash(find *)' 'Bash(fd *)' 'Bash(yq *)' 'Bash(rg *)' 'B
 	'Bash(git branch -D *)' 'Bash(git branch -d *)' 'Bash(git branch --delete *)' 'Bash(git push --force *)' \
 	'Bash(git reset --hard *)' 'Bash(git clean *)' 'Bash(git push *)' 'Bash(git *)' 'Bash(mise exec *)' \
 	'Bash(mise run *)' 'Bash(curl *)' 'Bash(sed *)' 'Bash(tee *)' 'Bash(xargs *)' 'Bash(cp *)' 'Bash(sudo ls)' \
-	'Bash(python3 *)' 'Bash(bash *)' 'Bash(*)' 'Bash(gh pr merge *)' 'Bash(gh api *)' 'Read(*)'; do
+	'Bash(python3 *)' 'Bash(bash *)' 'Bash(*)' 'Bash(gh pr merge *)' 'Bash(gh api *)' 'Read(*)' \
+	'Bash(chezmoi diff *)' 'Bash(chezmoi status *)' 'Bash(chezmoi apply *)' 'Bash(chezmoi *)' \
+	'Bash(git log *)' 'Bash(git diff *)' 'Bash(git show *)' 'Bash(less *)' 'Bash(sort *)' 'Bash(/bin/rm *)' \
+	'Bash(FOO=1 rm *)' 'Bash(mise install *)'; do
 	[ -n "$(allow_violation "$bad")" ] || fail "forbidden-check misses: $bad"
 done
 # ...and accept these.
-for ok in 'Bash(git status *)' 'Bash(git diff *)' 'Bash(git branch --list *)' 'Bash(git branch --show-current)' \
-	'Bash(gh pr view *)' 'Bash(grep *)' 'Bash(jq *)'; do
+for ok in 'Bash(git branch --list *)' 'Bash(git branch --show-current)' 'Bash(gh pr view *)' 'Bash(jq *)' \
+	'Bash(chezmoi diff)' 'Bash(chezmoi status)'; do
 	[ -z "$(allow_violation "$ok")" ] || fail "forbidden-check rejects fine entry: $ok"
 done
 

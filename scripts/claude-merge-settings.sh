@@ -9,11 +9,16 @@ set -euo pipefail
 settings="${1:?usage: claude-merge-settings.sh SETTINGS_JSON BASELINE_JSON}"
 baseline="${2:?usage: claude-merge-settings.sh SETTINGS_JSON BASELINE_JSON}"
 
-# Edit a symlink's target, not the link.
-if [ -L "$settings" ]; then
-	settings="$(readlink "$settings")"
-	case "$settings" in /*) ;; *) settings="$(dirname "$1")/$settings" ;; esac
-fi
+jq -e 'type == "object"' "$baseline" >/dev/null 2>&1 || {
+	echo "claude-merge-settings: bad baseline: $baseline" >&2
+	exit 2
+}
+
+# Edit a symlink chain's final target, not a link.
+while [ -L "$settings" ]; do
+	link="$(readlink "$settings")"
+	case "$link" in /*) settings="$link" ;; *) settings="$(dirname "$settings")/$link" ;; esac
+done
 
 dir="$(dirname "$settings")"
 mkdir -p "$dir"
@@ -33,7 +38,7 @@ tmp="$(mktemp "$dir/.settings.json.XXXXXX")"
 trap 'rm -f "$tmp"' EXIT
 if ! jq -e 'type == "object"' "$settings" >/dev/null 2>&1 ||
 	! jq --slurpfile b "$baseline" "$merge" "$settings" >"$tmp" 2>/dev/null; then
-	echo "skipped: invalid JSON"
+	echo "skipped: invalid JSON: $settings"
 	exit 0
 fi
 

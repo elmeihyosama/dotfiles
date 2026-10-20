@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Apply the Claude baseline (statusline, plugins, allow-list; see claude.toml)
 # to each profile's settings.json. Additive, so machine-local keys survive.
-# The baseline is in this file's text, so changing it re-runs the script.
+# Baseline and merge script are hashed here, so changing either re-runs it.
+# merge-settings sha256: {{ include "../scripts/claude-merge-settings.sh" | sha256sum }}
 set -euo pipefail
 baseline="$(mktemp)"
 trap 'rm -f "$baseline"' EXIT
 jq -n --arg cmd "$HOME/.claude/statusline.sh" \
-	--argjson plugins {{ .claude_baseline_plugins | toJson | quote }} \
-	--argjson allow {{ .claude_baseline_allow | toJson | quote }} \
+	--argjson plugins {{ .claude_baseline_plugins | toJson | squote }} \
+	--argjson allow {{ .claude_baseline_allow | toJson | squote }} \
 	'{statusLine: {type: "command", command: $cmd},
 		enabledPlugins: ($plugins | map({(.): true}) | add // {}),
 		permissions: {allow: $allow}}' >"$baseline"
