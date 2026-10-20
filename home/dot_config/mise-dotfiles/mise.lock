@@ -116,29 +116,6 @@ url = "https://github.com/astral-sh/uv/releases/download/0.13.1/uv-aarch64-apple
 url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/639312976"
 provenance = "github-attestations"
 
-[[tools."aqua:atuinsh/atuin"]]
-version = "18.17.1"
-backend = "aqua:atuinsh/atuin"
-specifiers = ["18.17.1"]
-
-[tools."aqua:atuinsh/atuin"."platforms.linux-arm64"]
-checksum = "sha256:9412210a9cdd6d0ff7635693e940096d82b368628326d334d27a8ca0ba173b0f"
-url = "https://github.com/atuinsh/atuin/releases/download/v18.17.1/atuin-aarch64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/atuinsh/atuin/releases/assets/477075556"
-provenance = "github-attestations"
-
-[tools."aqua:atuinsh/atuin"."platforms.linux-x64"]
-checksum = "sha256:72395cf7ae86b3698c04ba4a331773e7c4f027630bfd2b522bb14d4c80cb2410"
-url = "https://github.com/atuinsh/atuin/releases/download/v18.17.1/atuin-x86_64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/atuinsh/atuin/releases/assets/477075630"
-provenance = "github-attestations"
-
-[tools."aqua:atuinsh/atuin"."platforms.macos-arm64"]
-checksum = "sha256:f4f6ff23452d42d1e981c0878ade4f3edaee4bd5ce83c39b0d134d926ca04377"
-url = "https://github.com/atuinsh/atuin/releases/download/v18.17.1/atuin-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/atuinsh/atuin/releases/assets/477075557"
-provenance = "github-attestations"
-
 [[tools."aqua:bootandy/dust"]]
 version = "1.2.4"
 backend = "aqua:bootandy/dust"
@@ -541,26 +518,6 @@ checksum = "sha256:877e6b18d8f826167ca6b6f2ff00ebac2477fa1924c06b89befe524840ffc
 url = "https://github.com/starship/starship/releases/download/v1.24.1/starship-aarch64-apple-darwin.tar.gz"
 url_api = "https://api.github.com/repos/starship/starship/releases/assets/317045536"
 
-[[tools."aqua:sxyazi/yazi"]]
-version = "26.9.1"
-backend = "aqua:sxyazi/yazi"
-specifiers = ["26.9.1"]
-
-[tools."aqua:sxyazi/yazi"."platforms.linux-arm64"]
-checksum = "sha256:02807f08d6b589b65b7516a4e259d83f5995d7a23bb12b3a155141385b370b3a"
-url = "https://github.com/sxyazi/yazi/releases/download/v26.9.1/yazi-aarch64-unknown-linux-gnu.zip"
-url_api = "https://api.github.com/repos/sxyazi/yazi/releases/assets/539261402"
-
-[tools."aqua:sxyazi/yazi"."platforms.linux-x64"]
-checksum = "sha256:a02fe91d3304294048c681f010f1100856872a4e98ecf6927328e888d40a6ad2"
-url = "https://github.com/sxyazi/yazi/releases/download/v26.9.1/yazi-x86_64-unknown-linux-gnu.zip"
-url_api = "https://api.github.com/repos/sxyazi/yazi/releases/assets/539261400"
-
-[tools."aqua:sxyazi/yazi"."platforms.macos-arm64"]
-checksum = "sha256:3921182a21cceb0a505e5dac578e1487d48104caa5f114e9f8adf40b5a7289a9"
-url = "https://github.com/sxyazi/yazi/releases/download/v26.9.1/yazi-aarch64-apple-darwin.zip"
-url_api = "https://api.github.com/repos/sxyazi/yazi/releases/assets/539261410"
-
 [[tools."aqua:twpayne/chezmoi"]]
 version = "2.73.2"
 backend = "aqua:twpayne/chezmoi"
@@ -624,6 +581,32 @@ checksum = "sha256:b6acf83a7739cf5f0f4e9bd47709642d4d98acbbf8c34d4a12c6e706f531d
 url = "https://github.com/zellij-org/zellij/releases/download/v0.44.3/zellij-aarch64-apple-darwin.tar.gz"
 url_api = "https://api.github.com/repos/zellij-org/zellij/releases/assets/419107237"
 
+[[tools."github:atuinsh/atuin"]]
+version = "18.17.1"
+backend = "github:atuinsh/atuin"
+specifiers = ["18.17.1"]
+
+[tools."github:atuinsh/atuin".options]
+matching_regex = "^atuin-[a-z0-9_]+-(apple-darwin|unknown-linux-musl)[.]tar[.]gz$"
+
+[tools."github:atuinsh/atuin"."platforms.linux-arm64"]
+checksum = "sha256:13fc31e9f40fcc97b28c626adf4015eed080b5d8d8df31bb23e8ddf504d19d59"
+url = "https://github.com/atuinsh/atuin/releases/download/v18.17.1/atuin-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/atuinsh/atuin/releases/assets/477075570"
+provenance = "github-attestations"
+
+[tools."github:atuinsh/atuin"."platforms.linux-x64"]
+checksum = "sha256:5772df4121174a9f0b71c17260727794fde22a71b5a3ee5ac07b227eebcbfa9a"
+url = "https://github.com/atuinsh/atuin/releases/download/v18.17.1/atuin-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/atuinsh/atuin/releases/assets/477075637"
+provenance = "github-attestations"
+
+[tools."github:atuinsh/atuin"."platforms.macos-arm64"]
+checksum = "sha256:f4f6ff23452d42d1e981c0878ade4f3edaee4bd5ce83c39b0d134d926ca04377"
+url = "https://github.com/atuinsh/atuin/releases/download/v18.17.1/atuin-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/atuinsh/atuin/releases/assets/477075557"
+provenance = "github-attestations"
+
 [[tools."github:dlvhdr/gh-dash"]]
 version = "4.26.2"
 backend = "github:dlvhdr/gh-dash"
@@ -686,6 +669,29 @@ url_api = "https://api.github.com/repos/eza-community/eza/releases/assets/300249
 checksum = "sha256:afcf804979ba03df7545e8b02d41576ab5e15bd090dfc51a052f41df3a65b264"
 url = "https://github.com/eza-community/eza/releases/download/v0.23.4/man-0.23.4.tar.gz"
 url_api = "https://api.github.com/repos/eza-community/eza/releases/assets/300249834"
+
+[[tools."github:sxyazi/yazi"]]
+version = "26.9.1"
+backend = "github:sxyazi/yazi"
+specifiers = ["26.9.1"]
+
+[tools."github:sxyazi/yazi".options]
+matching_regex = "^yazi-[a-z0-9_]+-(apple-darwin|unknown-linux-musl)[.]zip$"
+
+[tools."github:sxyazi/yazi"."platforms.linux-arm64"]
+checksum = "sha256:dd569daecaae914185f295634109295ccd25c1b42b02eb89a74f651970024f2e"
+url = "https://github.com/sxyazi/yazi/releases/download/v26.9.1/yazi-aarch64-unknown-linux-musl.zip"
+url_api = "https://api.github.com/repos/sxyazi/yazi/releases/assets/539261411"
+
+[tools."github:sxyazi/yazi"."platforms.linux-x64"]
+checksum = "sha256:9b9c39decccf8cb0ff53a7d637d38f8a79d93bbd0099f4ea9c619ef6bb392f5d"
+url = "https://github.com/sxyazi/yazi/releases/download/v26.9.1/yazi-x86_64-unknown-linux-musl.zip"
+url_api = "https://api.github.com/repos/sxyazi/yazi/releases/assets/539261404"
+
+[tools."github:sxyazi/yazi"."platforms.macos-arm64"]
+checksum = "sha256:3921182a21cceb0a505e5dac578e1487d48104caa5f114e9f8adf40b5a7289a9"
+url = "https://github.com/sxyazi/yazi/releases/download/v26.9.1/yazi-aarch64-apple-darwin.zip"
+url_api = "https://api.github.com/repos/sxyazi/yazi/releases/assets/539261410"
 
 [[tools."github:tummychow/git-absorb"]]
 version = "0.9.0"

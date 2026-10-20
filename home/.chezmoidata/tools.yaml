@@ -28,7 +28,8 @@
 #                 doctor still checks it
 #
 # eza, git-absorb, gh-dash, editorconfig-checker use the github: backend (no
-# aqua registry entry); everything else prefers aqua:.
+# aqua registry entry); atuin and yazi too, for its matching_regex (musl on
+# Linux); everything else prefers aqua:.
 # Pins are the versions installed on the maintainer's Mac when this was
 # written, except tools that also appear in the repo root mise.toml (chezmoi,
 # yq, uv, gitleaks, editorconfig-checker): those take the mise.toml version
@@ -71,8 +72,10 @@ tools:
     version: "0.10.0"
   atuin:
     group: core
-    backend: aqua:atuinsh/atuin
+    backend: github:atuinsh/atuin
     version: "18.17.1"
+    # musl on Linux: the gnu build needs glibc 2.39 (Debian 12, EL9 ship older)
+    mise_options: {matching_regex: "^atuin-[a-z0-9_]+-(apple-darwin|unknown-linux-musl)[.]tar[.]gz$"}
   bat:
     group: core
     backend: aqua:sharkdp/bat
@@ -131,8 +134,10 @@ tools:
     version: "8.30.1"
   yazi:
     group: files
-    backend: aqua:sxyazi/yazi
+    backend: github:sxyazi/yazi
     version: "26.9.1"
+    # musl on Linux: the gnu build needs glibc 2.39 (Debian 12, EL9 ship older)
+    mise_options: {matching_regex: "^yazi-[a-z0-9_]+-(apple-darwin|unknown-linux-musl)[.]zip$"}
   dust:
     group: files
     backend: aqua:bootandy/dust
@@ -197,7 +202,7 @@ tools:
     group: dev
     backend: aqua:PaulJuliusMartinez/jless
     version: "0.9.0"
-    missing_on: [linux-arm64]
+    native_on: [linux] # the Linux binary links libxcb (clipboard): unusable on minimal/no-sudo hosts; distro package where there is one (no linux-arm64 asset either)
   watchexec:
     group: dev
     backend: aqua:watchexec/watchexec

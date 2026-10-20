@@ -53,6 +53,11 @@ for row in $(printf '%s\n' "$sel" | jq -r '.[] | "\(.name):\(.bin):\(.source)"')
 		fi
 		continue
 	fi
+	# Native packages are best effort and not all take --version (cava -v).
+	if [ "$source" = native ]; then
+		echo "OK:   $tool -> $bin (native, present: $(command -v "$bin"))"
+		continue
+	fi
 	if ! out="$("$bin" --version 2>&1)"; then
 		echo "FAIL: $tool -> '$bin' did not run '--version': $(printf '%s' "$out" | head -n1)"
 		fail=1

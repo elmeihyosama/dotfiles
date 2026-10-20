@@ -54,9 +54,10 @@ done
 
 # missing_on / native_on per platform
 out="$(TESTS_CHEZMOI_OS=linux TESTS_CHEZMOI_ARCH=arm64 render)"
-assert_not_contains "$out" "PaulJuliusMartinez/jless" "jless (missing_on linux-arm64) not pinned on linux-arm64"
+assert_not_contains "$out" "tummychow/git-absorb" "git-absorb (missing_on linux-arm64) not pinned on linux-arm64"
 out="$(TESTS_CHEZMOI_OS=linux TESTS_CHEZMOI_ARCH=amd64 render)"
-assert_contains "$out" "PaulJuliusMartinez/jless" "jless pinned on linux-x64"
+assert_contains "$out" "tummychow/git-absorb" "git-absorb pinned on linux-x64"
+assert_not_contains "$out" "PaulJuliusMartinez/jless" "jless (native on linux) not pinned on linux-x64"
 assert_contains "$out" "denisidoro/navi" "navi pinned on linux"
 out="$(TESTS_CHEZMOI_OS=darwin TESTS_CHEZMOI_ARCH=arm64 render)"
 assert_not_contains "$out" "denisidoro/navi" "navi (native on darwin) not pinned on darwin"
