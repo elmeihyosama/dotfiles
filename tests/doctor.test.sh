@@ -81,7 +81,7 @@ stub_mise "$want" "$HOME/.local/bin-$(uname -m)/mise"
 out="$(cd "$HOME" && env -i HOME="$HOME" PATH="$HOME/.local/bin-$(uname -m):$HOME/tbin:/usr/bin:/bin" \
 	sh "$doctor" --local rel-local.yml 2>&1)"
 assert_contains "$out" "OK    mise $want at $HOME/.local/bin-$(uname -m)/mise" "relative_local: shared_home read from a relative --local"
-printf 'tool_groups: [core]\ntools:\n  nosuchtool: {group: core, native_only: true, bin: nosuchtool-bin}\n' >"$HOME/rel-tools.yaml"
+printf 'tool_groups: [core]\ntools:\n  nosuchtool: {group: core, backend: \"aqua:example/nosuchtool\", version: \"1.0.0\", bin: nosuchtool-bin}\n' >"$HOME/rel-tools.yaml"
 out="$(cd "$HOME" && env -i HOME="$HOME" PATH="$HOME/.local/bin:$HOME/tbin:/usr/bin:/bin" \
 	sh "$doctor" --local /nonexistent --tools rel-tools.yaml 2>&1)"
 assert_contains "$out" "nosuchtool-bin" "relative_tools: the relative --tools catalog is the one checked"
