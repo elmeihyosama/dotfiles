@@ -54,8 +54,9 @@ assert_not_contains() {
 # render_tmpl FILE [KEY=VALUE ...]: render a chezmoi template with the CI
 # fixture, each KEY=VALUE replacing that [data] key. Booleans, numbers and
 # [..]/{..} values are raw TOML; anything else is a string.
-# TESTS_CHEZMOI_OS=darwin|linux replaces `.chezmoi.os` in a temp copy of the
-# top-level template (chezmoi has no way to override it).
+# TESTS_CHEZMOI_OS=darwin|linux and TESTS_CHEZMOI_ARCH=amd64|arm64 replace
+# `.chezmoi.os`/`.chezmoi.arch` in a temp copy of the top-level template
+# (chezmoi can't override them).
 render_tmpl() {
 	local file="$1" cfg_dir cfg kv key val line extra="" num_re='^-?[0-9]+(\.[0-9]+)?$'
 	shift
@@ -89,7 +90,6 @@ render_tmpl() {
 	if [ -n "${TESTS_CHEZMOI_OS:-}" ] || [ -n "${TESTS_CHEZMOI_ARCH:-}" ]; then
 		src="$cfg_dir/forced-os.tmpl"
 		# Anchored: only when not followed by an identifier char (BSD+GNU sed).
-		# TESTS_CHEZMOI_ARCH (amd64|arm64) forces .chezmoi.arch the same way.
 		local os_v="${TESTS_CHEZMOI_OS:-}" arch_v="${TESTS_CHEZMOI_ARCH:-}"
 		[ -n "$os_v" ] || os_v="$(chezmoi execute-template '{{ .chezmoi.os }}')"
 		[ -n "$arch_v" ] || arch_v="$(chezmoi execute-template '{{ .chezmoi.arch }}')"
