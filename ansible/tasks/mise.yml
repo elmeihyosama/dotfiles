@@ -8,11 +8,14 @@
     _mise_os: "{{ {'Darwin': 'macos', 'Linux': 'linux'}[ansible_facts.system] | default('unsupported') }}"
     _mise_arch: "{{ {'x86_64': 'x64', 'amd64': 'x64', 'aarch64': 'arm64', 'arm64': 'arm64'}[ansible_facts.architecture] | default('unsupported') }}"
 
+# Intel Macs are deliberately out: the pinned tools are locked (checksums)
+# for these three platforms only (README, "Supported platforms").
 - name: Fail clearly on a platform outside the locked set
   ansible.builtin.fail:
     msg: >-
-      mise bootstrap supports macos-arm64, linux-x64 and linux-arm64 only;
-      this host is {{ ansible_facts.system }}/{{ ansible_facts.architecture }}.
+      Unsupported platform {{ ansible_facts.system }}/{{ ansible_facts.architecture }}:
+      the dotfiles support Apple Silicon macOS (macos-arm64), linux-x64 and
+      linux-arm64 only{{ '; Intel Macs are not supported' if ansible_facts.system == 'Darwin' else '' }}.
   when: >-
     (_mise_os ~ '-' ~ _mise_arch) not in mise_sha256
 

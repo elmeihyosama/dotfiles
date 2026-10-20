@@ -19,7 +19,7 @@ tool regardless of OS so the shipped lock covers them all. */ -}}
 {{- if and (hasKey . "selected_tools") (not $all) -}}
 {{-   range $name := .selected_tools -}}
 {{-     if not (hasKey $.tools $name) -}}
-{{-       fail (printf "selected_tools: unknown tool %q (not in tools.yaml)" $name) -}}
+{{-       fail (printf "selected_tools: unknown tool %q (not in tools.yaml; stale since a tools.yaml change?). Refresh it: cd ansible && ansible-playbook site.yml --tags chezmoi" $name) -}}
 {{-     end -}}
 {{-     $names = append $names $name -}}
 {{-   end -}}
