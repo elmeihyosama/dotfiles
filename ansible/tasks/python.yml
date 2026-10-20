@@ -1,13 +1,7 @@
 ---
-# Provide a default Python via uv. uv ships standalone interpreters, so
-# pip-backed tooling (Mason's ruff, formatters, language servers) builds the
-# same on every machine, independent of the OS package manager's Python.
-# uv itself is a core mise tool (on PATH via the shims, see mise_env).
-#
-# Redirect uv's outputs to the (possibly per-arch) dirs. Without these, uv writes
-# the `uv`/`python3` shims to $XDG_BIN_HOME (~/.local/bin) and the interpreter ELF
-# + tool venvs to ~/.local/share/uv — both shared paths that collide across arches
-# on a shared-$HOME host. See group_vars/all.yml for local_bin/local_share.
+# A default Python via uv's standalone interpreters, so pip-backed tooling
+# builds the same everywhere. The dirs below keep uv's shims, interpreters and
+# venvs per-arch under shared_home.
 - name: Install the default Python interpreter via uv — {{ python_version }}
   ansible.builtin.command: "uv python install {{ python_version }} --default"
   args:
@@ -17,8 +11,7 @@
     UV_PYTHON_INSTALL_DIR: "{{ local_share }}/uv/python"
     UV_TOOL_DIR: "{{ local_share }}/uv/tools"
 
-# pre-commit is a Python tool: a version-pinned uv tool (pre_commit_version,
-# equal to the repo mise.toml pin; tests/python-pins.test.sh).
+# pre-commit pinned like the repo mise.toml (tests/python-pins.test.sh).
 - name: Read the installed pre-commit version
   ansible.builtin.command: "{{ local_bin }}/pre-commit --version"
   register: _pre_commit_v

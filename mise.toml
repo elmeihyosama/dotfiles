@@ -1,6 +1,5 @@
-# Pinned toolchain for linting/CI. Exact versions only (no "latest"); the
-# checksums live in mise.lock (regenerate with:
-#   mise lock --platform macos-arm64,linux-x64,linux-arm64).
+# Pinned lint/CI toolchain, exact versions; checksums in mise.lock (refresh with
+# scripts/relock.sh).
 [settings]
 lockfile = true
 

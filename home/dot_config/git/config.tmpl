@@ -52,14 +52,13 @@
 [diff]
     colorMoved = default
     algorithm = histogram
-# Machine-local settings (safe.directory, per-host identity): unmanaged, absent
-# is fine. Before the includeIf below: last value wins, repo-specific outranks.
+# Machine-local settings (unmanaged, may be absent); before the includeIf, as
+# the last value wins.
 [include]
     path = ~/.config/git/config.local
 {{ if hasKey . "personal_git_email" }}
-# Per-repo identity, after [user] and [include] (last value wins). `gitdir:`
-# matches everything beneath; the trailing slash is required. Directories come
-# from personal_git_dirs (home/.chezmoidata/git.toml, overridable in [data]).
+# Per-repo identity, last so it wins. `gitdir:` needs the trailing slash; dirs
+# from personal_git_dirs (home/.chezmoidata/git.toml).
 {{- range .personal_git_dirs }}
 [includeIf "gitdir:{{ . }}"]
     path = ~/.config/git/personal

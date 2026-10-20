@@ -1,8 +1,7 @@
 #!/usr/bin/env sh
 # Assert a captured second ansible-playbook run changed nothing (idempotence).
 # Usage: .github/scripts/assert-idempotent.sh LOGFILE
-# The PLAY RECAP is the only place `changed=N` appears (task lines use
-# `changed: [host]`), so `changed=[1-9]` matches iff the run did not converge.
+# `changed=N` appears only in the PLAY RECAP (tasks print `changed: [host]`).
 set -eu
 
 log="${1:?usage: assert-idempotent.sh LOGFILE}"

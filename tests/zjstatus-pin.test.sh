@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# The pinned zellij's minor has a zjstatus_by_zellij_minor entry (group_vars),
-# so a Renovate zellij bump to a new minor fails here, in seconds, instead of
-# in the macOS provision job (tasks/zjstatus.yml "Fail clearly ...").
+# The pinned zellij minor has a zjstatus entry, so a Renovate minor bump fails
+# here in seconds, not in the macOS provision job.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

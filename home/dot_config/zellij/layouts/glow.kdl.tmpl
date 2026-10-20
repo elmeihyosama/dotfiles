@@ -7,21 +7,17 @@
 {{- $subtle := $p.base04 -}}
 {{- $text := $p.base05 -}}
 {{- $bg := $p.base00 -}}
-{{- /* Contrast-safe fg for text on a coloured chip (base00 or base05, picked per
-theme by scripts/gen-on-colors.sh) — base00 alone fails on light/pastel accents. */ -}}
+{{- /* Chip foreground (scripts/gen-on-colors.sh): base00 alone fails on pastels. */ -}}
 {{- $on := index .on_colors .theme -}}
 {{- $onaccent := index $on .design.accent -}}
 {{- $onwarn := index $on .design.warn -}}
-{{- /* zjstatus's WASM sandbox can't read the system tz, and "local" is not a
-valid chrono-tz name (it silently falls back to UTC). Resolve the real
-IANA zone at render time from the /etc/localtime symlink — macOS points
-into /var/db/timezone/zoneinfo/, Linux into /usr/share/zoneinfo/. */ -}}
+{{- /* zjstatus's WASM sandbox can't read the system tz and "local" silently
+means UTC: resolve the IANA zone from the /etc/localtime symlink. */ -}}
 {{- $tzlink := trim (output "sh" "-c" "readlink /etc/localtime || echo UTC") -}}
 {{- $tz := regexReplaceAll `^.*zoneinfo(?:\.default)?/` $tzlink "" -}}
 {{- if not $tz }}{{ $tz = "UTC" }}{{ end -}}
-// Glow layout: top zjstatus bar (session pill, name-only pill tabs, muted
-// date/time) with pane frames off. Escape hatch: `zellij -l split` for the
-// stock two-pane layout with the compact bar.
+// Glow layout: top zjstatus bar, pane frames off. `zellij -l split` gives the
+// stock two-pane layout.
 layout {
     default_tab_template {
         pane size=1 borderless=true {
@@ -38,12 +34,9 @@ layout {
                 tab_normal    "#[fg={{ $overlay }},bg={{ $bar }}]#[fg={{ $subtle }},bg={{ $overlay }}] {name} #[fg={{ $overlay }},bg={{ $bar }}] "
                 tab_active    "#[fg={{ $accent }},bg={{ $bar }}]#[fg={{ $onaccent }},bg={{ $accent }},bold] {name} #[fg={{ $accent }},bg={{ $bar }}] "
 
-                // NOTE: `{session}` is its own top-level widget (src/widgets/session.rs) — it
-                // is NOT a substitution variable inside mode_* strings (only `{name}`, the mode
-                // name, is). The session pill above is therefore composed directly in
-                // format_left with a static accent style; mode_normal/mode_locked below render
-                // only a small colour-coded icon chip immediately to its left, which is what
-                // actually recolours per mode.
+                // `{session}` is a widget, not a variable in mode_* strings: the
+                // session pill is composed in format_left, and mode_* render only the
+                // colour-coded chip beside it.
                 mode_normal        "#[fg={{ $accent }},bg={{ $bar }}]#[fg={{ $onaccent }},bg={{ $accent }},bold] 󱂬 #[fg={{ $accent }},bg={{ $bar }}] "
                 mode_locked        "#[fg={{ $muted }},bg={{ $bar }}]#[fg={{ $bg }},bg={{ $muted }},bold] 󱂬 #[fg={{ $muted }},bg={{ $bar }}] "
                 mode_pane          "#[fg={{ $warn }},bg={{ $bar }}]#[fg={{ $onwarn }},bg={{ $warn }},bold] 󱂬 {name} #[fg={{ $warn }},bg={{ $bar }}] "

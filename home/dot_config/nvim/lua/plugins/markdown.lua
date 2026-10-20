@@ -1,6 +1,4 @@
--- In-editor markdown rendering (headings, tables, code blocks, lists, checkboxes)
--- right in the buffer — no browser. The line under the cursor shows raw markdown;
--- everything else renders. Toggle with `:RenderMarkdown toggle`.
+-- In-buffer markdown rendering; the cursor line stays raw. `:RenderMarkdown toggle`.
 return {
   {
     "MeanderingProgrammer/render-markdown.nvim",

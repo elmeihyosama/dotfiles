@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Pinned mise bootstrap: group_vars pins an exact mise version plus one sha256
-# per locked platform, and CI's two mise pins and tools.yaml agree with it.
+# group_vars pins mise (version + a sha256 per platform); CI and tools.yaml agree.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -30,9 +29,8 @@ mise_ver() { grep -E '^[[:space:]]*version:[[:space:]]*[0-9]' "$1" | head -1 | s
 assert_eq "$ver" "$(mise_ver .github/actions/setup-lint/action.yml)" "setup-lint version equals group_vars mise_version"
 assert_eq "$ver" "$(mise_ver .github/workflows/provision.yml)" "macOS job version equals group_vars mise_version"
 
-# The macOS job's sha is group_vars' macos-arm64 sha. setup-lint pins the
-# linux-x64 glibc asset, which group_vars (musl) does not carry, so only its
-# shape is checked below; relock.sh writes it from SHASUMS256.txt.
+# setup-lint pins the linux-x64 glibc asset, which group_vars (musl) lacks, so
+# only its shape is checked.
 grep -Eq '^[[:space:]]*sha256:[[:space:]]*[0-9a-f]{64}$' .github/actions/setup-lint/action.yml || fail "setup-lint sha256 is 64 lowercase hex"
 sha_of() { printf '%s\n' "$block" | sed -nE "s/^[[:space:]]+$1:[[:space:]]*\"([0-9a-f]{64})\".*/\1/p"; }
 assert_eq "$(sha_of macos-arm64)" "$(grep -E '^[[:space:]]*sha256:' .github/workflows/provision.yml | head -1 | sed -E 's/.*sha256:[[:space:]]*//')" "macOS job sha256 equals mise_sha256.macos-arm64"

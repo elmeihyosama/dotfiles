@@ -1,17 +1,9 @@
 #!/bin/sh
-# gen-on-colors.sh — precompute a contrast-safe foreground ("on-color") for every
-# accent slot (base08–base0F), per theme, into home/.chezmoidata/on_colors.toml.
-#
-# base16 only guarantees the accent slots contrast with base00 (the background),
-# NOT the inverse: text placed ON an accent-coloured chip (zellij pills, lualine
-# mode block, delta emph, yazi hover) needs a foreground that contrasts with the
-# accent — and on light/pastel themes base00 alone isn't enough (e.g. dark text
-# on a mid-luminance yellow). So for each slot we pick whichever of base00 / base07
-# (the two ends of the mono ramp) contrasts MORE with that slot's colour.
-#
-# Templates read it as: (index .on_colors .theme).base0A  →  the fg to use when
-# base0A is a chip background. Regenerate after theme changes:
-#   scripts/gen-on-colors.sh   (theme-audit.sh flags stale/low-contrast pairings)
+# gen-on-colors.sh: a contrast-safe foreground for each accent slot
+# (base08-base0F) per theme, into home/.chezmoidata/on_colors.toml.
+# base16 only guarantees accents contrast with base00, not that text ON an
+# accent chip is readable, so pick whichever of base00/base07 contrasts more.
+# Templates: (index .on_colors .theme).base0A. Rerun after theme changes.
 set -eu
 REPO_ROOT=$(CDPATH='' cd "$(dirname "$0")/.." && pwd)
 THEMES_DIR="$REPO_ROOT/home/.chezmoidata/themes"

@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# The playbook's install mask (MISE_GLOBAL_CONFIG_FILE=/nonexistent/...,
-# group_vars mise_install_env) hides ALL of the user's global mise config —
-# config.toml, mise.toml and conf.d/*.toml — so `ls --missing` /
-# `install --locked` see only the dotfiles pins. Offline: `config ls` only.
+# The playbook's install mask hides ALL of the user's global mise config
+# (config.toml, mise.toml, conf.d/*.toml). Offline: `config ls` only.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

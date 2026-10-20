@@ -1,28 +1,22 @@
-# Machine-local secrets/overrides — managed by hand, never by chezmoi.
+# Machine-local secrets/overrides, managed by hand.
 .config/zsh/local.zsh
 
-# LazyVim rewrites this at runtime — let Neovim own it, don't manage via
-# chezmoi (avoids "changed since chezmoi last wrote it" apply conflicts).
-# lazy-lock.json is deliberately NOT ignored: it is a symlink into the repo
-# (dot_config/nvim/symlink_lazy-lock.json.tmpl) so lockfile updates are tracked.
+# LazyVim rewrites this at runtime. lazy-lock.json is NOT ignored: it is a
+# symlink into the repo so lockfile updates are tracked.
 .config/nvim/lazyvim.json
 
-# Antigravity IDE settings are managed for macOS only (the Linux fork config
-# dir is unverified until a Linux GUI machine exists); the extensions list in
-# .config/antigravity-ide applies everywhere.
+# Antigravity settings: macOS only (the Linux config dir is unverified).
 {{ if ne .chezmoi.os "darwin" }}
 Library
 .config/raycast
 {{ end }}
 
-# Personal git identity — only rendered when personal_git_email is set in
-# chezmoi [data]; otherwise config.tmpl emits no includeIf for it.
+# Only with personal_git_email set.
 {{ if not (hasKey . "personal_git_email") }}
 .config/git/personal
 {{ end }}
 
-# zellij's plugin-permission cache lives under ~/Library/Caches on macOS; the
-# Linux twin (and Library/ off macOS, above) is ignored so only one renders.
+# zellij's permission cache is under ~/Library/Caches on macOS; one renders.
 {{ if eq .chezmoi.os "darwin" }}
 .cache/zellij
 {{ end }}

@@ -1,12 +1,8 @@
 #!/usr/bin/env sh
-# doctor.sh — read-only health check for a provisioned machine.
-# Sections: PATH, mise version, tools (via assert-tools.sh — same source of
-# truth as CI), Nerd Font, chezmoi drift, active theme, login shell, zellij plugin.
-# One OK/WARN/FAIL line per check; exits non-zero iff any FAIL.
+# doctor.sh: read-only health check for a provisioned machine. One
+# OK/WARN/FAIL line per check; exits non-zero iff any FAIL.
 # Usage: scripts/doctor.sh [--local LOCAL_YML] [--tools TOOLS_YAML]
-#   (or the `doctor` shell function). Both are passed to assert-tools.sh:
-#   --local  per-machine vars (default: ansible/local.yml; shared_home)
-#   --tools  tool catalog (tests use a small one)
+#   (both passed on to assert-tools.sh, the same check CI runs)
 set -eu
 
 repo_root="$(CDPATH='' cd "$(dirname "$0")/.." && pwd)"
@@ -30,11 +26,11 @@ abspath() { case "$1" in /*) printf '%s' "$1" ;; *) printf '%s/%s' "$PWD" "$1" ;
 local_yml="$(abspath "$local_yml")"
 tools_yaml="$(abspath "$tools_yaml")"
 case "$(uname -s)" in Darwin) os=darwin ;; *) os=linux ;; esac
-# resolve, remove_hint (use $os and $tools_yaml)
 # shellcheck source=remove-hint.sh
 . "$repo_root/scripts/remove-hint.sh"
-# Run from / so that tools resolved through mise shims (chezmoi, jq) answer
-# with the dotfiles' home pins, never a project mise.toml such as the repo's.
+# shellcheck source=mise-env.sh
+. "$repo_root/scripts/mise-env.sh"
+# From /, so mise shims answer with the home pins, never a project mise.toml.
 cd /
 fail=0
 ok() { printf 'OK    %s\n' "$1"; }
@@ -58,15 +54,11 @@ case ":$PATH:" in
 esac
 
 # --- mise ------------------------------------------------------------------
-# The bootstrap binary is pinned in ansible/group_vars (tasks/mise.yml) and
-# installed into the local bin dir (per-arch under shared_home). It must be
-# the right version AND the mise that PATH runs: the playbook cannot fix a
-# different mise ahead of it (Homebrew's, a distro package).
+# The pinned bootstrap binary must be the right version AND the mise PATH runs:
+# the playbook cannot fix a different mise ahead of it (Homebrew's, a distro's).
 want_mise="$(sed -nE 's/^mise_version:[[:space:]]*"?([^"[:space:]]+)"?.*/\1/p' "$repo_root/ansible/group_vars/all.yml")"
 lbin="$HOME/.local/bin"
-if [ -f "$local_yml" ] && grep -Eq '^[[:space:]]*shared_home:[[:space:]]*true' "$local_yml"; then
-	lbin="$HOME/.local/bin-$arch"
-fi
+[ -z "$(mise_sfx "$local_yml")" ] || lbin="$HOME/.local/bin-$arch"
 pinned_mise="$lbin/mise"
 mise_ver() { "$1" --version 2>/dev/null | awk 'NR == 1 { print $1 }'; }
 if [ ! -x "$pinned_mise" ]; then
@@ -78,8 +70,7 @@ else
 fi
 if ! mise_bin="$(command -v mise 2>/dev/null)"; then
 	bad "mise not on PATH (add $lbin to PATH)"
-# Only when the pinned one exists: a missing pin already FAILed above, and
-# nothing can shadow a binary that is not there.
+# Nothing can shadow a missing pin (already FAILed above).
 elif [ -x "$pinned_mise" ] && [ "$mise_bin" != "$pinned_mise" ] && [ "$(resolve "$mise_bin")" != "$(resolve "$pinned_mise")" ]; then
 	other="$(mise_ver "$mise_bin")"
 	hint="$(remove_hint mise "$mise_bin")"
@@ -92,14 +83,12 @@ elif [ -x "$pinned_mise" ] && [ "$mise_bin" != "$pinned_mise" ] && [ "$(resolve 
 fi
 
 # --- Tools -----------------------------------------------------------------
-# assert-tools resolves the home pins from / with the user's global mise config
-# masked; its WARN lines (non-mise copies shadowed on PATH) are surfaced here.
+# assert-tools' WARN lines (shadowed non-mise copies) are surfaced here.
 if tools_out="$("$repo_root/.github/scripts/assert-tools.sh" --local "$local_yml" --tools "$tools_yaml" 2>&1)"; then
 	ok "selected tools all present and runnable"
 else
 	bad "tool assertion failed:"
-	# Everything but OK/SKIP/WARN: FAIL lines, and any error output (a crash
-	# of select-tools or yq) that would otherwise leave this list empty.
+	# Everything but OK/SKIP/WARN, so a crash's error output shows too.
 	printf '%s\n' "$tools_out" | grep -Ev '^(OK|SKIP|WARN):|^All tool assertions|^Tool assertions FAILED' | sed 's/^/      /'
 fi
 printf '%s\n' "$tools_out" | sed -n 's/^WARN: //p' | while IFS= read -r w; do warn "$w"; done

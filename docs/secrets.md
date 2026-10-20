@@ -20,12 +20,10 @@ age-keygen -o ~/.config/chezmoi/key.txt   # prints the public key (age1...)
 
 # 2. Record the PUBLIC key in ansible/local.yml (never committed):
 #      age_recipient: "age1..."
-#    Re-run install.sh (or the playbook) to regenerate ~/.config/chezmoi/chezmoi.toml
-#    with the encryption block. Manual-config machines: uncomment the block in
-#    chezmoi.toml.example instead.
+#    Re-run install.sh (or the playbook) to add the encryption block to
+#    chezmoi.toml, or uncomment it from chezmoi.toml.example by hand.
 
-# 3. Copy key.txt to your other machines OUT-OF-BAND (scp, password manager).
-#    chmod 600 it. The public repo only ever sees ciphertext.
+# 3. Copy key.txt to your other machines OUT-OF-BAND and chmod 600 it.
 ```
 
 ## Using it

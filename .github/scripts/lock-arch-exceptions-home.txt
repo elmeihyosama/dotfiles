@@ -1,7 +1,0 @@
-# macos-arm64 entries in the shipped dotfiles lock
-# (home/dot_config/mise-dotfiles/mise.lock) allowed to be an x86_64 build,
-# read by scripts/check-lock-sync.sh. Same format as lock-exceptions.txt:
-#   tool-key platform  # reason
-# An x86_64 macOS binary runs only under Rosetta 2, which a fresh Apple Silicon
-# Mac does not have, so prefer native_on: [darwin] in tools.yaml (brew builds
-# arm64). List a tool here only when there is no such alternative.

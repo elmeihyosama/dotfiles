@@ -2,26 +2,20 @@
 # Copy to ansible/local.yml (git-ignored) and edit per machine.
 git_name: "Your Name"
 git_email: "you@example.com"
-# Optional identity for repos that must NOT use the default above (e.g. when
-# git_email is not your personal address). Both set → an includeIf in
-# ~/.config/git/config. Prefer GitHub's noreply form.
+# Optional identity for the repos below (both set → an includeIf in
+# ~/.config/git/config). Prefer GitHub's noreply form.
 # personal_git_name: "yourhandle"
 # personal_git_email: "12345678+yourhandle@users.noreply.github.com"
-# Directories (trailing slash = everything beneath) that use it.
-# Default: home/.chezmoidata/git.toml (["~/workspace/dotfiles/"]).
+# Directories (trailing slash = everything beneath); default in
+# home/.chezmoidata/git.toml.
 # personal_git_dirs: ["~/workspace/dotfiles/", "~/personal/"]
-# allow_sudo: false     # uncomment to force; otherwise auto-detected via `sudo -n true`.
-#                       # Drives install strategy (native vs user-local) and whether
-#                       # the login shell is switched to zsh or a .bashrc shim is used.
-# shared_home: false    # default false. Set true ONLY when one $HOME is shared across
-#                       # CPU architectures (e.g. x86_64 + aarch64 login hosts): binaries
-#                       # and runtimes then go to ~/.local/bin-<arch> / ~/.local/share-<arch>
-#                       # so the two arches don't clobber each other.
+# allow_sudo: false     # default: auto-detected via `sudo -n true`
+# shared_home: false    # true ONLY when one $HOME is shared across CPU arches:
+#                       # binaries then go to ~/.local/bin-<arch> etc.
 
-# Tool selection (catalog: home/.chezmoidata/tools.yaml; preview with
-# scripts/select-tools.sh --os <darwin|linux> --local ansible/local.yml).
-# The `core` group is always installed. With none of these keys set, every
-# group is installed. Dropping a tool here never uninstalls it.
+# Tool selection (catalog: home/.chezmoidata/tools.yaml). `core` is always
+# installed; with none of these keys, every group is. Only `dotfiles remove`
+# uninstalls (mise tools; native ones get a command).
 # tool_groups: [git, dev]          # core + these groups (valid: git, files,
 #                                  #   containers, system, media, dev)
 # tools_add: [lazydocker]          # extra tools on top of the groups

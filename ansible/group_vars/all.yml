@@ -1,30 +1,22 @@
 ---
-# On a shared-$HOME multi-arch host (shared_home=true) arch-specific ELF binaries
-# and runtimes must not collide, so bin/share dirs are suffixed with the machine
-# architecture (x86_64 / aarch64 — ansible_facts.architecture == `uname -m`, which
-# matches the user's existing ~/.local/bin-<arch> dirs). Default single-arch hosts
-# keep the plain paths untouched.
+# Under shared_home (one $HOME, several arches) bin/share dirs get an
+# ansible_facts.architecture (== `uname -m`) suffix so binaries don't collide.
 local_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin{{ ('-' + ansible_facts['architecture']) if (shared_home | default(false)) else '' }}"
 local_share: "{{ ansible_facts['env']['HOME'] }}/.local/share{{ ('-' + ansible_facts['architecture']) if (shared_home | default(false)) else '' }}"
 local_opt: "{{ ansible_facts['env']['HOME'] }}/.local/opt{{ ('-' + ansible_facts['architecture']) if (shared_home | default(false)) else '' }}"
 
-# pinned versions
 nerd_font: "JetBrainsMono"
 nerd_font_version: "v3.2.1"
 python_version: "3.13.16"      # uv-managed default python (= the repo mise.toml python; tests/python-pins.test.sh)
-# mise is bootstrapped from a pinned release binary (tasks/mise.yml). Linux uses
-# the musl asset (static, no glibc floor). Keep in step with CI's mise pin
-# (.github/actions/setup-lint/action.yml, the macos job in provision.yml): only
-# scripts/relock.sh edits these, together.
+# mise from a pinned release binary (tasks/mise.yml); musl on Linux (no glibc
+# floor). scripts/relock.sh edits these together with CI's mise pins.
 mise_version: "2026.10.11"
 mise_sha256:
   macos-arm64: "62e86e51f834899610e9bd0ee37580cfe01fac5fff03002318e714fbdb86faeb"
   linux-x64: "2b010104bfedca93b0dd69a8276a4f364bd9236a41d1faceae367d39b5e53f8a"
   linux-arm64: "b8994b622e2065e6bb083322bd011fd4111102bfec4883c4ce0336c1e3cb9e0d"
-# zjstatus must match the installed zellij minor (zellij-tile ABI) or the
-# server wedges at 100% CPU ("Unrecognized plugin command"). zellij is pinned
-# in tools.yaml, but a user's own mise config may override it, so
-# tasks/zjstatus.yml picks the entry for `zellij --version`. To add one:
+# zjstatus must match the zellij minor (zellij-tile ABI) or the server wedges
+# at 100% CPU; tasks/zjstatus.yml picks by `zellij --version`. To add one,
 # check zellij-tile in the tag's Cargo.toml and pin the wasm's sha256.
 zjstatus_by_zellij_minor:
   "0.42": { version: "v0.21.0", sha256: "a7a2539c0ca29b44f74e42731a1122b737372693e8bcbe64ee36fc82ffa82c3e" }
@@ -32,54 +24,41 @@ zjstatus_by_zellij_minor:
   "0.44": { version: "v0.24.0", sha256: "1ccedece1ded62cf3e209be690cdd39ca6fb9e8228ed71a951f6507f9956669b" }
   "0.45": { version: "v0.25.0", sha256: "282ceab219e56e1908c9fac33907241fe6c3e1ef7d85faab3e5f438cef87b8fe" }
 
-# Python bootstrap toolchain. install.sh reads uv_version/ansible_core_version
-# (and python_version, uv_installer_sha256) with sed (it runs before Ansible
-# exists): keep each on one line as `key: "X.Y.Z"`. All three equal the repo
-# mise.toml pins (tests/python-pins.test.sh). uv_installer_sha256 is the
-# sha256 of that release's uv-installer.sh, which uv publishes no checksum
-# for: scripts/relock.sh records it (the installer then checks the uv archive
-# against the sha256 embedded in it).
+# install.sh reads these with sed before Ansible exists: keep each on one line
+# as `key: "X.Y.Z"`. Versions equal the repo mise.toml (tests/python-pins).
+# uv publishes no installer checksum, so scripts/relock.sh records one.
 uv_version: "0.13.1"
 uv_installer_sha256: "7c482d409673a53f4d9bd34ae95c9166be3b8d89ca82f27dd7bca3cab457afff"
 ansible_core_version: "2.21.5"
 pre_commit_version: "4.7.0"
 
-# CLI tools come from mise (home/.chezmoidata/tools.yaml, rendered into
-# ~/.config/mise-dotfiles/config.toml, locked by mise.lock beside it). mise
-# reads that dir as its "system" config scope via MISE_SYSTEM_CONFIG_DIR.
-# MISE_DATA_DIR is per-arch under shared_home (matches conf.d/00-env.zsh).
+# Home CLI tools: mise reads ~/.config/mise-dotfiles (tools.yaml pins + lock)
+# as its system config scope. MISE_DATA_DIR is per-arch under shared_home.
 mise_config_root: "{{ ansible_facts['env']['HOME'] }}/.config/mise-dotfiles"
 mise_data_dir: "{{ local_share }}/mise"
-# Environment for the playbook's tasks (site.yml): mise-installed tools
-# resolve through the shims. Tasks run with cwd inside the repo, so mise would
-# also load the repo's own mise.toml (the lint toolchain, untrusted on a fresh
-# machine) and any config in the dirs above it: ignore the former and stop the
-# upward search at the repo root.
+# Tasks run with cwd in the repo: ignore its mise.toml (untrusted on a fresh
+# machine) and stop mise's upward config search at the repo root.
 mise_env:
   MISE_SYSTEM_CONFIG_DIR: "{{ mise_config_root }}"
   MISE_DATA_DIR: "{{ mise_data_dir }}"
   MISE_IGNORED_CONFIG_PATHS: "{{ playbook_dir | dirname }}"
   MISE_CEILING_PATHS: "{{ playbook_dir | dirname }}"
   PATH: "{{ mise_data_dir }}/shims:{{ local_bin }}:{{ ansible_facts['env']['PATH'] }}"
-# Installs only the dotfiles pins: the user's global config is masked (a tool
-# there with no lock entry would fail --locked); callers also pass -C / so no
-# cwd mise.toml joins in.
+# Only the dotfiles pins: the global config is masked (a tool there with no
+# lock entry would fail --locked); callers also pass -C /.
 mise_install_env: "{{ mise_env | combine({'MISE_GLOBAL_CONFIG_FILE': '/nonexistent/mise-user.toml', 'MISE_YES': '1'}) }}"
 
-# GUI apps installed via Homebrew cask on macOS (skipped on Linux). The value
-# is the app bundle name, used to detect a pre-existing manual install —
-# `brew install --cask` refuses to overwrite an app it did not install.
+# macOS casks; the value is the app bundle, used to detect a manual install
+# (`brew install --cask` won't overwrite an app it did not install).
 macos_casks:
   ghostty: Ghostty.app
   cmux: cmux.app
   raycast: Raycast.app
-  # antigravity-ide, not antigravity: the latter is Google's separate agent
-  # orchestration platform; the editor is the -ide cask (Antigravity IDE.app).
+  # antigravity-ide is the editor; `antigravity` is Google's agent platform.
   antigravity-ide: Antigravity IDE.app
 
-# macOS `defaults` writes applied by tasks/macos.yml (Darwin only). Deliberately
-# conservative — Dock and other taste-heavy prefs stay unmanaged. Remove a line
-# to stop managing it; revert one locally with `defaults delete <domain> <key>`.
+# macOS `defaults` writes (tasks/macos.yml), deliberately conservative. Revert
+# one locally with `defaults delete <domain> <key>`.
 macos_defaults:
   - { domain: NSGlobalDomain, key: KeyRepeat, type: int, value: 2 } # fastest key repeat
   - { domain: NSGlobalDomain, key: InitialKeyRepeat, type: int, value: 15 } # short delay before repeat starts

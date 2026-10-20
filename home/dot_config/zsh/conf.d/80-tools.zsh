@@ -1,14 +1,38 @@
-# Zoxide (guarded). `z <dir>` to jump by frecency; `zz` for interactive (see aliases).
+# Zoxide (guarded): `z <dir>` jumps by frecency; `zz` is interactive.
 if command -v zoxide >/dev/null 2>&1; then
   eval "$(zoxide init zsh --cmd z)"
 fi
 
-# navi cheatsheets are available as the `navi` command (no key widget, by preference).
 
-# doctor — read-only health check of this machine's provisioning (tools, font,
-# chezmoi drift, theme, login shell). Lives in the repo; resolve it like `theme`.
-doctor() {
+# dotfiles: this repo's CLI; resolve the script like `theme` does.
+dotfiles() {
   local src
-  src=$(chezmoi source-path 2>/dev/null) || { echo "doctor: chezmoi not found" >&2; return 1; }
-  sh "${src:h}/scripts/doctor.sh" "$@"
+  src=$(chezmoi source-path 2>/dev/null) || { echo "dotfiles: chezmoi not found" >&2; return 1; }
+  sh "${src:h}/scripts/dotfiles.sh" "$@"
 }
+
+# doctor: same as `dotfiles doctor`.
+doctor() { dotfiles doctor "$@" }
+
+# Completion: subcommands, then tool/group names for add/remove.
+_dotfiles() {
+  local src
+  local -a subs names
+  if (( CURRENT == 2 )); then
+    subs=('list:tools and their install state' 'add:select tools or groups' 'remove:deselect tools or groups' 'update:pull, apply and verify (--check to preview)' 'doctor:read-only health check' 'help:show usage')
+    _describe 'subcommand' subs
+    return
+  fi
+  case $words[2] in
+    add|remove)
+      src=$(chezmoi source-path 2>/dev/null) || return
+      (( $+commands[yq] )) || return
+      names=(${(f)"$(yq '(.tools | keys | .[]), .tool_groups[]' "$src/.chezmoidata/tools.yaml" 2>/dev/null)"})
+      _describe 'tool or group' names
+      compadd -- --no-apply
+      ;;
+    list) compadd -- --json ;;
+    update) compadd -- --check ;;
+  esac
+}
+compdef _dotfiles dotfiles

@@ -1,7 +1,6 @@
 # mise reads the dotfiles pins/lock from here (bash never reads .zshenv).
 export MISE_SYSTEM_CONFIG_DIR="$HOME/.config/mise-dotfiles"
-# mise shims first, before the interactive guard: non-interactive bash over
-# ssh (`ssh host cmd`) reads this file too, and the CLI tools are mise tools.
+# Shims before the interactive guard: `ssh host cmd` reads this file too.
 {{ if .shared_home -}}
 _mise_shims="$HOME/.local/share-$(uname -m)/mise/shims"
 {{- else -}}
@@ -15,17 +14,13 @@ if [ -d "$_mise_shims" ]; then
   export PATH
 fi
 unset _mise_shims
-# Standard bashrc head (interactive guard)
 case $- in *i*) ;; *) return ;; esac
 {{ if not (.allow_sudo | default false) }}
-# No-sudo machines: login shell can't be changed to zsh → jump into it once.
-# zsh itself is user-local (~/.local/bin), which a fresh login PATH doesn't
-# have yet — prepend it here or `command -v zsh` never finds it.
-# Escape hatch: `NO_ZSH_JUMP=1 bash` to stay in bash (e.g. to debug).
+# No-sudo machines can't chsh: jump into the user-local zsh once (it is not on
+# a fresh login PATH yet). `NO_ZSH_JUMP=1 bash` stays in bash.
 [[ -d "$HOME/.local/bin" && ":$PATH:" != *":$HOME/.local/bin:"* ]] && PATH="$HOME/.local/bin:$PATH"
 {{ if .shared_home -}}
-# On a shared-$HOME multi-arch host, zsh lives in the per-arch dir, not plain
-# ~/.local/bin — add it too so the jump below can find it (no-op if absent).
+# Shared-$HOME multi-arch host: zsh lives in the per-arch dir too.
 [[ -d "$HOME/.local/bin-$(uname -m)" && ":$PATH:" != *":$HOME/.local/bin-$(uname -m):"* ]] && PATH="$HOME/.local/bin-$(uname -m):$PATH"
 {{ end -}}
 if [[ -z "${NO_ZSH_JUMP:-}" && -z "$ZSH_VERSION" ]] && command -v zsh >/dev/null 2>&1; then

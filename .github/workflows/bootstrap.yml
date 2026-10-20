@@ -8,6 +8,7 @@ on:
       - 'scripts/select-tools.sh'
       - 'scripts/cleanup-ubi.sh'
       - 'scripts/remove-hint.sh' # sourced by assert-tools.sh / doctor.sh
+      - 'scripts/mise-env.sh' # sourced by assert-tools.sh / doctor.sh / dotfiles.sh
       - '.github/scripts/bootstrap-smoke.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'
@@ -21,17 +22,17 @@ on:
       - 'scripts/select-tools.sh'
       - 'scripts/cleanup-ubi.sh'
       - 'scripts/remove-hint.sh' # sourced by assert-tools.sh / doctor.sh
+      - 'scripts/mise-env.sh' # sourced by assert-tools.sh / doctor.sh / dotfiles.sh
       - '.github/scripts/bootstrap-smoke.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'
       - '.github/workflows/bootstrap.yml'
-  # Weekly run catches upstream drift (new tool releases, base images) between PRs.
+  # Weekly: catches upstream drift (tool releases, base images) between PRs.
   schedule:
     - cron: "17 5 * * 1"
   workflow_dispatch:
 
-# Read-only ephemeral token, passed into the container only to raise mise's
-# GitHub API rate limit (same rationale as provision.yml).
+# GITHUB_TOKEN goes into the container only to raise mise's API rate limit.
 permissions:
   contents: read
 
@@ -41,9 +42,7 @@ concurrency:
 
 jobs:
   bootstrap:
-    # The provision matrix covers per-distro package installs; this job covers
-    # the entry point itself (install.sh end-to-end) on an apt (Ubuntu) and a
-    # dnf (Fedora) host.
+    # The entry point itself (install.sh end-to-end) on an apt and a dnf host.
     name: bootstrap ${{ matrix.distro }} (${{ matrix.mode }})
     runs-on: ubuntu-24.04
     strategy:
@@ -51,8 +50,7 @@ jobs:
       matrix:
         distro: [ubuntu, fedora]
         mode: [sudo, nosudo]
-        # Digest-pinned like provision.yml (bump both files together; see the
-        # note there; tests/ci-pins.test.sh fails if the copies diverge).
+        # Digest-pinned like provision.yml (tests/ci-pins.test.sh keeps them equal).
         include:
           - distro: ubuntu
             image: mirror.gcr.io/library/ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac # 24.04
@@ -64,14 +62,10 @@ jobs:
           persist-credentials: false
       - name: Bootstrap (${{ matrix.image }} / ${{ matrix.mode }})
         run: |
-          # Same 3-retry pattern as provision.yml: absorb transient network
-          # blips; install.sh and the playbook are idempotent, so a retry only
-          # redoes what actually failed.
+          # Same retry loop as provision.yml.
           for attempt in 1 2 3; do
             echo "::group::bootstrap attempt $attempt"
-            # Same per-attempt bound + orphan-kill as provision.yml; bootstrap
-            # runs the full playbook (uv python, font, two passes), so the
-            # ceiling is higher than provision's.
+            # Higher ceiling than provision: the full playbook runs twice.
             if timeout 1500 docker run --rm \
               -e MODE='${{ matrix.mode }}' \
               -e GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \

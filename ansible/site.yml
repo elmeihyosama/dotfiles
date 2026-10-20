@@ -15,10 +15,8 @@
       changed_when: true
 
   pre_tasks:
-    # Tool catalog (shared with chezmoi, doctor and the dotfiles CLI). Loaded
-    # under a name, not via vars_files, so its generic top-level keys (`tools`,
-    # `tool_groups`) cannot collide with other vars. Read it as
-    # tool_catalog.tools / tool_catalog.tool_groups.
+    # Loaded under a name, not vars_files, so its generic keys (`tools`,
+    # `tool_groups`) cannot collide with other vars.
     - name: Load tool catalog
       ansible.builtin.include_vars:
         file: "{{ playbook_dir }}/../home/.chezmoidata/tools.yaml"
@@ -51,10 +49,8 @@
           shared_home={{ shared_home }}
           local_bin={{ local_bin }}
 
-  # Every task gets mise_env (group_vars): the shims on PATH, the dotfiles
-  # pins dir, the per-arch data dir. Order: pinned mise -> packages (core
-  # pins + locked install) -> chezmoi (deploys the full pins) -> locked
-  # install of the full selection -> everything that needs those tools.
+  # Every task gets mise_env (group_vars). Order: mise -> packages (core pins)
+  # -> chezmoi (full pins) -> locked install of those -> the rest.
   tasks:
     - name: Pinned mise
       ansible.builtin.import_tasks: tasks/mise.yml

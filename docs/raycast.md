@@ -10,6 +10,9 @@ ships [script commands] that tie Raycast into this stack:
 - **Switch Theme** — `theme <slug>` with the slug as a Raycast argument.
 - **Toggle Wallpaper** — the `wallpaper toggle` kill-switch.
 - **Dotfiles Doctor** — `doctor` with full output in the Raycast window.
+- **Dotfiles Update** — `dotfiles update` with full output. It can't prompt, so
+  git and ssh run non-interactively and a sudo that needs a password fails the
+  step instead of waiting.
 
 **One-time step per machine:** Raycast → Settings → Extensions → **Add Script
 Directory** → pick `~/.config/raycast/scripts`. Raycast watches the directory
@@ -17,7 +20,7 @@ afterwards, so new/edited commands appear on the next `chezmoi apply` with no
 further setup.
 
 The commands run through `zsh -ic` so the repo's shell functions (`theme`,
-`wallpaper`, `doctor`) are available.
+`wallpaper`, `doctor`, `dotfiles`) are available.
 
 ## Managed elsewhere
 

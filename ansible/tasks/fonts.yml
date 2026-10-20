@@ -26,11 +26,9 @@
         url: "https://github.com/ryanoasis/nerd-fonts/releases/download/{{ nerd_font_version }}/{{ nerd_font }}.zip"
         dest: "/tmp/{{ nerd_font }}.zip"
         mode: "0644"
-        # sha256 of JetBrainsMono.zip @ nerd_font_version: scripts/relock.sh
-        # rewrites it from the release SHA-256.txt (bump both together).
+        # JetBrainsMono.zip @ nerd_font_version; scripts/relock.sh rewrites it.
         checksum: "sha256:6596922aabaf8876bb657c36a47009ac68c388662db45d4ac05c2536c2f07ade"
-    # shell, not command: `command -v` is a shell builtin with no Linux binary
-    # equivalent (see the identical note in chezmoi.yml).
+    # shell, not command: `command -v` is a builtin (see chezmoi.yml).
     - name: Check for unzip (unarchive needs it for .zip archives)  # noqa command-instead-of-shell
       ansible.builtin.shell: command -v unzip
       register: _unzip
@@ -43,8 +41,7 @@
         remote_src: true
         include: "*.ttf"
       when: _unzip.rc == 0
-    # Minimal / no-sudo hosts may have no unzip at all (and can't install it);
-    # python is guaranteed — it's the interpreter these modules run on.
+    # Minimal/no-sudo hosts may lack unzip; python is always there.
     - name: Unpack via python zipfile when unzip is absent  # noqa command-instead-of-shell risky-shell-pipe
       ansible.builtin.shell: |
         set -eu

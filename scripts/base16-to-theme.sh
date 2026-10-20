@@ -1,12 +1,9 @@
 #!/bin/sh
-# base16-to-theme.sh — convert base16 scheme YAML(s) into chezmoi theme TOML.
-#
+# base16-to-theme.sh: convert base16 scheme YAML(s) into chezmoi theme TOML.
 # Usage:
 #   scripts/base16-to-theme.sh FILE.yaml [FILE2.yaml ...]
 #   scripts/base16-to-theme.sh -d SRC_DIR     # convert every *.yaml/*.yml in SRC_DIR
-#
-# Output: home/.chezmoidata/themes/<slug>.toml  (slug = filename without extension).
-# Dependency-free: POSIX sh + awk only. Idempotent.
+# Output: home/.chezmoidata/themes/<slug>.toml. POSIX sh + awk; idempotent.
 set -eu
 
 REPO_ROOT=$(CDPATH='' cd "$(dirname "$0")/.." && pwd)
@@ -30,9 +27,8 @@ printf "%s = \"#%s\"\n", key, tolower(substr(rest, RSTART, RLENGTH))
 }
 ' "$src"
 	} >"$out"
-	# Completeness guard: base16 must yield all 16 slots. Catches an upstream YAML
-	# reshape that the regex would otherwise silently drop (theme-audit's diff can't
-	# catch it — it runs the same parser both sides).
+	# All 16 slots or fail: an upstream reshape would otherwise drop slots
+	# silently (theme-audit runs this same parser, so it can't catch it).
 	n=$(grep -c '^base0' "$out" || true)
 	[ "$n" -eq 16 ] || {
 		echo "ERROR: $slug produced $n/16 base0X colours (upstream format change?)" >&2

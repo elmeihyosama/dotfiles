@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# scripts/cleanup-ubi.sh: a one-time removal of what the old ubi install path
-# left in the local bin/opt dirs. Only bins of tools this host gets from mise
-# (select-tools source "mise"/"bundled"); never user scripts, mise shims, the
-# pinned mise binary, foreign symlinks, native or deselected tools; and
-# nothing at all once the legacy markers (ubi, the neovim tree) are gone.
+# scripts/cleanup-ubi.sh: one-time removal of the old ubi install's leftovers.
+# Only bins of tools this host gets from mise; never user scripts, shims, the
+# pinned mise, foreign symlinks, native or deselected tools; and nothing once
+# the legacy markers are gone.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -38,9 +37,8 @@ exe "$d/brew/batcat"
 ln -s "$d/brew/batcat" "$bin/bat"
 exe "$d/brew/fdfind"
 ln -s "$d/brew/fdfind" "$bin/fd"
-# Kept: user script, the pinned mise binary, mise shims (a symlink to mise and
-# a script shim), uv's own install, a foreign symlink with a tool name, a
-# native tool (jless on Linux) and a deselected one (lazydocker).
+# Kept: user script, pinned mise, shims, uv's install, a foreign symlink, a
+# native (jless) and a deselected tool (lazydocker).
 exe "$bin/my-tool" "echo mine"
 exe "$bin/mise" "echo mise"
 ln -s "$bin/mise" "$bin/jq"
@@ -65,8 +63,7 @@ for f in my-tool mise jq yq uv gh jless lazydocker; do
 done
 [ -e "$d/brew/batcat" ] || fail "symlink target outside the bin dir is untouched"
 
-# One-shot: the markers are gone, so a later run touches nothing — not even a
-# legacy-looking binary the user drops in afterwards.
+# One-shot: with the markers gone a later run touches nothing.
 exe "$bin/rg" "echo user-rg"
 out="$("$script" "$bin" "$opt" "$tools_yaml" "$selection")" || fail "second run exits 0"
 assert_eq "" "$out" "second run removes nothing"

@@ -1,4 +1,3 @@
-# Directories whose repos use the personal identity (~/.config/git/personal)
-# via includeIf; only consulted when personal_git_email is set. Trailing slash
-# = everything beneath. Override in chezmoi.toml [data] or ansible/local.yml.
+# Repos using the personal identity (includeIf; only with personal_git_email).
+# Trailing slash = everything beneath. Override in chezmoi.toml or local.yml.
 personal_git_dirs = ["~/workspace/dotfiles/"]

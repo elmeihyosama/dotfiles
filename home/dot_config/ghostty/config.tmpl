@@ -5,9 +5,8 @@ background-opacity = 0.8
 background-blur = 20
 clipboard-write = allow
 copy-on-select = clipboard
-{{- /* Wallpaper pairing: themed background-image when the active theme has a
-  map entry in .chezmoidata/wallpaper.toml AND machine-local `wallpaper_mode`
-  is not "off" (absent = on). Unmapped/off → solid base00 background below. */ -}}
+{{- /* Background image when the theme has a wallpaper.toml entry and
+  machine-local `wallpaper_mode` is not "off" (absent = on). */ -}}
 {{- $mode := "on" -}}
 {{- if hasKey . "wallpaper_mode" }}{{ $mode = .wallpaper_mode }}{{ end -}}
 {{- $wp := "" -}}

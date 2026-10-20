@@ -16,6 +16,6 @@
 # mise reads the dotfiles pins/lock from this dir (also set in .zshenv).
 export MISE_SYSTEM_CONFIG_DIR="$HOME/.config/mise-dotfiles"
 
-# Interactive zsh so conf.d loads and the `theme` function exists. The slug
-# rides as a positional parameter, never interpolated into the command string.
+# Interactive zsh so `theme` exists; the slug is a positional parameter, never
+# interpolated into the command.
 exec zsh -ic 'theme "$1"' -- "$1"

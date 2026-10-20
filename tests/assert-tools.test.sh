@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
-# .github/scripts/assert-tools.sh: mise tools resolve (via the dotfiles pins,
-# from outside any repo) to the exact tools.yaml version and win on PATH;
-# non-mise copies further back are reported as shadowed.
-#
-# Uses the real mise (offline) over a fake install tree: an
-# installs/aqua-junegunn-fzf/<ver>/fzf script and a shim symlinked to mise, so
-# `mise which`, the shim and config resolution are mise's own behaviour.
+# .github/scripts/assert-tools.sh: mise tools resolve via the dotfiles pins to
+# the tools.yaml version and win on PATH; copies further back are shadowed.
+# The real mise (offline) over a fake install tree, so resolution is mise's own.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -53,8 +49,8 @@ assert_eq 0 "$rc" "pinned_ok: exit 0 ($out)"
 assert_contains "$out" "OK:   fzf -> fzf 0.67.0" "pinned_ok: fzf at the pinned version"
 assert_not_contains "$out" "WARN" "pinned_ok: nothing shadowed"
 
-# home pins are resolved outside the repo dir: a project mise.toml in the cwd
-# (like the repo's own lint toolchain) and the user's global config pin 0.66.0
+# home pins resolve outside the repo: a cwd mise.toml and the global config
+# pinning 0.66.0 do not answer
 mkdir -p "$HOME/repo" "$HOME/.config/mise"
 printf '[tools]\n"aqua:junegunn/fzf" = "0.66.0"\n' >"$HOME/repo/mise.toml"
 printf '[tools]\n"aqua:junegunn/fzf" = "0.66.0"\n' >"$HOME/.config/mise/config.toml"
@@ -78,16 +74,14 @@ assert_contains "$out" "FAIL: fzf" "pin_not_installed_fails: names the tool"
 catalog 0.67.0
 pins 0.67.0
 
-# stale_install_dir_fails: an old install dir (left on PATH by a stale
-# activated shell) runs 0.66.0 though mise which reports the pin
+# stale_install_dir_fails: an old install dir left on PATH by a stale shell
 run "$HOME" "$HOME/tbin:$data/installs/aqua-junegunn-fzf/0.66.0:$data/shims:/usr/bin:/bin"
 assert_eq 1 "$rc" "stale_install_dir_fails: exit 1 ($out)"
 assert_contains "$out" "FAIL: fzf -> 'fzf' resolves to $data/installs/aqua-junegunn-fzf/0.66.0/fzf" \
 	"stale_install_dir_fails: names the stale install"
 
-# global_override_warns: the user's own `mise use -g fzf@0.66.0` puts that
-# install dir first in an activated shell. Deliberate, so a WARN naming the
-# override, not a FAIL whose remedy (restart, reinstall) changes nothing.
+# global_override_warns: `mise use -g fzf@0.66.0` is deliberate: WARN, not a
+# FAIL whose remedy changes nothing
 mkdir -p "$HOME/.config/mise"
 printf '[tools]\n"aqua:junegunn/fzf" = "0.66.0"\n' >"$HOME/.config/mise/config.toml"
 run "$HOME" "$HOME/tbin:$data/installs/aqua-junegunn-fzf/0.66.0:$data/shims:/usr/bin:/bin"

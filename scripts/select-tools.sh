@@ -1,26 +1,20 @@
 #!/usr/bin/env sh
-# select-tools.sh — resolve which tools this machine installs, and how.
+# select-tools.sh: which tools this machine installs, and how.
 # Usage: select-tools.sh --os darwin|linux [--arch x64|arm64] --local LOCAL_YML [--tools TOOLS_YAML]
+#        select-tools.sh --platform macos-arm64|linux-x64|linux-arm64 ... (instead of --os/--arch)
 #
-# Reads the catalog (default home/.chezmoidata/tools.yaml) and the per-machine
-# ansible/local.yml, prints a JSON array sorted by name:
+# Prints a JSON array sorted by name:
 #   [{"name","bin","source","version","backend","provided_by"}]
-# source is the output contract, exactly one of:
-#   mise      installed from the dotfiles mise pins (backend and version set)
-#   native    installed by brew/apt/dnf/pacman (backend/version null)
-#             also: a tool whose <os>-<arch> is in its missing_on (no upstream
-#             asset for that locked platform)
-#   bootstrap installed by Ansible before mise exists (only `mise` itself;
-#             version set, backend null)
-#   bundled   ships inside another tool's install, see provided_by
-#             (age-keygen -> age); version/backend null
-# provided_by names that other tool, else null.
+# source (the output contract) is one of:
+#   mise      from the dotfiles mise pins (backend and version set)
+#   native    brew/apt/dnf/pacman, also a platform in missing_on (backend/version null)
+#   bootstrap installed by Ansible before mise exists (mise itself; version set)
+#   bundled   inside provided_by's install (age-keygen -> age); version/backend null
 #
-# Selection = core U tools in tool_groups (default: every group) U tools_add
-#             - tools_remove. Removing a core tool is an error. A provided_by
-# tool follows its provider. Nothing here ever uninstalls anything.
-# Exit 2 with a message on stderr for bad input: unknown groups/tools, a core
-# removal, a non-list value, or a provided_by tool added without its provider.
+# Selection = core + tool_groups (default: all) + tools_add - tools_remove; a
+# provided_by tool follows its provider. Never uninstalls anything. Bad input
+# (unknown names, removing core, a non-list, a provided_by tool without its
+# provider) exits 2.
 set -eu
 
 repo_root="$(CDPATH='' cd "$(dirname "$0")/.." && pwd)"
@@ -30,7 +24,7 @@ local_yml=""
 tools_yaml="$repo_root/home/.chezmoidata/tools.yaml"
 
 usage() {
-	echo "usage: select-tools.sh --os darwin|linux [--arch x64|arm64] --local LOCAL_YML [--tools TOOLS_YAML]" >&2
+	echo "usage: select-tools.sh --os darwin|linux [--arch x64|arm64] | --platform <os>-<arch> --local LOCAL_YML [--tools TOOLS_YAML]" >&2
 	exit 2
 }
 while [ $# -gt 0 ]; do
@@ -48,6 +42,12 @@ while [ $# -gt 0 ]; do
 	--arch)
 		[ $# -ge 2 ] || usage
 		arch="$2"
+		shift 2
+		;;
+	--platform)
+		[ $# -ge 2 ] || usage
+		case "$2" in macos-*) os=darwin ;; linux-*) os=linux ;; *) usage ;; esac
+		arch="${2#*-}"
 		shift 2
 		;;
 	--tools)

@@ -1,5 +1,5 @@
-# CI/pre-commit fixture: per-machine data for rendering chezmoi templates.
-# Mirrors ansible/local.yml.example. NO secrets. Theme/font come from home/.chezmoidata.
+# Per-machine data for rendering chezmoi templates in CI/pre-commit; mirrors
+# ansible/local.yml.example. NO secrets.
 [data]
     allow_sudo = true
     shared_home = false

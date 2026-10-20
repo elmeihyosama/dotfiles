@@ -1,7 +1,6 @@
 ---
-# shell, not command: `command -v` is a shell builtin — there is no /usr/bin/command
-# on Linux, so the command module can never resolve it there (macOS ships one,
-# which masked this).
+# shell, not command: `command -v` is a shell builtin with no /usr/bin/command
+# on Linux (macOS ships one, which masked this).
 - name: Locate chezmoi  # noqa command-instead-of-shell
   ansible.builtin.shell: command -v chezmoi
   register: _chezmoi
@@ -19,18 +18,17 @@
     state: directory
     mode: "0755"
 
-# `theme`/`wallpaper` and hand-written per-machine overrides (atuin_sync,
-# sessionize_roots, ...) live in [data] of this file. Ansible rewrites it from
-# a fixed key set, so read the existing [data] back first or they are lost.
+# [data] also holds `theme`, `wallpaper` and hand-set overrides; Ansible
+# rewrites the file from a fixed key set, so read them back first.
 - name: Read existing chezmoi.toml (to preserve machine-local [data] overrides)
   ansible.builtin.slurp:
     src: "{{ ansible_facts['env']['HOME'] }}/.config/chezmoi/chezmoi.toml"
   register: _cz_existing
   failed_when: false
 
-# Raw `key = value` lines, so quoting and types survive. Keys Ansible writes
-# are dropped (duplicate key = TOML error); comments and multi-line values are
-# not carried.
+# Raw `key = value` lines keep quoting and types. Keys Ansible writes are
+# dropped (duplicates are a TOML error); comments and multi-line values are not
+# carried.
 - name: Carry over [data] keys Ansible does not own
   ansible.builtin.set_fact:
     _kept_data_lines: >-
@@ -39,8 +37,7 @@
         | list }}
   vars:
     _existing: "{{ _cz_existing.content | default('') | b64decode }}"
-    # regex_findall: a '\1' argument to regex_search unescapes differently
-    # across ansible-core releases.
+    # regex_findall: regex_search's '\1' argument differs across releases.
     _data_block: >-
       {{ _existing | regex_findall('(?ms)^\[data\][ \t]*\n(.*?)(?=^\[|\Z)')
         | default([''], true) | first }}
@@ -54,10 +51,8 @@
       - personal_git_dirs
       - selected_tools
 
-# Tools to pin via mise on this machine (OS-filtered, source == mise only), so
-# the pins template renders exactly what select-tools.sh would install. Needs
-# jq + yq on PATH. Without selected_tools in chezmoi.toml the template falls
-# back to every mise-capable tool.
+# This machine's mise tools (what select-tools.sh installs), for the pins
+# template; without selected_tools it pins every mise-capable tool.
 - name: Select tools for this machine
   ansible.builtin.command:
     argv:
@@ -79,8 +74,7 @@
     content: |
       sourceDir = "{{ playbook_dir | dirname }}"
       {% if age_recipient is defined %}
-      # Opt-in age encryption (see docs/secrets.md). The identity file is
-      # per-machine and never committed; sync it out-of-band.
+      # Opt-in age encryption (docs/secrets.md); the identity is per-machine.
       encryption = "age"
       [age]
           identity = "~/.config/chezmoi/key.txt"
@@ -110,16 +104,14 @@
   register: _cz_status
   changed_when: false
 
-# --force: skip prompts (need a TTY) when a managed file changed outside chezmoi.
-# Pre-existing files are backed up first by the run_once backup script.
+# --force: no TTY to prompt; the run_once script backs pre-existing files up.
 - name: Apply chezmoi (only when there are pending changes)
   ansible.builtin.command: "{{ _chezmoi.stdout }} apply --force"
   register: _cz_apply
   when: _cz_status.stdout | length > 0
   changed_when: true
 
-# Surfaces run_onchange script noise (a "command not found" here means a
-# script ran before the tool it needs was installed; CI greps for it).
+# Surfaces run_onchange script output; CI greps it for "command not found".
 - name: Show chezmoi apply output
   ansible.builtin.debug:
     msg: "{{ (_cz_apply.stdout_lines | default([])) + (_cz_apply.stderr_lines | default([])) }}"

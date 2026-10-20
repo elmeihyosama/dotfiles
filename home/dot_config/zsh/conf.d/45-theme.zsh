@@ -1,14 +1,9 @@
-# _chezmoi_set_data KEY VALUE CFG — set `KEY = "VALUE"` inside the [data] table
-# of the chezmoi config, scoped to [data] only. Replaces an existing or
-# commented KEY; if [data] exists without it, inserts it there; if [data] is
-# absent, appends a new [data] table. Writes back in place to preserve
-# mode/inode/symlink. Used by `theme` and `wallpaper`. KEY must be a literal
-# name (no regex metacharacters) since it is interpolated into an awk regex.
+# _chezmoi_set_data KEY VALUE CFG: set `KEY = "VALUE"` in the chezmoi config's
+# [data] table (replacing it, inserting it, or adding [data]). Writes in place
+# to keep mode/inode/symlink. KEY must be literal: it goes into an awk regex.
 _chezmoi_set_data() {
   local key=$1 val=$2 cfg=$3 tmp
-  # KEY is interpolated into an awk regex and VAL into a "..."-quoted TOML value;
-  # reject a value containing a double-quote (would emit malformed TOML). Both
-  # current callers pass safe strings, but this guards a future third caller.
+  # A double-quote in VAL would emit malformed TOML.
   [[ $val == *'"'* ]] && { print -u2 "_chezmoi_set_data: value may not contain a double-quote"; return 1; }
   tmp=$(mktemp) || return 1
   awk -v key="$key" -v val="$val" '
@@ -30,7 +25,7 @@ _chezmoi_set_data() {
   rm -f "$tmp"
 }
 
-# theme — switch the active base16 theme (per-machine; no git diff).
+# theme: switch the active base16 theme (per-machine; no git diff).
 #   theme            fzf-pick from available themes
 #   theme <slug>     set directly
 theme() {
@@ -61,16 +56,14 @@ theme() {
   # cmux reads ~/.config/ghostty/config directly; repaint running sessions live.
   command -v cmux >/dev/null 2>&1 && cmux reload-config >/dev/null 2>&1
   echo "theme → ${slug}.  cmux repaints live; new shells, ghostty windows, zellij & nvim need a restart to fully apply."
-  # Reload only interactive terminals: from a headless caller (Raycast script
-  # commands, cron) exec'ing an interactive zsh would strand a shell waiting
-  # on stdin.
+  # Only interactive terminals: a headless caller (Raycast, cron) exec'ing an
+  # interactive zsh would strand a shell waiting on stdin.
   if [[ -t 0 && -t 1 ]]; then
     exec zsh
   fi
 }
 
-# Tab completion: `theme <Tab>` lists the vendored slugs, `wallpaper <Tab>`
-# its verbs. compinit is loaded earlier by 20-completion.zsh.
+# `theme <Tab>` lists the slugs, `wallpaper <Tab>` its verbs.
 _theme_slugs() {
   local src
   src=$(chezmoi source-path 2>/dev/null) || return
@@ -87,8 +80,7 @@ _wallpaper_verbs() {
 }
 compdef _wallpaper_verbs wallpaper
 
-# wallpaper — toggle the themed terminal background image (machine-local; no git
-# diff). Pairs with the active theme via .chezmoidata/wallpaper.toml.
+# wallpaper: toggle the themed terminal background (machine-local; no git diff).
 #   wallpaper on | off | toggle   (bare `wallpaper` = toggle)
 wallpaper() {
   emulate -L zsh

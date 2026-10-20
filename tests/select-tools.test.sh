@@ -89,8 +89,7 @@ assert_eq bootstrap "$(field mise source)" "mise is bootstrap"
 out="$("$sel" --os linux --local "$d/absent.yml")"
 assert_eq "$all" "$(names)" "missing local.yml: default selection"
 
-# yaml_has_every_legacy_tool: the pre-mise group_vars `tools` list (removed
-# from group_vars; tools.yaml is now the only catalog)
+# yaml_has_every_legacy_tool: the pre-mise group_vars `tools` list
 for t in chezmoi atuin sheldon zellij navi starship zoxide eza bat fd ripgrep fzf \
 	git-delta lazygit lazydocker yazi jq yq gh dust duf btop neovim gitleaks \
 	editorconfig-checker fastfetch git-absorb gh-dash mise cava vivid hyperfine xh \
@@ -157,3 +156,8 @@ assert_eq mise "$(src_of darwin arm64 jless)" "native_on: jless mise on macos-ar
 assert_eq native "$(src_of darwin arm64 navi)" "native_on: navi native on darwin"
 assert_eq mise "$(src_of linux arm64 navi)" "native_on: navi mise on linux"
 if "$sel" --os linux --arch riscv --local /nonexistent >/dev/null 2>&1; then fail "bad --arch is rejected"; fi
+# --platform <os>-<arch> is the same as --os/--arch
+plat_src() { "$sel" --platform "$1" --local /nonexistent | jq -r --arg n "$2" '.[] | select(.name == $n) | .source'; }
+assert_eq native "$(plat_src linux-arm64 git-absorb)" "--platform linux-arm64 maps to linux/arm64"
+assert_eq mise "$(plat_src macos-arm64 jless)" "--platform macos-arm64 maps to darwin/arm64"
+if "$sel" --platform windows-x64 --local /nonexistent >/dev/null 2>&1; then fail "bad --platform is rejected"; fi

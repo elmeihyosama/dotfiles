@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# The bootstrap Python toolchain pins in group_vars (read by install.sh with
-# sed and by tasks/python.yml) equal the repo mise.toml pins, and install.sh
-# installs exactly those (sha256-checked uv installer, ansible-core==<pin> on
-# the pinned Python). CI's provision matrix installs the same ansible-core.
+# group_vars' bootstrap Python pins equal the repo mise.toml's, and install.sh
+# and CI's provision matrix install exactly those.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -36,14 +34,13 @@ assert_not_contains "$inst" "apt-get install -y ansible" "install.sh: no apt ans
 assert_not_contains "$inst" "dnf install -y ansible" "install.sh: no dnf ansible"
 assert_contains "$(cat ansible/tasks/python.yml)" 'pre-commit=={{ pre_commit_version }}' "python.yml pins pre-commit"
 
-# install.sh's sed reader returns the pins (it runs before ansible exists).
+# install.sh's sed reader returns the pins.
 # shellcheck disable=SC1090
 eval "$(sed -n '/^gv_pin() {/,/^}/p' install.sh)"
 declare -F gv_pin >/dev/null || fail "install.sh defines gv_pin()"
 assert_eq "$(sed -nE 's/^uv_version:[[:space:]]*"([^"]*)".*/\1/p' "$gv")" "$(gv_pin uv_version "$gv")" "install.sh gv_pin reads uv_version"
 
-# CI's provision matrix pins ansible-core to the same version (Arch excepted:
-# pacman's, see provision-ci.sh).
+# CI's provision matrix pins the same ansible-core (Arch: pacman's).
 ci="$(cat .github/scripts/provision-ci.sh)"
 # shellcheck disable=SC2016
 assert_contains "$ci" 'ANSIBLE_CORE="$(gv_pin ansible_core_version)"' "provision-ci.sh reads ansible_core_version"

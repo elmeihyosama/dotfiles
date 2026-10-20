@@ -1,14 +1,9 @@
 #!/usr/bin/env bash
-# Canary for the undocumented MISE_SYSTEM_CONFIG_DIR the dotfiles pins/lock rely on:
-# mise reads ~/.config/mise-dotfiles as its "system" config scope, the user's
-# global config is masked (MISE_GLOBAL_CONFIG_FILE=/nonexistent/...), `-C /`
-# keeps project configs out, and `mise lock -g` writes mise.lock beside the
-# system config. In a throwaway HOME, with the repo's real rendered pins
-# template and shipped lock and whatever mise is on PATH:
-#   1. the user's own `mise use -g jq@1.7.1` succeeds,
-#   2. the dotfiles locked install (user config masked) succeeds,
-#   3. pins and lock are byte-identical afterwards (no chezmoi drift).
-# Also dry-runs the full default pins for this platform. Downloads two small tools, so it SKIPs (exit 0) without mise or network.
+# Canary for the undocumented MISE_SYSTEM_CONFIG_DIR layout the pins rely on
+# (system scope, masked global config, -C /, `lock -g` beside it). In a
+# throwaway HOME with the real pins and lock: the user's `mise use -g` works,
+# the locked install works, and pins/lock stay byte-identical. Downloads two
+# small tools, so it SKIPs (exit 0) without mise or network.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -37,8 +32,8 @@ export MISE_SYSTEM_CONFIG_DIR="$HOME/.config/mise-dotfiles"
 cfg="$MISE_SYSTEM_CONFIG_DIR/config.toml" lock="$MISE_SYSTEM_CONFIG_DIR/mise.lock"
 mkdir -p "$MISE_SYSTEM_CONFIG_DIR"
 
-# A small subset of the real template (fzf, fd); the lock stays the FULL shipped
-# one, as on a machine with a partial selection.
+# A subset of the real template with the FULL shipped lock, as on a machine
+# with a partial selection.
 render_tmpl "$tmpl" 'selected_tools=["fzf","fd"]' >"$cfg" || {
 	fail "render pins template"
 	exit 1
@@ -63,9 +58,8 @@ assert_not_contains "$(cat "$cfg")" "1.7.1" "dotfiles pins untouched by mise use
 fzf_v="$(mise -C / exec -- fzf --version 2>&1)" || fail "4. pinned fzf runs: $fzf_v"
 assert_contains "$fzf_v" "0.67.0" "4. fzf resolves to the pinned version"
 
-# 5. The full default selection for THIS platform resolves against the shipped
-# lock: a dry-run locked install fails on any tool without a lock url here
-# (e.g. an upstream with no asset for this OS/arch).
+# 5. The full default selection for THIS platform resolves against the lock:
+# a dry-run locked install fails on any tool without a lock url here.
 render_tmpl "$tmpl" >"$cfg" || fail "5. render full default pins"
 out="$(MISE_GLOBAL_CONFIG_FILE=/nonexistent/mise-user.toml mise -C / install --locked --dry-run 2>&1)" ||
 	fail "5. full default pins resolve against the shipped lock: $out"

@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
-# renovate.json: valid JSON with the agreed shape (config:recommended, Monday
-# schedule, one "pins" group, github-actions left to Dependabot, the mise
-# manager on), and every customManager regex really matches the pins it is
-# meant to bump. Each regex runs (perl, same syntax for these patterns as
-# Renovate's RE2 with the "g" flag and no "m") over the files its
-# managerFilePatterns select, and the match counts and captured values are
-# compared with what the files actually pin, so a regex that silently matches
-# nothing fails here. The official validator runs only when npx and a Node
-# that renovate supports exist (else SKIP).
+# renovate.json: the agreed shape, and every customManager regex really
+# matches the pins it should bump: each runs (perl, RE2-compatible here, "g"
+# and no "m") over its files, and the matches are compared with what the files
+# pin, so a regex that silently matches nothing fails. The official validator
+# runs only when npx and a supported Node exist (else SKIP).
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -31,8 +27,7 @@ assert_eq "true" "$(q '.mise.enabled')" "mise manager enabled"
 assert_eq '["/^mise\\.toml$/"]' "$(jq -c '.mise.managerFilePatterns' "$cfg")" "mise manager reads only the repo mise.toml"
 assert_eq "pins" "$(q '[.packageRules[] | select(.matchPackageNames == ["*"]) | .groupName] | first')" "one pins group for everything"
 assert_eq "true" "$(q '[.packageRules[] | select(.matchDatasources == ["docker"]) | .pinDigests] | first')" "docker images keep digest pins"
-# ignorePaths keeps config:recommended's defaults (:ignoreModulesAndTests,
-# which an explicit ignorePaths replaces) and adds the generated .mise/ locks.
+# The recommended ignorePaths defaults (an explicit list replaces them) plus .mise/.
 assert_eq '["**/node_modules/**","**/bower_components/**","**/vendor/**","**/examples/**","**/__tests__/**","**/test/**","**/tests/**","**/__fixtures__/**",".mise/**"]' \
 	"$(jq -c .ignorePaths "$cfg")" "ignorePaths: the recommended defaults plus .mise/**"
 # zjstatus_by_zellij_minor stays manual: no regex targets it, the config says so.
@@ -40,9 +35,8 @@ assert_not_contains "$(q '[.customManagers[].matchStrings[]] | join(" ")')" "zjs
 assert_contains "$(q '.description | join(" ")')" "Manual, not managed here: zjstatus_by_zellij_minor" "renovate.json documents zjstatus as manual"
 
 # --- customManagers: run each regex against the real files ---------------
-# Output, one line per match: <file> TAB <depName> TAB <currentValue> TAB
-# <currentDigest> TAB <datasource>. depName/datasource fall back to the
-# manager's literal templates.
+# One line per match: file, depName, currentValue, currentDigest, datasource
+# (depName/datasource fall back to the manager's templates).
 n="$(q '.customManagers | length')"
 [ "$n" -gt 0 ] || fail "customManagers present"
 files="$(git ls-files)"

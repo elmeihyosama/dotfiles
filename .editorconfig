@@ -1,5 +1,4 @@
-# https://editorconfig.org — enforced by editorconfig-checker in CI + pre-commit
-# (a few files with intentional alignment are excluded in .editorconfig-checker.json).
+# Enforced by editorconfig-checker (exclusions in .editorconfig-checker.json).
 root = true
 
 [*]
@@ -10,11 +9,10 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 
-# Shell scripts use tabs (matches shfmt, enforced in CI).
+# Tabs, as shfmt.
 [*.sh]
 indent_style = tab
 
-# chezmoi-templated shell scripts render to the same shfmt-tab style.
 [*.sh.tmpl]
 indent_style = tab
 

@@ -175,7 +175,7 @@ the exceptions follow it.
 
 | Pin | Lives in | Checksum |
 | --- | --- | --- |
-| Home CLI tools | `home/.chezmoidata/tools.yaml` | `home/dot_config/mise-dotfiles/mise.lock`, except the entries in `.github/scripts/lock-exceptions-home.txt` |
+| Home CLI tools | `home/.chezmoidata/tools.yaml` | `home/dot_config/mise-dotfiles/mise.lock`, except the platforms in a tool's `no_checksum_on` |
 | Repo lint toolchain | `mise.toml` | `mise.lock`, plus `.mise/locks/pipx-*/<ver>/uv.lock` (hash-pinned, dependencies included) |
 | mise itself (bootstrap) | `mise_version` in `ansible/group_vars/all.yml` | `mise_sha256` beside it |
 | CI's mise binary | `version:` in `.github/actions/setup-lint/action.yml` and the macOS job in `.github/workflows/provision.yml` | the `sha256:` input below it |
@@ -189,10 +189,15 @@ the exceptions follow it.
 
 Not checksum-verified:
 
-- **Home tools whose upstream publishes no checksum**, listed with a reason
-  in `.github/scripts/lock-exceptions-home.txt`: jless on macOS and navi on
-  Linux. Their lock entries hold the release asset url and id only;
-  `mise install --locked` still installs exactly that asset.
+- **Home tools whose upstream publishes no checksum**, listed per tool in
+  tools.yaml as `no_checksum_on: [<platform>...]  # reason`: jless on macOS
+  and navi on Linux. Their lock entries hold the release asset url and id
+  only; `mise install --locked` still installs exactly that asset.
+  `.github/scripts/check-lock.sh` fails once such a checksum appears, so the
+  entry gets removed. Platforms where mise does not install a tool
+  (`native_on`, `native_only`, `missing_on`) need no checksum and no entry.
+  pipx tools in the repo lock need a uv.lock digest instead of per-platform
+  checksums.
 - **ansible-core and pre-commit as install.sh / the playbook install them**
   (`uv tool install X==<ver>`): only the top-level version is pinned. Their
   dependencies resolve at install time, and neither install reads the repo
@@ -202,8 +207,8 @@ Not checksum-verified:
 
 `scripts/check-lock-sync.sh` also rejects a macos-arm64 lock url that names
 an x86_64 build (it needs Rosetta 2, which a fresh Apple Silicon Mac does not
-have) unless `.github/scripts/lock-arch-exceptions-home.txt` lists it; the
-usual fix is `native_on: [darwin]` (brew builds arm64), as for dust.
+have), with no exceptions; the fix is `native_on: [darwin]` (brew builds
+arm64), as for dust.
 
 `scripts/relock.sh` is the one command that refreshes every checksum from
 the versions above: `mise_sha256`, CI's mise `sha256:` inputs, both

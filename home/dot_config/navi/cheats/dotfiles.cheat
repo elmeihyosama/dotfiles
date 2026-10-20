@@ -12,6 +12,21 @@ wallpaper toggle
 # Health-check this machine's provisioning (tools, font, drift, theme)
 doctor
 
+# List catalog tools: selected here, installed (--json for machine output)
+dotfiles list
+
+# Select tools or groups in ansible/local.yml, then apply (--no-apply to only edit)
+dotfiles add <tool_or_group>
+
+# Deselect tools or groups, then apply
+dotfiles remove <tool_or_group>
+
+# Pull, provision, chezmoi apply, plugin sync, doctor
+dotfiles update
+
+# Preview an update: incoming commits, drift, missing tools (writes nothing)
+dotfiles update --check
+
 # Sessionizer — fuzzy-pick a project and open/attach a zellij session
 sz
 

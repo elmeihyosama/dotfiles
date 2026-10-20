@@ -4,6 +4,11 @@
 # the dir. Exits non-zero if any test fails.
 set -uo pipefail
 
+# A git hook's GIT_DIR etc. would aim tests' temp-repo git at the real repo.
+if command -v git >/dev/null 2>&1; then
+	for _v in $(git rev-parse --local-env-vars); do unset "$_v"; done
+fi
+
 dir="${TESTS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 pattern="${1:-.}"
 fail=0

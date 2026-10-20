@@ -47,7 +47,7 @@ reassignment **replaces** the defaults, so include the commands you want to skip
 
 ```zsh
 NOTIFY_THRESHOLD=60
-# Custom list — include defaults you want to keep, plus your own commands
+# keep the defaults you want, plus your own
 NOTIFY_EXCLUDE=(ssh nvim vim less man watch top htop btop tig lazygit lazydocker fzf yazi ff sz my-repl)
 ```
 

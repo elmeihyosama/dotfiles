@@ -1,8 +1,6 @@
 #!/bin/sh
-# One-time: preserve any pre-existing ~/.ssh/config as the machine-local
-# include (~/.ssh/config.local) before chezmoi starts managing ~/.ssh/config
-# itself. Without this, the first apply would overwrite hand-written host
-# blocks. Skipped if config.local already exists (nothing is ever clobbered).
+# One-time: keep a pre-existing ~/.ssh/config as ~/.ssh/config.local (the
+# include) before chezmoi manages it; never clobbers an existing one.
 set -eu
 cfg="$HOME/.ssh/config"
 local_cfg="$HOME/.ssh/config.local"

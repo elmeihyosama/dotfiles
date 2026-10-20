@@ -102,6 +102,27 @@ saying so.
   is backed up to `<path>.pre-dotfiles.bak`, so adopting on a machine you
   already use is recoverable.
 
+## Day to day
+
+`dotfiles <subcommand>` manages the repo and this machine. Exit codes: 0 ok,
+1 an operation failed, 2 usage or validation error.
+
+- `dotfiles list [--json]` — catalog tools, whether this machine selects them,
+  and what is installed.
+- `dotfiles add TOOL|GROUP... [--no-apply]` / `dotfiles remove ...` — select or
+  deselect tools and groups, then apply (`--no-apply` only edits). They edit
+  only `tool_groups`, `tools_add` and `tools_remove` in `ansible/local.yml`.
+  Removed mise tools are uninstalled; native ones get the command to run.
+- `dotfiles update [--check]` — refuses a dirty repo, then runs `git pull
+  --ff-only`, the ansible playbook, `chezmoi apply`, `sheldon lock`, nvim plugin
+  restore and `doctor`, stopping at the first failure. `--check` only fetches
+  (no file changes) and reports incoming commits, chezmoi drift and missing
+  tools.
+- `dotfiles doctor` — read-only health check (also `doctor`).
+
+On macOS, Raycast has *Dotfiles Update* and *Dotfiles Doctor* commands
+([Raycast](docs/raycast.md)).
+
 ## Usage
 
 - Apply changes: `chezmoi apply` — preview with `chezmoi diff`.

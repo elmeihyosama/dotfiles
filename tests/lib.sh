@@ -104,12 +104,14 @@ render_tmpl() {
 	return "$rc"
 }
 
-# mk_home: point HOME and the XDG dirs at a fresh temp dir.
+# mk_home: point HOME and the XDG dirs at a fresh temp dir; git can't search
+# above it for an enclosing repo.
 mk_home() {
 	local d
 	d="$(mktemp -d)"
 	_tests_tmpdirs+=("$d")
 	export HOME="$d"
+	export GIT_CEILING_DIRECTORIES="$d"
 	export XDG_CONFIG_HOME="$d/.config"
 	export XDG_DATA_HOME="$d/.local/share"
 	export XDG_STATE_HOME="$d/.local/state"
