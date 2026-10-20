@@ -341,7 +341,7 @@ nfiles() {
 printf 'git_name: "A"\n' >"$LOCAL"
 chmod 640 "$LOCAL"
 run remove fzf --no-apply
-assert_eq "640" "$(stat -f %Lp "$LOCAL" 2>/dev/null || stat -c %a "$LOCAL")" "mode_kept"
+assert_eq "640" "$(stat -c %a "$LOCAL" 2>/dev/null || stat -f %Lp "$LOCAL")" "mode_kept" # GNU first: GNU `stat -f` succeeds with fs info
 assert_eq 1 "$(nfiles)" "no_temp_left"
 # a failing verify step leaves the original intact (exit 1)
 mv "$HOME/bin/yq" "$HOME/bin/yq.real"
