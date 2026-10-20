@@ -26,7 +26,8 @@
         url: "https://github.com/ryanoasis/nerd-fonts/releases/download/{{ nerd_font_version }}/{{ nerd_font }}.zip"
         dest: "/tmp/{{ nerd_font }}.zip"
         mode: "0644"
-        # sha256 of JetBrainsMono.zip @ nerd_font_version — bump both together.
+        # sha256 of JetBrainsMono.zip @ nerd_font_version: scripts/relock.sh
+        # rewrites it from the release SHA-256.txt (bump both together).
         checksum: "sha256:6596922aabaf8876bb657c36a47009ac68c388662db45d4ac05c2536c2f07ade"
     # shell, not command: `command -v` is a shell builtin with no Linux binary
     # equivalent (see the identical note in chezmoi.yml).

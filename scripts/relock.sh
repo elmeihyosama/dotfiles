@@ -4,15 +4,19 @@
 #   1. mise_sha256 (3 locked platforms) from the release's SHASUMS256.txt
 #   2. CI's mise pins: setup-lint (version + linux-x64 sha256) and the macos job
 #      in provision.yml (version + macos-arm64 sha256)
-#   3. the repo mise.lock (`mise lock`)
+#   3. the repo mise.lock (`mise lock`), removing .mise/locks/pipx-*/<ver>/
+#      uv.lock dirs it no longer references (left behind by a version bump)
 #   4. the shipped dotfiles lock, home/dot_config/mise-dotfiles/mise.lock: every
 #      tool in tools.yaml with a backend, rendered from the pins template into a
 #      temp dir and locked there (never touches your own mise config)
+#   5. the nerd font zip's sha256 in ansible/tasks/fonts.yml, for the
+#      nerd_font / nerd_font_version in group_vars (release SHA-256.txt)
 # One function per artifact (more can be added). Idempotent: a second run is a
 # no-op. Prints what changed. Respects the caller's MISE_* / GITHUB_TOKEN env.
 # Every rewrite is re-read and checked, so workflow/YAML drift fails loudly
 # instead of silently doing nothing. Needs: mise, chezmoi, yq, gh or curl.
-# Usage: scripts/relock.sh   (edit mise_version first to bump)
+# Usage: scripts/relock.sh   (edit mise_version / nerd_font_version first to
+# bump, or run it on a Renovate PR branch that already did)
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -23,6 +27,7 @@ PROVISION=.github/workflows/provision.yml
 REPO_LOCK=mise.lock
 HOME_LOCK=home/dot_config/mise-dotfiles/mise.lock
 PINS_TMPL=home/dot_config/mise-dotfiles/config.toml.tmpl
+FONTS=ansible/tasks/fonts.yml
 PLATFORMS=macos-arm64,linux-x64,linux-arm64
 changed=0
 
@@ -61,13 +66,17 @@ MISE_VERSION="$(sed -nE 's/^mise_version:[[:space:]]*"?([0-9][^"#[:space:]]*)"?.
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-fetch_shasums() {
-	local f="$tmp/SHASUMS256.txt" url="https://github.com/jdx/mise/releases/download/v$MISE_VERSION/SHASUMS256.txt"
-	if command -v gh >/dev/null 2>&1 && gh release download "v$MISE_VERSION" -R jdx/mise -p SHASUMS256.txt -O "$f" --clobber >/dev/null 2>&1; then :; else
-		command -v curl >/dev/null 2>&1 || die "gh release download failed and curl is missing"
-		curl -fsSL "$url" -o "$f"
+# fetch_release_asset REPO TAG ASSET OUT: gh, falling back to curl.
+fetch_release_asset() {
+	if command -v gh >/dev/null 2>&1 && gh release download "$2" -R "$1" -p "$3" -O "$4" --clobber >/dev/null 2>&1; then :; else
+		command -v curl >/dev/null 2>&1 || die "gh release download of $1 $2 $3 failed and curl is missing"
+		curl -fsSL "https://github.com/$1/releases/download/$2/$3" -o "$4"
 	fi
-	SHASUMS="$f"
+}
+
+fetch_shasums() {
+	SHASUMS="$tmp/SHASUMS256.txt"
+	fetch_release_asset jdx/mise "v$MISE_VERSION" SHASUMS256.txt "$SHASUMS"
 }
 
 # asset_sha ASSET -> sha256 of that raw release binary
@@ -138,6 +147,23 @@ relock_repo_lock() {
 	mise lock --platform "$PLATFORMS" >/dev/null
 	[ -f "$REPO_LOCK" ] || die "mise lock did not produce $REPO_LOCK"
 	lock_changed "$REPO_LOCK" "$REPO_LOCK" "$before"
+	prune_orphan_uvlocks
+}
+
+# Same rule as scripts/check-lock-sync.sh (c): a pipx tool's uv.lock dir must
+# be a `path = "..."` the repo lock references.
+prune_orphan_uvlocks() {
+	local refs d rel
+	refs="$(grep -o 'path = "[^"]*"' "$REPO_LOCK" | sed -e 's/^path = "//' -e 's/"$//')"
+	for d in .mise/locks/pipx-*/*/; do
+		[ -d "$d" ] || continue
+		rel="${d%/}"
+		printf '%s\n' "$refs" | grep -qxF "$rel" && continue
+		rm -rf "$rel"
+		rmdir "$(dirname "$rel")" 2>/dev/null || true
+		say "$rel: REMOVED (no longer in $REPO_LOCK)"
+		changed=1
+	done
 }
 
 # The dotfiles lock covers EVERY tool with a backend (the template's
@@ -156,11 +182,27 @@ relock_home_lock() {
 	replace_if_changed "$HOME_LOCK" "$d/mise.lock" "$HOME_LOCK"
 }
 
+# The font zip's sha256 from the release's SHA-256.txt, written into the
+# get_url checksum in tasks/fonts.yml.
+relock_nerd_font() {
+	local font ver sums="$tmp/nerd-fonts-SHA-256.txt" sha out="$tmp/fonts.yml"
+	font="$(sed -nE 's/^nerd_font:[[:space:]]*"([^"]+)".*/\1/p' "$GV")"
+	ver="$(sed -nE 's/^nerd_font_version:[[:space:]]*"([^"]+)".*/\1/p' "$GV")"
+	[ -n "$font" ] && [ -n "$ver" ] || die "nerd_font / nerd_font_version not found in $GV"
+	fetch_release_asset ryanoasis/nerd-fonts "$ver" SHA-256.txt "$sums"
+	sha="$(awk -v a="$font.zip" '$2==a {print $1; exit}' "$sums")"
+	[[ "$sha" =~ ^[0-9a-f]{64}$ ]] || die "no sha256 for $font.zip in nerd-fonts $ver SHA-256.txt"
+	sed -E "s/(checksum:[[:space:]]*\"sha256:)[0-9a-f]{64}\"/\1$sha\"/" "$FONTS" >"$out"
+	expect "$out" "checksum:[[:space:]]*\"sha256:$sha\"" "$FONTS nerd font checksum"
+	replace_if_changed "$FONTS" "$out" "$FONTS nerd font sha256"
+}
+
 fetch_shasums
 relock_group_vars
 relock_ci
 relock_repo_lock
 relock_home_lock
+relock_nerd_font
 if [ "$changed" -eq 0 ]; then
 	say "nothing to change"
 else
