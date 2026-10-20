@@ -39,11 +39,13 @@
   when: _native_linux
 
 # ---- 2. Core pins + lock (fresh machine only) ----------------------------
-- name: Ensure the dotfiles mise config dir
+# No mode: chezmoi owns this dir after the first apply and creates it with the
+# user's umask (0775 under umask 002); forcing 0755 here would flip it back
+# and forth on every run.
+- name: Ensure the dotfiles mise config dir  # noqa risky-file-permissions
   ansible.builtin.file:
     path: "{{ mise_config_root }}"
     state: directory
-    mode: "0755"
 
 - name: Write the core-only bootstrap pins (only when no pins exist yet)
   ansible.builtin.template:
