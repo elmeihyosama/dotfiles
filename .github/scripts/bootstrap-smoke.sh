@@ -33,7 +33,7 @@ else
 	exit 1
 fi
 
-# ubi reads GITHUB_TOKEN to raise its API rate limit; empty is fine.
+# mise reads GITHUB_TOKEN to raise its API rate limit; empty is fine.
 export GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
 # In CI the mounted checkout sits at a detached HEAD; cloning that yields no

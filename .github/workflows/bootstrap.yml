@@ -7,6 +7,7 @@ on:
       - 'home/**'
       - 'scripts/select-tools.sh'
       - 'scripts/cleanup-ubi.sh'
+      - 'scripts/remove-hint.sh' # sourced by assert-tools.sh / doctor.sh
       - '.github/scripts/bootstrap-smoke.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'
@@ -19,6 +20,7 @@ on:
       - 'home/**'
       - 'scripts/select-tools.sh'
       - 'scripts/cleanup-ubi.sh'
+      - 'scripts/remove-hint.sh' # sourced by assert-tools.sh / doctor.sh
       - '.github/scripts/bootstrap-smoke.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'
@@ -28,7 +30,7 @@ on:
     - cron: "17 5 * * 1"
   workflow_dispatch:
 
-# Read-only ephemeral token, passed into the container only to raise ubi's
+# Read-only ephemeral token, passed into the container only to raise mise's
 # GitHub API rate limit (same rationale as provision.yml).
 permissions:
   contents: read
