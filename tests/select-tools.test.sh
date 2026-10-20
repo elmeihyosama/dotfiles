@@ -137,3 +137,12 @@ assert_eq 2 "$rc" "age-keygen without age: exit 2"
 assert_contains "$(cat "$d/err")" "age-keygen comes with age; add age instead" "age-keygen without age: message"
 run linux $'tool_groups: [git]\ntools_add: [age, age-keygen]'
 assert_eq 0 "$rc" "age-keygen with age: ok"
+
+# missing_on: a tool with no asset for <os>-<arch> is native there, mise elsewhere
+src_of() { "$sel" --os "$1" --arch "$2" --local /nonexistent | jq -r --arg n "$3" '.[] | select(.name == $n) | .source'; }
+assert_eq native "$(src_of linux arm64 jless)" "missing_on: jless native on linux-arm64"
+assert_eq mise "$(src_of linux x64 jless)" "missing_on: jless mise on linux-x64"
+assert_eq mise "$(src_of darwin arm64 jless)" "missing_on: jless mise on macos-arm64"
+assert_eq native "$(src_of darwin arm64 navi)" "native_on: navi native on darwin"
+assert_eq mise "$(src_of linux arm64 navi)" "native_on: navi mise on linux"
+if "$sel" --os linux --arch riscv --local /nonexistent >/dev/null 2>&1; then fail "bad --arch is rejected"; fi

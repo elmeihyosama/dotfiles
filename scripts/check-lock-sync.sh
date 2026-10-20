@@ -36,6 +36,7 @@ done
 : "${repo_lock:=$root/mise.lock}"
 
 status=0
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bad() {
 	echo "check-lock-sync: $*"
 	status=1
@@ -59,12 +60,30 @@ have() { jq -e --arg k "$2" --arg v "$3" '(.[$k] // []) | index($v) != null' <<<
 home_json="$(lock_json "$home_lock")" || exit 2
 repo_json="$(lock_json "$repo_lock")" || exit 2
 
-# (a) tools.yaml backend+version rows, TSV
+# (a) tools.yaml backend+version rows, TSV. Same skips as the pins template:
+# bootstrap and provided_by tools are never pinned.
 while IFS=$'\t' read -r name backend version; do
 	[ -n "$backend" ] || continue
 	have "$home_json" "$backend" "$version" ||
 		bad "tools.yaml: $name ($backend@$version) is not in $home_lock"
-done < <(yq -o json '.tools' "$tools" | jq -r 'to_entries[] | select(.value.backend != null and .value.version != null) | [.key, .value.backend, .value.version] | @tsv')
+done < <(yq -o json '.tools' "$tools" | jq -r 'to_entries[] | select(.value.backend != null and .value.version != null and .value.bootstrap != true and .value.provided_by == null) | [.key, .value.backend, .value.version] | @tsv')
+
+# (a2) platform coverage: every tool select-tools marks source "mise" on a locked
+# platform (default selection) needs a lock entry with a url for that platform.
+# This catches upstreams with no asset for a platform (declare native_on or
+# missing_on in tools.yaml) which a checksum-only check can miss behind exceptions.
+for plat in macos-arm64 linux-x64 linux-arm64; do
+	os=linux
+	[ "${plat%%-*}" = macos ] && os=darwin
+	plat_json="$(yq -p toml -o json '.tools // {}' "$home_lock" |
+		jq -c --arg p "$plat" 'with_entries(.value = ([.value | if type == "array" then .[] else . end | select(.["platforms." + $p].url != null) | .version]))')"
+	while IFS=$'\t' read -r name backend version; do
+		[ -n "$backend" ] || continue
+		have "$plat_json" "$backend" "$version" ||
+			bad "$name ($backend@$version) has no $plat asset in $home_lock: add it to native_on or missing_on in tools.yaml"
+	done < <("$here/select-tools.sh" --os "$os" --arch "${plat#*-}" --local /nonexistent --tools "$tools" |
+		jq -r '.[] | select(.source == "mise") | [.name, .backend, .version] | @tsv')
+done
 
 # (b) repo mise.toml tools; the value is a version string or a table with .version
 while IFS=$'\t' read -r key version; do

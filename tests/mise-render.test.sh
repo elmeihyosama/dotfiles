@@ -42,13 +42,33 @@ assert_eq "0" "$(printf '%s\n' "$out" | yq -p toml '.tools | length')" "empty se
 out="$(TESTS_CHEZMOI_OS=darwin render 'mise_pins_all=true')"
 assert_contains "$out" '"aqua:aristocratos/btop" = "1.4.7"' "pins_all: btop present on darwin"
 
-# fallback (no selected_tools) == select-tools.sh default, mise source, both OSes
-for os in darwin linux; do
-	want="$("$sel" --os "$os" --local /nonexistent | jq -r '.[] | select(.source == "mise") | .backend' | sort | paste -sd, -)"
-	got="$(TESTS_CHEZMOI_OS=$os render | yq -p toml -o json '.tools | keys | .[]' | tr -d '"' | sort | paste -sd, -)"
-	assert_eq "$want" "$got" "fallback tool set equals select-tools default ($os)"
-	[ -n "$got" ] || fail "fallback renders tools ($os)"
+# fallback (no selected_tools) == select-tools.sh default, mise source, for every
+# locked platform (os, chezmoi arch, select-tools arch)
+for combo in darwin:arm64:arm64 linux:amd64:x64 linux:arm64:arm64; do
+	IFS=: read -r os carch sarch <<<"$combo"
+	want="$("$sel" --os "$os" --arch "$sarch" --local /nonexistent | jq -r '.[] | select(.source == "mise") | .backend' | sort | paste -sd, -)"
+	got="$(TESTS_CHEZMOI_OS=$os TESTS_CHEZMOI_ARCH=$carch render | yq -p toml -o json '.tools | keys | .[]' | tr -d '"' | sort | paste -sd, -)"
+	assert_eq "$want" "$got" "fallback tool set equals select-tools default ($os-$sarch)"
+	[ -n "$got" ] || fail "fallback renders tools ($os-$sarch)"
 done
+
+# missing_on / native_on per platform
+out="$(TESTS_CHEZMOI_OS=linux TESTS_CHEZMOI_ARCH=arm64 render)"
+assert_not_contains "$out" "PaulJuliusMartinez/jless" "jless (missing_on linux-arm64) not pinned on linux-arm64"
+out="$(TESTS_CHEZMOI_OS=linux TESTS_CHEZMOI_ARCH=amd64 render)"
+assert_contains "$out" "PaulJuliusMartinez/jless" "jless pinned on linux-x64"
+assert_contains "$out" "denisidoro/navi" "navi pinned on linux"
+out="$(TESTS_CHEZMOI_OS=darwin TESTS_CHEZMOI_ARCH=arm64 render)"
+assert_not_contains "$out" "denisidoro/navi" "navi (native on darwin) not pinned on darwin"
+
+# an unknown selected_tools name fails the render with a clear message
+err="$(render 'selected_tools=["fzf","nosuchtool"]' 2>&1 >/dev/null)" && fail "unknown selected tool fails the render"
+assert_contains "$err" "unknown tool \"nosuchtool\"" "unknown selected tool: clear message"
+
+# no blank line after [tools]
+out="$(TESTS_CHEZMOI_OS=linux render 'selected_tools=["fzf"]')"
+assert_eq "[tools]" "$(printf '%s\n' "$out" | sed -n 1p)" "pins start with [tools]"
+assert_contains "$(printf '%s\n' "$out" | sed -n 2p)" "aqua:junegunn/fzf" "no blank line after [tools]"
 
 # MISE_SYSTEM_CONFIG_DIR is exported everywhere a mise shim can run
 # shellcheck disable=SC2016  # literal $HOME is what the files contain

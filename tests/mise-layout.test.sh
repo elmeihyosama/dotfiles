@@ -5,7 +5,7 @@
 #   1. the user's own `mise use -g jq@1.7.1` succeeds,
 #   2. the dotfiles locked install (user config masked) succeeds,
 #   3. pins and lock are byte-identical afterwards (no chezmoi drift).
-# Downloads two small tools, so it SKIPs (exit 0) without mise or network.
+# Also dry-runs the full default pins for this platform. Downloads two small tools, so it SKIPs (exit 0) without mise or network.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -59,3 +59,11 @@ assert_not_contains "$(cat "$cfg")" "1.7.1" "dotfiles pins untouched by mise use
 # And the pinned tools really resolve through the dotfiles config.
 fzf_v="$(mise -C / exec -- fzf --version 2>&1)" || fail "4. pinned fzf runs: $fzf_v"
 assert_contains "$fzf_v" "0.67.0" "4. fzf resolves to the pinned version"
+
+# 5. The full default selection for THIS platform resolves against the shipped
+# lock: a dry-run locked install fails on any tool without a lock url here
+# (e.g. an upstream with no asset for this OS/arch).
+render_tmpl "$tmpl" >"$cfg" || fail "5. render full default pins"
+out="$(MISE_GLOBAL_CONFIG_FILE=/nonexistent/mise-user.toml mise -C / install --locked --dry-run 2>&1)" ||
+	fail "5. full default pins resolve against the shipped lock: $out"
+cmp -s "$HOME/lock.orig" "$lock" || fail "5. lock unchanged by the dry run"
