@@ -1,0 +1,19 @@
+# iglass Frosted (dark) from github.com/vukkt/iglass, tag v1.5.0, MIT license.
+# Mapped to base16 by hand; not in tinted-theming/schemes.
+[themes.iglass-dark]
+base00 = "#17181c"
+base01 = "#2c2c2e"
+base02 = "#124172"
+base03 = "#a4a5aa"
+base04 = "#d1d1d6"
+base05 = "#f7f8fd"
+base06 = "#ffffff"
+base07 = "#ffffff"
+base08 = "#ff7f70"
+base09 = "#ffb8b0"
+base0A = "#ffd60a"
+base0B = "#32d74b"
+base0C = "#64d2ff"
+base0D = "#62a7ff"
+base0E = "#d384ff"
+base0F = "#e7b9ff"

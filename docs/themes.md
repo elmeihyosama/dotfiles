@@ -114,3 +114,11 @@ The converter is idempotent — re-running regenerates the files in place.
 TOMLs, and reports DRIFT / COLLISION / LOWCONTRAST. Collisions are upstream
 facts (e.g. rose-pine-moon's gold appears as both base09 and base0E) — the
 role layer exists so chrome can route around them.
+
+## iglass themes
+
+`iglass-dark` and `iglass-light` are the iglass "frosted" palettes
+(`github.com/vukkt/iglass` v1.5.0, MIT), hand-mapped to base16, so the audit
+skips their missing-upstream DRIFT. Pair them with `glass frosted`. Avoid
+`iglass-light` over a dark wallpaper: the wallpaper darkens the translucent
+background and its dark text loses contrast.
