@@ -31,12 +31,26 @@
   changed_when: false
   when: _native_linux and _pkgmgr == 'pacman'
 
-- name: Install bootstrap essentials (git, curl, zsh, unzip, tar)
+# Only the commands that are missing: EL9/EL10 images ship curl-minimal, which
+# provides the curl command but conflicts with the curl package, and asking dnf
+# for `curl` there fails the run. Each package is named after its command.
+# shell, not command: `command -v` is a shell builtin (see chezmoi.yml).
+- name: Find missing bootstrap essentials  # noqa command-instead-of-shell
+  ansible.builtin.shell: |
+    for c in git curl zsh unzip tar; do
+      command -v "$c" >/dev/null 2>&1 || echo "$c"
+    done
+  register: _missing_essentials
+  changed_when: false
+  check_mode: false
+  when: _native_linux
+
+- name: Install missing bootstrap essentials (git, curl, zsh, unzip, tar)
   become: true
   ansible.builtin.package:
-    name: [git, curl, zsh, unzip, tar]
+    name: "{{ _missing_essentials.stdout_lines }}"
     state: present
-  when: _native_linux
+  when: _native_linux and _missing_essentials.stdout_lines | length > 0
 
 # ---- 2. Core pins + lock (fresh machine only) ----------------------------
 # No mode: chezmoi owns this dir after the first apply and creates it with the
