@@ -2,12 +2,19 @@
 # read by check-lock.sh. Same format as lock-exceptions.txt (see there). Separate
 # file because the repo lock's pipx exceptions would be stale here.
 #
-# mise records a checksum at lock time only when upstream publishes one; for the
-# tools below it keeps just the asset url/url_api (pinned to the release asset id)
-# and `mise install --locked` still works. Drop a line as soon as it goes stale.
-aqua:PaulJuliusMartinez/jless *  # upstream releases publish no checksum file; lock holds url/url_api only
-aqua:ajeetdsouza/zoxide *  # upstream releases publish no checksum file; lock holds url/url_api only
-aqua:dandavison/delta *  # upstream releases publish no checksum file; lock holds url/url_api only
-aqua:denisidoro/navi *  # upstream releases publish no checksum file; lock holds url/url_api only
-aqua:sxyazi/yazi *  # upstream releases publish no checksum file; lock holds url/url_api only
-aqua:aristocratos/btop macos-arm64  # upstream ships no macOS build; btop is native_on darwin (brew), so the pins skip it there
+# Per platform on purpose: a `*` line could hide a platform with no release asset
+# at all. scripts/check-lock-sync.sh separately requires an asset url on every
+# locked platform for each tool installed via mise, so a gap listed here is only
+# ever a missing checksum, never a missing asset (that goes in tools.yaml as
+# native_on / missing_on).
+#
+# mise records a checksum only when the release publishes one (a checksum file or
+# a GitHub asset digest); otherwise the lock keeps url/url_api, pinned to the
+# release asset id, and `mise install --locked` still works.
+aqua:PaulJuliusMartinez/jless macos-arm64  # release asset has no checksum file and no GitHub digest (jless 0.9.0 is old); lock holds url/url_api only
+aqua:PaulJuliusMartinez/jless linux-x64  # same: no checksum file or GitHub digest upstream; lock holds url/url_api only
+aqua:PaulJuliusMartinez/jless linux-arm64  # no linux-arm64 release asset; tools.yaml missing_on makes select-tools report it native there, and the pins skip it
+aqua:denisidoro/navi linux-x64  # navi 2.24.0 assets have no checksum file or GitHub digest; lock holds url/url_api only
+aqua:denisidoro/navi linux-arm64  # same: no checksum file or GitHub digest upstream; lock holds url/url_api only
+aqua:denisidoro/navi macos-arm64  # no macOS release asset at all; navi is native_on darwin (brew), so the pins skip it there
+aqua:aristocratos/btop macos-arm64  # no macOS release asset; btop is native_on darwin (brew), so the pins skip it there

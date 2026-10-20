@@ -11,17 +11,16 @@ _tests_tmpdirs+=("$d")
 # A tiny repo: tools.yaml (two tools), home lock, mise.toml, repo lock.
 mkdir -p "$d/tools" "$d/mise-locks"
 cat >"$d/tools.yaml" <<'Y'
-{"tools": {"fzf": {"backend": "aqua:junegunn/fzf", "version": "0.67.0"}, "eza": {"backend": "github:eza-community/eza", "version": "0.23.4"}, "cava": {"native_only": true}, "mise": {"bootstrap": true, "version": "1.0.0"}}}
+{"tool_groups": ["core"], "tools": {"fzf": {"group": "core", "backend": "aqua:junegunn/fzf", "version": "0.67.0"}, "eza": {"group": "core", "backend": "github:eza-community/eza", "version": "0.23.4"}, "cava": {"group": "core", "native_only": true}, "mise": {"group": "core", "bootstrap": true, "version": "1.0.0", "backend": "aqua:jdx/mise"}}}
 Y
-cat >"$d/home.lock" <<'L'
-[[tools."aqua:junegunn/fzf"]]
-version = "0.67.0"
-backend = "aqua:junegunn/fzf"
-
-[[tools."github:eza-community/eza"]]
-version = "0.23.4"
-backend = "github:eza-community/eza"
-L
+plat() { printf '[tools."%s"."platforms.%s"]\nurl = "https://example.invalid/x"\n\n' "$1" "$2"; }
+{
+	printf '[[tools."aqua:junegunn/fzf"]]\nversion = "0.67.0"\nbackend = "aqua:junegunn/fzf"\n\n'
+	for p in macos-arm64 linux-x64 linux-arm64; do plat aqua:junegunn/fzf $p; done
+	printf '[[tools."github:eza-community/eza"]]\nversion = "0.23.4"\nbackend = "github:eza-community/eza"\n\n'
+	for p in macos-arm64 linux-x64 linux-arm64; do plat github:eza-community/eza $p; done
+} >"$d/home.lock"
+cp "$d/home.lock" "$d/home.lock.orig"
 cat >"$d/mise.toml" <<'T'
 [tools]
 "aqua:mvdan/sh" = "3.14.1"
@@ -61,6 +60,19 @@ assert_eq 1 "$rc" "version_without_lock_fails: exit 1"
 assert_contains "$out" "github:eza-community/eza" "version_without_lock_fails: names the tool"
 assert_contains "$out" "run scripts/relock.sh" "version_without_lock_fails: hint"
 mv "$d/tools.yaml.bak" "$d/tools.yaml"
+
+# platform_asset_missing_fails: fzf has no linux-arm64 asset in the lock
+awk '/^\[tools."aqua:junegunn\/fzf"."platforms.linux-arm64"\]/ {skip=3} skip>0 {skip--; next} {print}' "$d/home.lock.orig" >"$d/home.lock"
+run
+assert_eq 1 "$rc" "platform_asset_missing_fails: exit 1"
+assert_contains "$out" "fzf" "platform_asset_missing_fails: names the tool"
+assert_contains "$out" "linux-arm64" "platform_asset_missing_fails: names the platform"
+# ... unless tools.yaml says so (missing_on), or the tool is native on that OS
+sed -i.bak 's/"version": "0.67.0"/"version": "0.67.0", "missing_on": ["linux-arm64"]/' "$d/tools.yaml"
+run
+assert_eq 0 "$rc" "missing_on_exempts_platform: exit 0 ($out)"
+mv "$d/tools.yaml.bak" "$d/tools.yaml"
+cp "$d/home.lock.orig" "$d/home.lock"
 
 # repo mise.toml tool missing from the repo lock
 sed -i.bak 's/3.14.1/3.15.0/' "$d/mise.toml"

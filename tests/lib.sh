@@ -101,11 +101,17 @@ render_tmpl() {
 			if ($0 ~ /^\[data\][ \t]*$/) printf "%s", add
 		}' "$TESTS_FIXTURE" >"$cfg"
 	local src="$file"
-	if [ -n "${TESTS_CHEZMOI_OS:-}" ]; then
+	if [ -n "${TESTS_CHEZMOI_OS:-}" ] || [ -n "${TESTS_CHEZMOI_ARCH:-}" ]; then
 		src="$cfg_dir/forced-os.tmpl"
 		# Anchored: only when not followed by an identifier char (BSD+GNU sed).
-		sed -e "s/\\.chezmoi\\.os\$/\"$TESTS_CHEZMOI_OS\"/" \
-			-e "s/\\.chezmoi\\.os\\([^A-Za-z0-9_]\\)/\"$TESTS_CHEZMOI_OS\"\\1/g" "$file" >"$src"
+		# TESTS_CHEZMOI_ARCH (amd64|arm64) forces .chezmoi.arch the same way.
+		local os_v="${TESTS_CHEZMOI_OS:-}" arch_v="${TESTS_CHEZMOI_ARCH:-}"
+		[ -n "$os_v" ] || os_v="$(chezmoi execute-template '{{ .chezmoi.os }}')"
+		[ -n "$arch_v" ] || arch_v="$(chezmoi execute-template '{{ .chezmoi.arch }}')"
+		sed -e "s/\\.chezmoi\\.os\$/\"$os_v\"/" \
+			-e "s/\\.chezmoi\\.os\\([^A-Za-z0-9_]\\)/\"$os_v\"\\1/g" \
+			-e "s/\\.chezmoi\\.arch\$/\"$arch_v\"/" \
+			-e "s/\\.chezmoi\\.arch\\([^A-Za-z0-9_]\\)/\"$arch_v\"\\1/g" "$file" >"$src"
 	fi
 	chezmoi execute-template --source "$TESTS_REPO" --config "$cfg" <"$src"
 	local rc=$?

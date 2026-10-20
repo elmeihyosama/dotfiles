@@ -64,10 +64,13 @@
       - "{{ playbook_dir }}/../scripts/select-tools.sh"
       - --os
       - "{{ 'darwin' if ansible_facts['system'] == 'Darwin' else 'linux' }}"
+      - --arch
+      - "{{ 'x64' if ansible_facts['architecture'] in ['x86_64', 'amd64'] else 'arm64' }}"
       - --local
       - "{{ playbook_dir }}/local.yml"
   register: _selected_tools_raw
   changed_when: false
+  check_mode: false
 
 - name: Template chezmoi.toml from per-machine vars
   ansible.builtin.copy:
