@@ -1,5 +1,5 @@
 ---
-# zsh is not in `tools`: ubi has no static build, so no-sudo hosts use the
+# zsh is not in `tools`: upstream ships no static build, so no-sudo hosts use the
 # .bashrc shim, and macOS ships it. Sudo Linux needs the native package, or the
 # `command -v zsh` probe below fails and the login-shell block skips silently.
 - name: Install zsh (sudo Linux only; macOS ships it, no-sudo hosts use the shim)

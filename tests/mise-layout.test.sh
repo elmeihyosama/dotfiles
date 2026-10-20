@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Canary for the undocumented MISE_SYSTEM_CONFIG_DIR the dotfiles pins/lock rely on
-# (layout spike, plan 03). In a throwaway HOME, with the repo's real rendered pins
+# Canary for the undocumented MISE_SYSTEM_CONFIG_DIR the dotfiles pins/lock rely on:
+# mise reads ~/.config/mise-dotfiles as its "system" config scope, the user's
+# global config is masked (MISE_GLOBAL_CONFIG_FILE=/nonexistent/...), `-C /`
+# keeps project configs out, and `mise lock -g` writes mise.lock beside the
+# system config. In a throwaway HOME, with the repo's real rendered pins
 # template and shipped lock and whatever mise is on PATH:
 #   1. the user's own `mise use -g jq@1.7.1` succeeds,
 #   2. the dotfiles locked install (user config masked) succeeds,

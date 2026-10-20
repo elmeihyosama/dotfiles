@@ -6,6 +6,7 @@ on:
       - 'home/**'
       - 'scripts/select-tools.sh'
       - 'scripts/cleanup-ubi.sh'
+      - 'scripts/remove-hint.sh' # sourced by assert-tools.sh / doctor.sh
       - 'scripts/doctor.sh'
       - '.github/scripts/provision-ci.sh'
       - '.github/scripts/assert-tools.sh'
@@ -18,6 +19,7 @@ on:
       - 'home/**'
       - 'scripts/select-tools.sh'
       - 'scripts/cleanup-ubi.sh'
+      - 'scripts/remove-hint.sh' # sourced by assert-tools.sh / doctor.sh
       - 'scripts/doctor.sh'
       - '.github/scripts/provision-ci.sh'
       - '.github/scripts/assert-tools.sh'
@@ -29,7 +31,7 @@ on:
   workflow_dispatch:
 
 # Read-only ephemeral token: GITHUB_TOKEN is passed into the container only to
-# raise ubi's GitHub API rate limit; contents:read keeps it minimal so exposure
+# raise mise's GitHub API rate limit; contents:read keeps it minimal so exposure
 # to the (same-repo) provisioning script carries negligible risk.
 permissions:
   contents: read
@@ -83,9 +85,9 @@ jobs:
       - name: Provision (${{ matrix.image }} / ${{ matrix.mode }})
         run: |
           # Retry up to 3× (fresh container each) to absorb transient network
-          # blips — ubi GitHub-API/download hiccups and dnf makecache timeouts
+          # blips — mise GitHub-API/download hiccups and dnf makecache timeouts
           # across a 12-job network-heavy matrix. The provisioning is idempotent
-          # (ubi `creates:`, package managers skip installed), so a retry mostly
+          # (mise skips installed tools, package managers too), so a retry mostly
           # re-checks and only redoes what actually failed.
           for attempt in 1 2 3; do
             echo "::group::provision attempt $attempt"
