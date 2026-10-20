@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# Usage: run.sh [REGEX]   e.g. `run.sh env`, `run.sh 'mise-render|lock-sync'`
-# Run tests/*.test.sh whose name (basename minus .test.sh) matches the extended
-# regex REGEX (default: all). The regex is unanchored, so `glass` also matches
-# `iglass-themes`; use `^name$` for an exact selection. TESTS_DIR overrides the
-# test dir. One bash process each so a failing test can't leak state into the next. Non-zero if any fail.
+# Usage: run.sh [REGEX] — run tests/*.test.sh whose name matches REGEX
+# (unanchored ERE; default all), each in its own bash. TESTS_DIR overrides
+# the dir. Exits non-zero if any test fails.
 set -uo pipefail
 
 dir="${TESTS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"

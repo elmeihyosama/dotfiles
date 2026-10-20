@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
-# Shared helpers for tests/*.test.sh. Source it; do not execute it.
-#
-# Tests must not set their own EXIT trap: it would replace ours and drop both
-# the temp-dir cleanup and the failure -> exit-code conversion (chain it instead).
-#
-# Assertions record a failure and keep going so one run reports every problem;
-# the EXIT trap turns the recorded failure into a non-zero exit status.
+# Shared helpers for tests/*.test.sh (source, don't execute). Assertions
+# record failures and keep going; the EXIT trap cleans up and sets the exit
+# status, so tests must not replace it.
 
 TESTS_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TESTS_FIXTURE="$TESTS_REPO/.github/scripts/fixture.toml"
@@ -23,8 +19,7 @@ _tests_cleanup() {
 }
 trap _tests_cleanup EXIT
 
-# fail MSG: record a failure (same effect as a failed assert) for checks that
-# are not a plain comparison.
+# fail MSG: record a failure.
 fail() {
 	TESTS_FAILED=1
 	printf 'FAIL: %s\n' "$1" >&2
@@ -56,21 +51,11 @@ assert_not_contains() {
 	esac
 }
 
-# Forcing .chezmoi.os: chezmoi execute-template has no data/os override
-# (.chezmoi.* is built in and --override-data does not exist), so when
-# TESTS_CHEZMOI_OS is set (darwin|linux) render_tmpl rewrites the literal
-# `.chezmoi.os` in a temp copy of the template to that string before rendering.
-# Only `.chezmoi.os` itself is replaced, never longer names such as
-# `.chezmoi.osRelease`, and only the top-level template is rewritten (not
-# includes/includeTemplate). Test-only: real templates and machines are never
-# touched.
-#
 # render_tmpl FILE [KEY=VALUE ...]: render a chezmoi template with the CI
-# fixture plus extra [data] keys. true/false, integers/floats and values that
-# start with [ or { (arrays/inline tables) pass through as raw TOML; anything
-# else is a TOML string. String values only get double quotes escaped, not
-# backslashes or tabs/newlines. The temp config keeps a .toml name (chezmoi
-# infers the format from the extension). Each KEY=VALUE replaces any fixture line for that key.
+# fixture, each KEY=VALUE replacing that [data] key. Booleans, numbers and
+# [..]/{..} values are raw TOML; anything else is a string.
+# TESTS_CHEZMOI_OS=darwin|linux replaces `.chezmoi.os` in a temp copy of the
+# top-level template (chezmoi has no way to override it).
 render_tmpl() {
 	local file="$1" cfg_dir cfg kv key val line extra="" num_re='^-?[0-9]+(\.[0-9]+)?$'
 	shift
@@ -113,8 +98,7 @@ render_tmpl() {
 	return "$rc"
 }
 
-# mk_home: point HOME and the XDG dirs at a fresh temp dir (removed on exit)
-# so tests never touch the real home.
+# mk_home: point HOME and the XDG dirs at a fresh temp dir.
 mk_home() {
 	local d
 	d="$(mktemp -d)"
@@ -132,8 +116,7 @@ mk_home() {
 run_zsh_env() {
 	local script="$1" rendered rc
 	shift
-	# Callers use $(...), so a registry append here would die in the subshell;
-	# clean up locally instead.
+	# Runs in $(...), so clean up here rather than via _tests_tmpdirs.
 	rendered="$(mktemp)"
 	if ! render_tmpl "$script" >"$rendered"; then
 		rm -f "$rendered"
