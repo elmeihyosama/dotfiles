@@ -70,3 +70,13 @@ l="$(render_tmpl "$g/allowed_signers.tmpl" "signing_key=$pub")"
 assert_eq "1+ci-personal@users.noreply.github.com ssh-ed25519 AAAATESTKEY comment" "$l" "allowed_signers_line: personal"
 l="$(render_nopersonal "$g/allowed_signers.tmpl")"
 assert_eq "ci@example.com ssh-ed25519 AAAATESTKEY comment" "$l" "allowed_signers_line: git_email fallback"
+
+# private_key_path_ignored: a non-.pub path renders nothing and is never read
+priv="$HOME/.ssh/id_test"
+printf 'PRIVATE-KEY-BODY\n' >"$priv"
+for f in config personal allowed_signers; do
+	o="$(render_tmpl "$g/$f.tmpl" "signing_key=$priv" 2>&1)"
+	assert_not_contains "$o" "PRIVATE-KEY-BODY" "private_key_path_ignored: $f leaks"
+	assert_not_contains "$o" "signingkey" "private_key_path_ignored: $f signs"
+	assert_not_contains "$o" "allowedSignersFile" "private_key_path_ignored: $f signers"
+done
