@@ -3,16 +3,36 @@
 STUB_LOG: file that gets one JSON argv per call.
 STUB_FAIL: a subcommand that exits 1 (after printing a FAIL line).
 STUB_LIST: replaces the `list --json` output verbatim.
+STUB_PROC: file that gets one JSON {argv, pid, leader, prompt} per call.
+STUB_SLOW: a full command line (e.g. "update") that sleeps 30s (quit/cancel tests).
+STUB_BIG: doctor prints 200 KB with no newline first.
 """
 
 import json
 import os
 import sys
+import time
 
 args = sys.argv[1:]
 with open(os.environ["STUB_LOG"], "a") as f:
     f.write(json.dumps(args) + "\n")
+if proc_log := os.environ.get("STUB_PROC"):
+    with open(proc_log, "a") as f:
+        f.write(
+            json.dumps(
+                {
+                    "argv": args,
+                    "pid": os.getpid(),
+                    "leader": os.getsid(0) == os.getpid(),
+                    "prompt": os.environ.get("GIT_TERMINAL_PROMPT"),
+                }
+            )
+            + "\n"
+        )
 sub = args[0] if args else ""
+if " ".join(args) == os.environ.get("STUB_SLOW"):
+    print("started", flush=True)
+    time.sleep(30)
 if sub == os.environ.get("STUB_FAIL"):
     print(f"FAIL  stub {sub} failed")
     sys.exit(1)
@@ -72,11 +92,18 @@ elif args == ["look", "--json"]:
                 "theme": current,
                 "glass": None,
                 "levels": ["clear", "frosted", "solid", "default"],
-                "themes": [{"slug": "dark-one", "colors": PAL}, {"slug": "light-two", "colors": LIGHT}],
+                "themes": [
+                    {"slug": "dark-one", "colors": PAL},
+                    {"slug": "light-two", "colors": LIGHT},
+                    {"slug": "bad-hex", "colors": {**LIGHT, "base00": "#abc"}},
+                    "junk",
+                ],
             }
         )
     )
 elif sub == "doctor":
+    if os.environ.get("STUB_BIG"):
+        print("x" * 200_000, end="\r")
     print("OK    user-local bin dir on PATH")
     print("OK    mise 2026.10.11")
     print("WARN  fzf also installed at /opt/homebrew/bin/fzf (shadowed)")

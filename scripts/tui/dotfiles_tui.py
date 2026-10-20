@@ -15,9 +15,12 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import shlex
+import signal
 import sys
 from collections.abc import Callable
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +48,7 @@ from textual.widgets.option_list import Option
 
 REPO = Path(__file__).resolve().parents[2]
 BASES = [f"base0{c}" for c in "0123456789ABCDEF"]
+HEX = re.compile(r"#[0-9a-fA-F]{6}")
 
 
 def cli() -> list[str]:
@@ -54,33 +58,76 @@ def cli() -> list[str]:
     return ["sh", str(REPO / "scripts" / "dotfiles.sh")]
 
 
-async def capture(*args: str) -> tuple[int, str, str]:
-    """Run the CLI with ARGS; return (rc, stdout, stderr)."""
+# Children get no terminal: a new session has no controlling tty, so chezmoi
+# and git fail fast instead of prompting under the TUI. Lines can be long
+# (progress bars, diffs): read chunks, not asyncio's 64 KiB-limited lines.
+CHILD_ENV = {"NO_COLOR": "1", "GIT_TERMINAL_PROMPT": "0"}
+LIVE: set[asyncio.subprocess.Process] = set()  # stopped on quit
+
+
+async def spawn(args: list[str] | tuple[str, ...], *, merge: bool) -> asyncio.subprocess.Process:
     proc = await asyncio.create_subprocess_exec(
         *cli(),
         *args,
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT if merge else asyncio.subprocess.PIPE,
+        env={**os.environ, **CHILD_ENV},
+        start_new_session=True,
     )
-    out, err = await proc.communicate()
+    LIVE.add(proc)
+    return proc
+
+
+async def stop(proc: asyncio.subprocess.Process) -> None:
+    """Kill PROC's process group if it is still running (cancel, quit), then
+    reap it so no zombie or open pipe outlives the command."""
+    LIVE.discard(proc)
+    if proc.returncode is None:
+        with suppress(ProcessLookupError, PermissionError):
+            os.killpg(proc.pid, signal.SIGTERM)
+        with suppress(TimeoutError, ProcessLookupError):
+            await asyncio.wait_for(proc.wait(), 5)
+
+
+async def capture(*args: str) -> tuple[int, str, str]:
+    """Run the CLI with ARGS; return (rc, stdout, stderr)."""
+    try:
+        proc = await spawn(args, merge=False)
+    except OSError as e:
+        return 127, "", f"cannot run the dotfiles CLI: {e}"
+    try:
+        out, err = await proc.communicate()
+    finally:
+        await stop(proc)
     return proc.returncode or 0, out.decode(errors="replace"), err.decode(errors="replace")
 
 
 async def stream(args: list[str], line: Callable[[str], None]) -> int:
     """Run the CLI with ARGS, passing each stdout/stderr line to LINE."""
-    proc = await asyncio.create_subprocess_exec(
-        *cli(),
-        *args,
-        stdin=asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT,
-        env={**os.environ, "NO_COLOR": "1"},
-    )
+    try:
+        proc = await spawn(args, merge=True)
+    except OSError as e:
+        line(f"FAIL  cannot run the dotfiles CLI: {e}")
+        return 127
     assert proc.stdout is not None
-    async for raw in proc.stdout:
-        line(raw.decode(errors="replace").rstrip("\n"))
-    return await proc.wait()
+    buf = b""
+    try:
+        while chunk := await proc.stdout.read(65536):
+            *done, buf = re.split(rb"\r\n|\r|\n", buf + chunk)
+            for raw in done:
+                line(raw.decode(errors="replace"))
+        if buf:
+            line(buf.decode(errors="replace"))
+        return await proc.wait()
+    finally:
+        await stop(proc)
+
+
+def field(item: dict[str, Any], key: str) -> str:
+    """ITEM[KEY] when it is a string, else "" (nulls, off-contract values)."""
+    value = item.get(key)
+    return value if isinstance(value, str) else ""
 
 
 def tone(app: App[Any], spec: str) -> str:
@@ -286,7 +333,8 @@ class ToolsPane(TabPane):
                 Text(f"dotfiles list failed: {e}", style=tone(self.app, "$error"))
             )
             return
-        self.tools = tools
+        # off-contract items are dropped, not fatal
+        self.tools = [t for t in tools if isinstance(t, dict) and isinstance(t.get("name"), str)]
         self.pending = {k: v for k, v in self.pending.items() if any(t["name"] == k for t in tools)}
         self.render_rows()
 
@@ -305,22 +353,23 @@ class ToolsPane(TabPane):
         table.clear()
         shown = drift = missing = 0
         for t in self.tools:
-            hay = f"{t.get('name', '')} {t.get('group', '')} {t.get('source', '')}".lower()
+            group, source = field(t, "group"), field(t, "source")
+            hay = f"{t['name']} {group} {source}".lower()
             if needle and needle not in hay:
                 continue
             shown += 1
-            pinned, actual = t.get("pinned"), t.get("actual")
-            drifted = actual is not None and pinned is not None and actual != pinned
+            pinned, actual = field(t, "pinned"), field(t, "actual")
+            drifted = bool(actual and pinned and actual != pinned)
             drift += drifted
             missing += bool(t.get("selected") and not t.get("installed"))
             table.add_row(
                 self.mark_cell(t),
                 t["name"],
-                Text(t.get("group", ""), style="dim"),
-                t.get("source", ""),
+                Text(group, style="dim"),
+                source,
                 Text("●", style=tone(self.app, "$success")) if t.get("installed") else Text("○", style="dim"),
-                pinned or "",
-                Text(actual or "", style=tone(self.app, "bold $warning") if drifted else ""),
+                pinned,
+                Text(actual, style=tone(self.app, "bold $warning") if drifted else ""),
                 key=t["name"],
             )
         if shown:
@@ -448,6 +497,8 @@ class UpdatePane(TabPane):
     def action_update(self) -> None:
         def confirmed(yes: bool | None) -> None:
             if yes:
+                # a still-streaming check would race the pull (its process group is killed)
+                self.app.workers.cancel_group(self, "update")
                 self.app.push_screen(Run("dotfiles update", [["update"]]), lambda _rc: self.action_check())
 
         self.app.push_screen(Confirm("Pull the repo, run the playbook and chezmoi apply, then doctor?"), confirmed)
@@ -493,22 +544,35 @@ class LookPane(TabPane):
         glass = self.query_one("#glass-list", OptionList)
         glass.clear_options()
         active = look.get("glass") or "default"
-        glass.add_options(Option(f"{'● ' if lv == active else '  '}{lv}", id=lv) for lv in look.get("levels", []))
+        glass.add_options(
+            Option(f"{'● ' if lv == active else '  '}{lv}", id=lv)
+            for lv in look.get("levels") or []
+            if isinstance(lv, str)
+        )
         if isinstance(self.app, DotfilesApp):
             self.app.apply_palette(self.palette(look.get("theme")))
 
     def palette(self, slug: str | None) -> dict[str, str] | None:
-        for t in self.look.get("themes", []):
-            if t.get("slug") == slug and all(k in t.get("colors", {}) for k in BASES):
-                return t["colors"]
+        """SLUG's colours, or None unless all 16 are #rrggbb."""
+        for t in self.themes():
+            colors = t.get("colors")
+            if (
+                t["slug"] == slug
+                and isinstance(colors, dict)
+                and all(isinstance(colors.get(k), str) and HEX.fullmatch(colors[k]) for k in BASES)
+            ):
+                return colors
         return None
+
+    def themes(self) -> list[dict[str, Any]]:
+        return [t for t in self.look.get("themes") or [] if isinstance(t, dict) and isinstance(t.get("slug"), str)]
 
     def render_themes(self) -> None:
         themes = self.query_one("#theme-list", OptionList)
         needle = self.query_one("#theme-filter", Input).value.strip().lower()
         active = self.look.get("theme")
         themes.clear_options()
-        slugs = [t["slug"] for t in self.look.get("themes", []) if needle in t["slug"].lower()]
+        slugs = [t["slug"] for t in self.themes() if needle in t["slug"].lower()]
         themes.add_options(Option(f"{'● ' if s == active else '  '}{s}", id=s) for s in slugs)
         if active in slugs:
             themes.highlighted = slugs.index(active)
@@ -577,6 +641,19 @@ class DotfilesApp(App[None]):
         Binding("3", "tab('update')", "update", show=False),
         Binding("4", "tab('look')", "look", show=False),
     ]
+
+    quit_armed = False
+
+    async def action_quit(self) -> None:
+        """Quit; while a command runs, only on a second press (it stops the command)."""
+        running = any(isinstance(s, Run) and s.rc is None for s in self.screen_stack)
+        if running and not self.quit_armed:
+            self.quit_armed = True
+            self.notify("a command is still running: quit again to stop it", severity="warning")
+            return
+        for proc in list(LIVE):
+            await stop(proc)
+        self.exit()
 
     def compose(self) -> ComposeResult:
         yield Header()

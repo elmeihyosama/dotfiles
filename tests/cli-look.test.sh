@@ -75,6 +75,35 @@ assert_eq 2 "$rc" "theme: a slug is required"
 run glass a b
 assert_eq 2 "$rc" "glass: one level only"
 
+# theme_real_zsh: the real `zsh -fc` snippet and 45-theme.zsh, against a stub
+# chezmoi and a temp config: sets the key, applies, never execs a new shell.
+zsh_bin=""
+for d in /bin /usr/bin; do [ -x "$d/zsh" ] && zsh_bin="$d/zsh" && break; done
+if [ -n "$zsh_bin" ]; then
+	src="$HOME/src/home"
+	mkdir -p "$src/.chezmoidata/themes" "$HOME/rbin"
+	: >"$src/.chezmoidata/themes/rose-pine.toml"
+	printf '[data]\n    theme = "old"\n' >"$HOME/chezmoi.toml"
+	ln -s "$zsh_bin" "$HOME/rbin/zsh"
+	printf '#!/bin/sh\ncase "$1" in source-path) echo "%s" ;; apply) echo apply >>"%s" ;; esac\n' "$src" "$STUB_CALL" >"$HOME/rbin/chezmoi"
+	for t in cmux zellij pgrep pkill nvim; do printf '#!/bin/sh\nexit 0\n' >"$HOME/rbin/$t"; done
+	chmod +x "$HOME/rbin/"*
+	rm -f "$STUB_CALL"
+	out="$(env -i HOME="$HOME" PATH="$HOME/rbin:/usr/bin:/bin" CHEZMOI_CONFIG="$HOME/chezmoi.toml" \
+		DOTFILES_TEST=1 THEME_NVIM_GLOB="$HOME/none*" sh "$script" theme rose-pine 2>&1 </dev/null)"
+	rc=$?
+	assert_eq 0 "$rc" "real zsh: theme exits 0 ($out)"
+	assert_contains "$out" "theme → rose-pine" "real zsh: theme ran"
+	assert_contains "$(cat "$HOME/chezmoi.toml")" 'theme = "rose-pine"' "real zsh: theme key written"
+	assert_eq apply "$(cat "$STUB_CALL" 2>/dev/null)" "real zsh: chezmoi apply ran once"
+	out="$(env -i HOME="$HOME" PATH="$HOME/rbin:/usr/bin:/bin" CHEZMOI_CONFIG="$HOME/chezmoi.toml" \
+		DOTFILES_TEST=1 sh "$script" theme no-such 2>&1 </dev/null)"
+	assert_eq 1 "$?" "real zsh: unknown theme exits 1"
+	assert_contains "$out" "unknown theme" "real zsh: unknown theme says so"
+elif [ -n "${CI:-}" ]; then
+	fail "no zsh in /bin or /usr/bin (CI must not skip)"
+fi
+
 # tui_dispatch: uv runs the locked script; no uv is a clear error
 rm -f "$STUB_CALL"
 run tui
