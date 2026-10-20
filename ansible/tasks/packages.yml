@@ -9,7 +9,7 @@
 #      absent: on a re-run the chezmoi-deployed full pins and lock are a
 #      consistent pair, and rewriting them would ping-pong with chezmoi)
 #   3. locked install of those pins (tasks/mise-install.yml)
-#   4. legacy ubi cleanup, select-tools, native tools
+#   4. select-tools, one-time legacy ubi cleanup, native tools
 # then tasks/chezmoi.yml deploys the full pins and site.yml runs the locked
 # install again for the full selection.
 - name: Set package-manager facts
@@ -71,25 +71,7 @@
 - name: Install the pinned core tools
   ansible.builtin.import_tasks: mise-install.yml
 
-# ---- 4. Legacy cleanup, selection, native tools --------------------------
-# Before mise, tools were ubi binaries in local_bin (plus rename symlinks and
-# the neovim tree in local_opt). The shims come first on PATH now, but those
-# files are stale; remove only what that path created.
-- name: Remove legacy ubi installs
-  ansible.builtin.command:
-    argv:
-      - "{{ playbook_dir }}/../scripts/cleanup-ubi.sh"
-      - "{{ local_bin }}"
-      - "{{ local_opt }}"
-      - "{{ playbook_dir }}/../home/.chezmoidata/tools.yaml"
-  register: _ubi_cleanup
-  changed_when: _ubi_cleanup.stdout | length > 0
-
-- name: Report removed legacy files
-  ansible.builtin.debug:
-    msg: "{{ _ubi_cleanup.stdout_lines }}"
-  when: _ubi_cleanup.stdout | length > 0
-
+# ---- 4. Selection, legacy cleanup, native tools --------------------------
 - name: Select tools for this machine
   ansible.builtin.command:
     argv:
@@ -103,6 +85,27 @@
   register: _tool_selection
   changed_when: false
   check_mode: false
+
+# Before mise, tools were ubi binaries in local_bin (plus rename symlinks and
+# the neovim tree in local_opt). One-shot (the script runs only while the
+# legacy ubi binary or neovim tree exists, and removes them last) and limited
+# to the bins this host now gets from mise, so user binaries for native or
+# deselected tools are never touched.
+- name: Remove legacy ubi installs (one-time migration)
+  ansible.builtin.command:
+    argv:
+      - "{{ playbook_dir }}/../scripts/cleanup-ubi.sh"
+      - "{{ local_bin }}"
+      - "{{ local_opt }}"
+      - "{{ playbook_dir }}/../home/.chezmoidata/tools.yaml"
+      - "{{ _tool_selection.stdout }}"
+  register: _ubi_cleanup
+  changed_when: _ubi_cleanup.stdout | length > 0
+
+- name: Report removed legacy files
+  ansible.builtin.debug:
+    msg: "{{ _ubi_cleanup.stdout_lines }}"
+  when: _ubi_cleanup.stdout | length > 0
 
 - name: List the native tools (brew / distro packages)
   ansible.builtin.set_fact:

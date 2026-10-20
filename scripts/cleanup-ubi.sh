@@ -1,36 +1,50 @@
 #!/usr/bin/env sh
-# cleanup-ubi.sh — remove what the old ubi install path left behind, now that
-# CLI tools come from mise.
-# Usage: cleanup-ubi.sh LOCAL_BIN LOCAL_OPT TOOLS_YAML   (needs yq)
+# cleanup-ubi.sh — one-time removal of what the old ubi install path left
+# behind, now that CLI tools come from mise.
+# Usage: cleanup-ubi.sh LOCAL_BIN LOCAL_OPT TOOLS_YAML SELECTION_JSON   (needs jq)
+#   SELECTION_JSON: scripts/select-tools.sh output for this host (the JSON
+#   text itself, not a path).
 #
-# In LOCAL_BIN it deletes, by name (`ubi`, every tool `bin` in TOOLS_YAML,
-# plus the legacy names delta/rg/nvim/ec):
-#   - regular files, unless they are mise shims (mention `mise`);
-#   - the legacy rename symlinks: targets named batcat/fdfind (apt) or
-#     editorconfig-checker (brew), or anything into LOCAL_OPT/neovim.
-# Never touched: the pinned mise binary and uv (installed by mise.yml and
-# uv's own installer, not ubi), source-only tools (never ubi-installed),
-# symlinks into mise or anywhere else, and every other file. Then it deletes
-# LOCAL_OPT/neovim (the ubi --extract-all tree).
+# One-shot: it runs only while a legacy marker exists — LOCAL_BIN/ubi (every
+# old install path bootstrapped ubi: the no-sudo path, macOS for gh-dash and
+# sudo Linux for the force_ubi tools) or the LOCAL_OPT/neovim tree. It deletes
+# both markers last, so later runs are no-ops and a binary the user puts in
+# LOCAL_BIN afterwards is never touched. A marker instead of a stamp file: no
+# extra state to keep, and a host that never had ubi is never scanned.
+#
+# Scope: only bins of tools that select-tools reports with source "mise" on
+# this host (or "bundled" with a mise provider, e.g. age-keygen) — the locked
+# mise install replaces exactly those. Native, deselected and bootstrap tools
+# (mise itself) are never touched, nor uv (install.sh puts its own pinned uv
+# in LOCAL_BIN; ubi never installed it). For each such name in LOCAL_BIN it deletes:
+#   - a regular file, unless it is a mise shim (mentions `mise`);
+#   - a legacy rename symlink: target named batcat/fdfind (apt) or
+#     editorconfig-checker (brew), or into LOCAL_OPT/neovim.
+# Foreign symlinks and every other file stay. TOOLS_YAML is accepted for the
+# interface's sake (the selection already carries each bin).
 # Prints one `removed: PATH` line per deletion; nothing when clean. Exit 0.
 set -eu
 
-[ $# -eq 3 ] || {
-	echo "usage: cleanup-ubi.sh LOCAL_BIN LOCAL_OPT TOOLS_YAML" >&2
+[ $# -eq 4 ] || {
+	echo "usage: cleanup-ubi.sh LOCAL_BIN LOCAL_OPT TOOLS_YAML SELECTION_JSON" >&2
 	exit 2
 }
 bin_dir="$1"
 opt_dir="$2"
-tools_yaml="$3"
+selection="$4"
 
-names="$(yq '.tools | to_entries | .[]
-	| select(.value.bootstrap != true and .value.native_only != true and .key != "uv")
-	| (.value.bin // .key)' "$tools_yaml")"
-names="ubi delta rg nvim ec $names"
+if [ ! -e "$bin_dir/ubi" ] && [ ! -d "$opt_dir/neovim" ]; then
+	exit 0
+fi
+
+names="$(printf '%s\n' "$selection" | jq -r '
+	(map({key: .name, value: .source}) | from_entries) as $src
+	| .[] | select(.source == "mise" or (.source == "bundled" and $src[.provided_by] == "mise"))
+	| select(.name != "uv")
+	| .bin')"
 
 removed=""
-# shellcheck disable=SC2086 # word-split the name list on purpose
-for n in $(printf '%s\n' $names | sort -u); do
+for n in $names; do
 	f="$bin_dir/$n"
 	if [ -L "$f" ]; then
 		target="$(readlink "$f")"
@@ -48,9 +62,15 @@ for n in $(printf '%s\n' $names | sort -u); do
 	removed="$removed$f
 "
 done
+# The markers last: once they are gone this script never runs again.
 if [ -d "$opt_dir/neovim" ]; then
 	rm -rf "$opt_dir/neovim"
 	removed="$removed$opt_dir/neovim
+"
+fi
+if [ -f "$bin_dir/ubi" ] && ! [ -L "$bin_dir/ubi" ]; then
+	rm -f "$bin_dir/ubi"
+	removed="$removed$bin_dir/ubi
 "
 fi
 printf '%s' "$removed" | sed 's/^/removed: /'
