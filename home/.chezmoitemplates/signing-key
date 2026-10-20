@@ -1,0 +1,4 @@
+{{- /* Absolute signing_key path ("" when unset or not a .pub: never read private keys); git does not expand ~ here. */ -}}
+{{- $k := get . "signing_key" -}}
+{{- if not (hasSuffix ".pub" $k) }}{{ $k = "" }}{{ end -}}
+{{- if hasPrefix "~/" $k }}{{ joinPath .chezmoi.homeDir (trimPrefix "~/" $k) }}{{ else }}{{ $k }}{{ end -}}

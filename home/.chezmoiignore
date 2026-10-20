@@ -20,3 +20,8 @@ Library
 {{ if eq .chezmoi.os "darwin" }}
 .cache/zellij
 {{ end }}
+
+# Only with signing_key set.
+{{ if not (get . "signing_key") }}
+.config/git/allowed_signers
+{{ end }}

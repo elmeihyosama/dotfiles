@@ -9,6 +9,9 @@ git_email: "you@example.com"
 # Directories (trailing slash = everything beneath); default in
 # home/.chezmoidata/git.toml.
 # personal_git_dirs: ["~/workspace/dotfiles/", "~/personal/"]
+# SSH public key; signs commits for the personal identity (or all commits
+# without one). Blank/absent: no signing.
+# signing_key: "~/.ssh/id_ed25519.pub"
 # allow_sudo: false     # default: auto-detected via `sudo -n true`
 # shared_home: false    # true ONLY when one $HOME is shared across CPU arches:
 #                       # binaries then go to ~/.local/bin-<arch> etc.

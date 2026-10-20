@@ -138,6 +138,74 @@ if [ -f "$HOME/.config/chezmoi/chezmoi.toml" ] &&
 	fi
 fi
 
+# --- Commit signing (checked only when signing_key is set) ----------------
+sk=""
+if command -v chezmoi >/dev/null 2>&1; then
+	sk="$(chezmoi execute-template '{{ get . "signing_key" }}' 2>/dev/null || true)"
+fi
+# gh_registered KEYFILE BODY: WARN/OK on GitHub registration. Never a FAIL, and
+# bounded (DOCTOR_GH_TIMEOUT s, default 10) without timeout(1), absent on macOS.
+gh_registered() {
+	_skip="signing key registration not checked"
+	command -v gh >/dev/null 2>&1 || {
+		warn "$_skip (gh not installed)"
+		return
+	}
+	gh auth token >/dev/null 2>&1 || {
+		warn "$_skip (gh not authenticated)"
+		return
+	}
+	_d="$(mktemp -d)"
+	gh api user/ssh_signing_keys --jq '.[].key' >"$_d/out" 2>"$_d/err" &
+	_p=$!
+	(
+		sleep "${DOCTOR_GH_TIMEOUT:-10}"
+		kill "$_p" 2>/dev/null
+	) >/dev/null 2>&1 &
+	_w=$!
+	_rc=0
+	wait "$_p" || _rc=$?
+	kill "$_w" 2>/dev/null || true
+	if [ "$_rc" -eq 0 ]; then
+		if grep -qF -- "$2" "$_d/out"; then
+			ok "signing key registered on GitHub"
+		else
+			warn "signing key not registered on GitHub; run: gh ssh-key add $1 --type signing --title \"\$(hostname -s)\""
+		fi
+	elif grep -q 'admin:ssh_signing_key' "$_d/err"; then
+		warn "$_skip (token lacks a scope; run: gh auth refresh -h github.com -s admin:ssh_signing_key)"
+	elif grep -q 'HTTP 401' "$_d/err"; then
+		warn "$_skip (gh not authenticated)"
+	else
+		warn "$_skip (offline)"
+	fi
+	rm -rf "$_d"
+}
+case "$sk" in
+"") ;;
+*.pub)
+	case "$sk" in \~/*) sk="$HOME/${sk#\~/}" ;; esac
+	if [ ! -f "$sk" ]; then
+		bad "signing key $sk is missing (generate it: ssh-keygen -t ed25519 -f ${sk%.pub})"
+	else
+		read -r kt kb _ <"$sk" || true
+		kb="$(printf '%s' "${kb:-}" | tr -d '\r')"
+		case "${kt:-}" in
+		ssh-* | ecdsa-* | sk-*) [ -z "$kb" ] || valid=1 ;;
+		esac
+		if [ "${valid:-0}" -ne 1 ]; then
+			bad "signing key $sk is not a valid public key (empty or malformed)"
+		else
+			ok "signing key $sk present"
+			gh_registered "$sk" "$kb"
+		fi
+	fi
+	;;
+*)
+	bad "signing_key $sk must be the public key (a .pub file), not the private key (set it in ansible/local.yml)"
+	;;
+esac
+
 # --- Login shell -----------------------------------------------------------
 case "${SHELL:-}" in
 */zsh)

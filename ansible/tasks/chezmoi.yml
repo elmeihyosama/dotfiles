@@ -49,6 +49,7 @@
       - personal_git_name
       - personal_git_email
       - personal_git_dirs
+      - signing_key
       - selected_tools
 
 # This machine's mise tools (what select-tools.sh installs), for the pins
@@ -92,6 +93,9 @@
       {% endif %}
       {% if personal_git_dirs is defined %}
           personal_git_dirs = {{ personal_git_dirs | to_json }}
+      {% endif %}
+      {% if signing_key | default('') | length > 0 %}
+          signing_key = {{ signing_key | to_json }}
       {% endif %}
           allow_sudo = {{ allow_sudo | lower }}
           shared_home = {{ shared_home | default(false) | lower }}

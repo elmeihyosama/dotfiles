@@ -151,6 +151,8 @@ Deeper guides for the non-obvious pieces:
 - [mise](docs/mise.md) — per-project runtimes, environment, and tasks.
 - [Eye-candy](docs/eye-candy.md) — wallpaper↔theme pairing and themed cava.
 - [Clipboard & notifications](docs/clipboard-notify.md) — OSC escape sequences that work over SSH.
+- [Secrets](docs/secrets.md) — age-encrypted files synced through the repo.
+- [Commit signing](docs/signing.md) — SSH-signed commits for your GitHub identity.
 
 ## License
 
