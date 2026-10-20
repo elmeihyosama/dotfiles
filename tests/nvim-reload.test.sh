@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Live theme reload (_theme_live_reload in conf.d/45-theme.zsh): repaints a
-# private headless nvim over RPC, skips stale/hung sockets within the 2s
-# bound, and runs from theme/glass/wallpaper without exec'ing a shell. Only
-# temp sockets (THEME_NVIM_GLOB) and stub cmux/chezmoi are used.
+# private headless nvim (colorscheme + lualine) over RPC, skips stale/hung
+# sockets within the 2s bound, finds sockets in the default macOS/Linux
+# layouts, signals Ghostty, notes zellij, leaves no jobs, and runs from
+# theme/glass/wallpaper without exec'ing a shell. Only temp sockets and stub
+# cmux/zellij/pgrep/pkill/chezmoi are used.
+# shellcheck disable=SC2016 # stub and zsh bodies expand later
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -40,31 +43,33 @@ _cleanup_all() {
 }
 trap _cleanup_all EXIT
 
-# Stubs: cmux logs its args; chezmoi renders from the repo, never applies.
+# Stubs log to STUB_LOG. pgrep "finds" ghostty when GH_RUNNING=1; pkill exits
+# GH_PKILL_RC; zellij list-sessions prints ZJ_LIST; chezmoi never applies.
 mkdir -p "$HOME/bin"
 export STUB_LOG="$HOME/stub.log"
-cat >"$HOME/bin/cmux" <<'STUB'
-#!/bin/sh
-echo "cmux $*" >>"$STUB_LOG"
-STUB
+stub() {
+	printf '#!/bin/sh\n%s\n' "$2" >"$HOME/bin/$1"
+	chmod +x "$HOME/bin/$1"
+}
+stub cmux 'echo "cmux $*" >>"$STUB_LOG"'
+stub pgrep 'echo "pgrep $*" >>"$STUB_LOG"; [ "${GH_RUNNING:-0}" = 1 ]'
+stub pkill 'echo "pkill $*" >>"$STUB_LOG"; exit "${GH_PKILL_RC:-0}"'
+stub zellij '[ "$1" = list-sessions ] && printf "%s" "${ZJ_LIST:-}"; exit 0'
 export REAL_CHEZMOI="$real_chezmoi" STUB_SRC="$TESTS_REPO" STUB_CFG="$TESTS_FIXTURE"
-cat >"$HOME/bin/chezmoi" <<'STUB'
-#!/bin/sh
-case "$1" in
+stub chezmoi 'case "$1" in
 data) exec "$REAL_CHEZMOI" data --source "$STUB_SRC" --config "$STUB_CFG" --format json ;;
 source-path) echo "$STUB_SRC/home" ;;
 apply) echo apply >>"$STUB_LOG" ;;
-esac
-STUB
-chmod +x "$HOME/bin/cmux" "$HOME/bin/chezmoi"
+esac'
 # Stubs only for the zsh side; render_tmpl needs the real chezmoi.
 stubpath="$HOME/bin:$PATH"
 
-# Rendered nvim config (only the theme modules) plus a base16 stub, since
-# --clean has no plugins: the stub paints Normal from the palette it's given.
+# Rendered theme modules plus plugins/ui.lua, with base16 and lualine stubs
+# (--clean has no plugins): base16 paints Normal, lualine keeps its opts.
 cfg="$HOME/nvim"
 mkdir -p "$cfg/lua/config" "$cfg/lua/plugins"
 cp "$nvim_src/lua/config/theme_reload.lua" "$cfg/lua/config/"
+cp "$nvim_src/lua/plugins/ui.lua" "$cfg/lua/plugins/"
 cat >"$cfg/lua/base16-colorscheme.lua" <<'LUA'
 return {
 	setup = function(c)
@@ -72,6 +77,16 @@ return {
 		vim.g.colors_name = "base16-stub"
 	end,
 }
+LUA
+cat >"$cfg/lua/lualine.lua" <<'LUA'
+local M = {}
+M.get_config = function()
+	return { options = {} }
+end
+M.setup = function(o)
+	M.last = o
+end
+return M
 LUA
 render_theme() {
 	render_tmpl "$nvim_src/lua/plugins/colorscheme.lua.tmpl" theme="$1" >"$cfg/lua/plugins/colorscheme.lua"
@@ -92,35 +107,46 @@ start_nvim() {
 	done
 	fail "nvim did not listen on $1"
 }
-normal_bg() {
-	nvim --server "$1" --remote-expr \
-		'luaeval("string.format(\"#%06x\", vim.api.nvim_get_hl(0, {name = \"Normal\"}).bg or 0)")' 2>&1
-}
+remote() { nvim --server "$1" --remote-expr "luaeval('$2')" 2>&1; }
+normal_bg() { remote "$1" 'string.format("#%06x", vim.api.nvim_get_hl(0, {name = "Normal"}).bg or 0)'; }
 
-# reload GLOB: run the helper in zsh -f with the socket glob pointed at GLOB.
+# reload GLOB [ENV=VAL ...]: the helper in zsh -f, socket glob = GLOB.
 reload() {
-	PATH="${PATH_OVERRIDE:-$stubpath}" THEME_NVIM_GLOB="$1" zsh -f -c '
+	local g="$1"
+	shift
+	env PATH="$stubpath" THEME_NVIM_GLOB="$g" "$@" zsh -f -c '
 		compdef() { :; }
 		source "$1"; _theme_live_reload' _ "$zsh_fn" 2>&1 </dev/null
 }
 
-ghostty="ghostty: press ⌘⇧, (or ctrl+shift+, on Linux) to apply"
 a=nord b=catppuccin-mocha
 [ "$(base00 $a)" != "$(base00 $b)" ] || fail "themes $a and $b need distinct base00"
 
-# live_reload: render A, reload; re-render B, reload; Normal follows the disk.
+# live_reload: render A, reload; re-render B, reload; Normal and the lualine
+# theme follow the disk.
 live="$sockdir/live"
 mkdir -p "$live/x"
 render_theme "$a"
 start_nvim "$live/x/nvim.1.0"
+remote "$live/x/nvim.1.0" 'require("lualine") and 1' >/dev/null
+: >"$STUB_LOG"
 out="$(reload "$live/*/nvim.*.0")"
-assert_contains "$out" "reloaded 1 nvim; $ghostty" "live_reload: counts 1 nvim"
+assert_eq "reloaded 1 nvim" "$out" "live_reload: counts 1 nvim, nothing else"
 assert_eq "$(base00 $a)" "$(normal_bg "$live/x/nvim.1.0")" "live_reload: theme A applied"
 render_theme "$b"
+accent_b="$(sed -n 's/^  accent  = "\(#[0-9a-fA-F]*\)",/\1/p' "$cfg/lua/config/design.lua")"
 out="$(reload "$live/*/nvim.*.0")"
-assert_contains "$out" "reloaded 1 nvim" "live_reload: counts 1 nvim after re-render"
+assert_eq "reloaded 1 nvim" "$out" "live_reload: counts 1 nvim after re-render"
 assert_eq "$(base00 $b)" "$(normal_bg "$live/x/nvim.1.0")" "live_reload: theme B applied"
-assert_eq "cmux reload-config" "$(tail -n1 "$STUB_LOG" 2>/dev/null)" "live_reload: cmux reloaded"
+assert_eq "$accent_b" "$(remote "$live/x/nvim.1.0" 'require("lualine").last.options.theme.normal.a.bg')" \
+	"live_reload: lualine theme rebuilt"
+assert_contains "$(cat "$STUB_LOG")" "cmux reload-config" "live_reload: cmux reloaded"
+
+# no_jobs: an interactive shell's job table stays empty afterwards.
+out="$(PATH="$stubpath" THEME_NVIM_GLOB="$live/*/nvim.*.0" zsh -f -i -c '
+	compdef() { :; }
+	source "$1"; _theme_live_reload >/dev/null; jobs; echo end' _ "$zsh_fn" 2>&1 </dev/null)"
+assert_eq "end" "$out" "no_jobs: jobs empty"
 
 # stale_socket: a regular file, a dead socket (nvim killed -9) and a hung nvim
 # (SIGSTOP) are each skipped silently; the hung one costs at most ~2s.
@@ -135,12 +161,62 @@ kill -STOP "${pids[${#pids[@]} - 1]}"
 start=$SECONDS
 out="$(reload "$stale/nvim.*.0")"
 elapsed=$((SECONDS - start))
-assert_eq "reloaded 0 nvim; $ghostty" "$(grep -v "^zellij: applied$" <<<"$out")" "stale_socket: nothing counted, no noise"
+assert_eq "reloaded 0 nvim" "$out" "stale_socket: nothing counted, no noise"
 [ "$elapsed" -le 5 ] || fail "stale_socket: took ${elapsed}s (bound is 2s per socket)"
 
+# sockets_only: a regular file never reaches nvim (stub nvim logs calls).
+fake="$HOME/fakenvim"
+mkdir -p "$fake"
+printf '#!/bin/sh\necho "nvim $*" >>"$STUB_LOG"\n' >"$fake/nvim"
+chmod +x "$fake/nvim"
+: >"$STUB_LOG"
+out="$(stubpath="$fake:$stubpath" reload "$stale/nvim.file.0")"
+assert_eq "reloaded 0 nvim" "$out" "sockets_only: file not counted"
+assert_not_contains "$(cat "$STUB_LOG")" "nvim --server" "sockets_only: file not contacted"
+
 # no_nvim: nothing matches, nvim missing from PATH: still silent.
-out="$(PATH_OVERRIDE="$HOME/bin:/usr/bin:/bin" reload "$sockdir/none/*.0")"
-assert_eq "reloaded 0 nvim; $ghostty" "$(grep -v "^zellij: applied$" <<<"$out")" "no_nvim: silent"
+out="$(stubpath="$HOME/bin:/usr/bin:/bin" reload "$sockdir/none/*.0")"
+assert_eq "reloaded 0 nvim" "$out" "no_nvim: silent"
+
+# default_glob: THEME_NVIM_GLOB unset (opted in under DOTFILES_TEST). macOS
+# layout $TMPDIR/nvim.$USER/*/nvim.N.0; Linux $XDG_RUNTIME_DIR/nvim.N.0.
+mac="$sockdir/m" lnx="$sockdir/l" empty="$sockdir/e"
+mkdir -p "$mac/nvim.$USER/ab" "$lnx" "$empty"
+start_nvim "$mac/nvim.$USER/ab/nvim.1.0"
+start_nvim "$lnx/nvim.2.0"
+: >"$lnx/other.0"
+dflt() {
+	env -u THEME_NVIM_GLOB -u XDG_RUNTIME_DIR PATH="$stubpath" "$@" zsh -f -c '
+		compdef() { :; }
+		source "$1"; _theme_live_reload' _ "$zsh_fn" 2>&1 </dev/null
+}
+assert_eq "reloaded 1 nvim" "$(dflt THEME_TEST_DEFAULT_GLOB=1 TMPDIR="$mac/")" "default_glob: macOS layout"
+assert_eq "reloaded 1 nvim" "$(dflt THEME_TEST_DEFAULT_GLOB=1 TMPDIR="$empty" XDG_RUNTIME_DIR="$lnx")" \
+	"default_glob: Linux layout"
+assert_eq "reloaded 2 nvim" "$(dflt THEME_TEST_DEFAULT_GLOB=1 TMPDIR="$mac" XDG_RUNTIME_DIR="$lnx")" \
+	"default_glob: both roots"
+# guard: under DOTFILES_TEST the default globs need the opt-in.
+assert_eq "reloaded 0 nvim" "$(dflt TMPDIR="$mac/")" "guard: no default glob in tests"
+
+# ghostty: SIGUSR2 to the user's own ghostty, only when one runs.
+gh() { reload "$sockdir/none/*.0" THEME_TEST_SIGNAL=1 "$@"; }
+: >"$STUB_LOG"
+assert_eq "reloaded 0 nvim; ghostty: reloaded" "$(gh GH_RUNNING=1)" "ghostty: signalled"
+assert_contains "$(cat "$STUB_LOG")" "pkill -USR2 -u $USER -x ghostty" "ghostty: pkill args"
+: >"$STUB_LOG"
+assert_eq "reloaded 0 nvim" "$(gh GH_RUNNING=0)" "ghostty: none running, nothing printed"
+assert_not_contains "$(cat "$STUB_LOG")" "pkill" "ghostty: none running, no signal"
+assert_eq "reloaded 0 nvim; ghostty: press ⌘⇧, (or ctrl+shift+, on Linux) to apply" \
+	"$(gh GH_RUNNING=1 GH_PKILL_RC=1)" "ghostty: signal failed, key hint"
+: >"$STUB_LOG"
+reload "$sockdir/none/*.0" GH_RUNNING=1 >/dev/null
+assert_not_contains "$(cat "$STUB_LOG")" "pkill" "guard: no signal in tests without opt-in"
+
+# zellij: noted only while a live session exists.
+assert_eq "reloaded 0 nvim
+zellij: applied" "$(reload "$sockdir/none/*.0" ZJ_LIST='main [Created 1m ago] (current)')" "zellij: live session"
+assert_eq "reloaded 0 nvim" "$(reload "$sockdir/none/*.0" ZJ_LIST='old [Created 2d ago] (EXITED - attach to resurrect)')" \
+	"zellij: exited only"
 
 # callers: theme, glass and wallpaper reload live and return (headless: no
 # exec zsh); the old restart message is gone.

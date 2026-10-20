@@ -26,15 +26,15 @@ btop, fzf, git-delta, gh-dash, cava, nvim, vivid/LS_COLORS) renders from those
 
 New shells and new ghostty windows pick the theme up automatically. After
 applying, `theme`, `glass` and `wallpaper` reload what they can live: every
-running nvim (over its RPC socket, 2s limit each), cmux, and zellij (it
-reloads `config.kdl` on change). Existing **ghostty windows** need the reload
-key (`⌘⇧,`, or `ctrl+shift+,` on Linux), and **running TUIs (btop,
-lazydocker, lazygit, yazi)** need a restart.
+running nvim (over its RPC socket, 2s limit each), cmux, Ghostty (SIGUSR2 to
+your own `ghostty` processes; if that fails, press `⌘⇧,`, or `ctrl+shift+,` on
+Linux), and zellij (live sessions reload `config.kdl` on change). **Running
+TUIs (btop, lazydocker, lazygit, yazi)** need a restart.
 
 ### cmux
 
 [cmux] reads `~/.config/ghostty/config` directly, so it follows the switcher
-with no extra config; the `theme` command runs `cmux reload-config` to repaint
+with no extra config; `theme`, `glass` and `wallpaper` run `cmux reload-config` to repaint
 running sessions live. Do **not** run `cmux themes set <preset>` — that writes a
 cmux override that shadows the Ghostty config with a vendored preset, breaking
 the base16 sync (`cmux themes clear` restores it).

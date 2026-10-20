@@ -105,35 +105,57 @@ wallpaper() {
   _theme_live_reload
 }
 
-# _theme_live_reload: repaint running apps after `chezmoi apply`. nvim over RPC
-# (THEME_NVIM_GLOB overrides the socket glob), cmux via reload-config; zellij
-# reloads config.kdl itself; Ghostty needs its reload key.
+# _theme_live_reload: repaint running apps after `chezmoi apply`: nvim over RPC
+# (THEME_NVIM_GLOB overrides the socket glob), cmux, Ghostty via SIGUSR2;
+# zellij reloads config.kdl itself. Under DOTFILES_TEST the default globs and
+# the signal need THEME_TEST_DEFAULT_GLOB / THEME_TEST_SIGNAL.
 _theme_live_reload() {
   emulate -L zsh
-  setopt no_monitor no_notify
   local -a socks
+  local r n=0 line
   if [[ -n ${THEME_NVIM_GLOB-} ]]; then
     socks=(${~THEME_NVIM_GLOB}(N=))
-  else
-    socks=(${XDG_RUNTIME_DIR:-${${TMPDIR:-/tmp}%/}}/nvim.${USER}/*/nvim.*.0(N=))
-    [[ -n ${XDG_RUNTIME_DIR-} ]] && socks+=($XDG_RUNTIME_DIR/nvim.*.0(N=))
-  fi
-  local s pid wd n=0
-  if (( ${#socks} )) && command -v nvim >/dev/null 2>&1; then
-    for s in $socks; do
-      nvim --server $s --remote-expr 'luaeval("require(\"config.theme_reload\").reload()")' >/dev/null 2>&1 &
-      pid=$!
-      # 2s watchdog (no `timeout` on stock macOS): a hung nvim never answers.
-      { sleep 2; kill $pid } >/dev/null 2>&1 &
-      wd=$!
-      wait $pid 2>/dev/null && (( ++n ))
-      kill $wd 2>/dev/null
+  elif [[ -z ${DOTFILES_TEST-} || -n ${THEME_TEST_DEFAULT_GLOB-} ]]; then
+    # macOS: $TMPDIR/nvim.$USER/*/; Linux: $XDG_RUNTIME_DIR/. Both roots.
+    for r in ${${TMPDIR:-/tmp}%/} ${XDG_RUNTIME_DIR%/}; do
+      socks+=($r/nvim.${USER}/*/nvim.*.0(N=) $r/nvim.*.0(N=))
     done
+    socks=(${(u)socks})
+  fi
+  if (( ${#socks} )) && command -v nvim >/dev/null 2>&1; then
+    # In $(...) so its jobs stay out of the caller's job table; 2s watchdog
+    # per socket (stock macOS has no timeout(1)). No comments inside: an
+    # interactive shell parses $(...) without interactive_comments.
+    n=$(
+      c=0
+      for s in $socks; do
+        nvim --server $s --remote-expr 'luaeval("require(\"config.theme_reload\").reload()")' >/dev/null 2>&1 &
+        pid=$!
+        { sleep 2; kill $pid } >/dev/null 2>&1 &
+        wd=$!
+        wait $pid 2>/dev/null && (( ++c ))
+        kill $wd 2>/dev/null
+      done
+      print $c
+    )
   fi
   # cmux reads ~/.config/ghostty/config directly.
   command -v cmux >/dev/null 2>&1 && cmux reload-config >/dev/null 2>&1
-  print -r -- "reloaded $n nvim; ghostty: press ⌘⇧, (or ctrl+shift+, on Linux) to apply"
-  command -v zellij >/dev/null 2>&1 && print -r -- "zellij: applied"
+  line="reloaded $n nvim"
+  if [[ -z ${DOTFILES_TEST-} || -n ${THEME_TEST_SIGNAL-} ]] &&
+    pgrep -u "$USER" -x ghostty >/dev/null 2>&1; then
+    if pkill -USR2 -u "$USER" -x ghostty 2>/dev/null; then
+      line+="; ghostty: reloaded"
+    else
+      line+="; ghostty: press ⌘⇧, (or ctrl+shift+, on Linux) to apply"
+    fi
+  fi
+  print -r -- $line
+  # Live sessions only; list-sessions also shows EXITED (resurrectable) ones.
+  if command -v zellij >/dev/null 2>&1 &&
+    zellij list-sessions -n 2>/dev/null | command grep '\[Created' | command grep -qv EXITED; then
+    print -r -- "zellij: applied"
+  fi
   return 0
 }
 
