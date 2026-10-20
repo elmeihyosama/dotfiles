@@ -18,7 +18,7 @@ rev = "449a7c3d095bc8f3d78cf37b9549f8bb4c383f3d"
 
 [plugins.forgit]
 github = "wfxr/forgit"
-rev = "15db0016623b87472c0b6ff7488b123a74b82c7e"
+tag = "26.08.0"
 
 # MUST be last — wraps all widgets.
 [plugins.fast-syntax-highlighting]
