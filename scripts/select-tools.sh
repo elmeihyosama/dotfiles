@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # select-tools.sh — resolve which tools this machine installs, and how.
 # Usage: select-tools.sh --os darwin|linux [--arch x64|arm64] --local LOCAL_YML [--tools TOOLS_YAML]
+#        select-tools.sh --platform macos-arm64|linux-x64|linux-arm64 ... (instead of --os/--arch)
 #
 # Reads the catalog (default home/.chezmoidata/tools.yaml) and the per-machine
 # ansible/local.yml, prints a JSON array sorted by name:
@@ -30,7 +31,7 @@ local_yml=""
 tools_yaml="$repo_root/home/.chezmoidata/tools.yaml"
 
 usage() {
-	echo "usage: select-tools.sh --os darwin|linux [--arch x64|arm64] --local LOCAL_YML [--tools TOOLS_YAML]" >&2
+	echo "usage: select-tools.sh --os darwin|linux [--arch x64|arm64] | --platform <os>-<arch> --local LOCAL_YML [--tools TOOLS_YAML]" >&2
 	exit 2
 }
 while [ $# -gt 0 ]; do
@@ -48,6 +49,12 @@ while [ $# -gt 0 ]; do
 	--arch)
 		[ $# -ge 2 ] || usage
 		arch="$2"
+		shift 2
+		;;
+	--platform)
+		[ $# -ge 2 ] || usage
+		case "$2" in macos-*) os=darwin ;; linux-*) os=linux ;; *) usage ;; esac
+		arch="${2#*-}"
 		shift 2
 		;;
 	--tools)

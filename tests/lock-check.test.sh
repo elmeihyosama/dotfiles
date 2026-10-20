@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # check-lock.sh gates every mise.lock: each tool needs a checksum for each
-# locked platform, or an explicit (and still-needed) exception.
+# locked platform, unless tools.yaml says otherwise (no_checksum_on, native).
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -42,30 +42,56 @@ assert_eq 1 "$rc" "missing checksum fails"
 assert_contains "$out" "MISSING aqua:x/y linux-arm64" "names the missing platform"
 assert_not_contains "$out" "MISSING aqua:x/y linux-x64" "does not flag present platform"
 
-# exception_allows
-printf '# comment\n\naqua:x/y linux-arm64  # no arm64 build\n' >"$dir/exc.txt"
-run_check "$dir/missing.lock" "$dir/exc.txt"
-assert_eq 0 "$rc" "exception allows the gap"
-printf 'aqua:x/y *  # nothing built\n' >"$dir/star.txt"
-mk_lock "$dir/none.lock" aqua:x/y
-run_check "$dir/none.lock" "$dir/star.txt"
-assert_eq 0 "$rc" "wildcard exception covers all platforms"
+# pipx_tools_need_no_platform_checksum: a hash-pinned uv.lock covers them,
+# but the lock must still record its digest.
+printf '[[tools."pipx:x"]]\nversion = "1.0.0"\nuv = { path = ".mise/locks/pipx-x/1.0.0", digest = "sha256:aa" }\n' >"$dir/pipx.lock"
+run_check "$dir/pipx.lock"
+assert_eq 0 "$rc" "pipx tool with a uv.lock digest passes ($out)"
+printf '[[tools."pipx:x"]]\nversion = "1.0.0"\n' >"$dir/pipx-nodigest.lock"
+run_check "$dir/pipx-nodigest.lock"
+assert_eq 1 "$rc" "pipx tool without a uv.lock digest fails"
+assert_contains "$out" "MISSING pipx:x uv.lock digest" "names the missing digest"
 
-# stale_exception_fails
-run_check "$dir/ok.lock" "$dir/exc.txt"
-assert_eq 1 "$rc" "stale exception fails"
-assert_contains "$out" "STALE-EXCEPTION aqua:x/y linux-arm64" "names the stale exception"
+# With TOOLS_YAML: no_checksum_on allows a gap; native / missing platforms skip.
+# mk_tools FILE EXTRA: one tool y (backend aqua:x/y) with EXTRA yaml lines.
+mk_tools() {
+	printf 'tool_groups: [core]\ntools:\n  y:\n    group: core\n    backend: aqua:x/y\n    version: "1.0.0"\n%s' "$2" >"$1"
+}
+mk_tools "$dir/t-nocs.yaml" $'    no_checksum_on: [linux-arm64] # no sums upstream\n'
+run_check "$dir/missing.lock" "$dir/t-nocs.yaml"
+assert_eq 0 "$rc" "no_checksum_on allows the gap ($out)"
+mk_tools "$dir/t-other.yaml" $'    no_checksum_on: [linux-x64] # no sums upstream\n'
+run_check "$dir/missing.lock" "$dir/t-other.yaml"
+assert_eq 1 "$rc" "no_checksum_on for another platform does not cover the gap"
+assert_contains "$out" "MISSING aqua:x/y linux-arm64" "still names the gap"
+mk_tools "$dir/t-plain.yaml" ''
+run_check "$dir/missing.lock" "$dir/t-plain.yaml"
+assert_eq 1 "$rc" "tools.yaml without no_checksum_on: gap fails"
 
-# malformed_exception_lines_are_rejected: a missing reason or platform is a
-# usage error (exit 2) that names the offending line, not a silent allow.
-printf 'aqua:x/y linux-arm64\n' >"$dir/noreason.txt"
-run_check "$dir/missing.lock" "$dir/noreason.txt"
-assert_eq 2 "$rc" "exception without a reason is rejected"
-assert_contains "$out" "noreason.txt:1" "names the line lacking a reason"
-printf '# ok\naqua:x/y  # reason only\n' >"$dir/noplat.txt"
-run_check "$dir/missing.lock" "$dir/noplat.txt"
-assert_eq 2 "$rc" "exception without a platform is rejected"
-assert_contains "$out" "noplat.txt:2" "names the line lacking a platform"
-printf 'aqua:x/y linux-arm64  #   \n' >"$dir/emptyreason.txt"
-run_check "$dir/missing.lock" "$dir/emptyreason.txt"
-assert_eq 2 "$rc" "exception with an empty reason is rejected"
+# native_and_missing_platforms_skip: no checksum needed where mise does not install it
+mk_lock "$dir/mac-only.lock" aqua:x/y macos-arm64
+mk_tools "$dir/t-native.yaml" $'    native_on: [linux]\n'
+run_check "$dir/mac-only.lock" "$dir/t-native.yaml"
+assert_eq 0 "$rc" "native_on platforms are skipped ($out)"
+mk_tools "$dir/t-missing.yaml" $'    missing_on: [linux-x64, linux-arm64]\n'
+run_check "$dir/mac-only.lock" "$dir/t-missing.yaml"
+assert_eq 0 "$rc" "missing_on platforms are skipped ($out)"
+mk_tools "$dir/t-missing1.yaml" $'    missing_on: [linux-x64]\n'
+run_check "$dir/mac-only.lock" "$dir/t-missing1.yaml"
+assert_eq 1 "$rc" "missing_on skips only its own platforms"
+assert_contains "$out" "MISSING aqua:x/y linux-arm64" "names the remaining gap"
+
+# stale_no_checksum_on_fails: the checksum is there now, so the entry must go
+run_check "$dir/ok.lock" "$dir/t-nocs.yaml"
+assert_eq 1 "$rc" "stale no_checksum_on fails"
+assert_contains "$out" "STALE-EXCEPTION aqua:x/y linux-arm64" "names the stale entry"
+assert_contains "$out" "remove linux-arm64 from y.no_checksum_on" "says to remove it"
+
+# no_checksum_on_needs_a_reason: a trailing # comment, else usage error (exit 2)
+mk_tools "$dir/t-noreason.yaml" $'    no_checksum_on: [linux-arm64]\n'
+run_check "$dir/missing.lock" "$dir/t-noreason.yaml"
+assert_eq 2 "$rc" "no_checksum_on without a reason is rejected"
+assert_contains "$out" "y.no_checksum_on" "names the tool lacking a reason"
+mk_tools "$dir/t-badplat.yaml" $'    no_checksum_on: [linux-riscv] # x\n'
+run_check "$dir/missing.lock" "$dir/t-badplat.yaml"
+assert_eq 2 "$rc" "no_checksum_on with an unknown platform is rejected"

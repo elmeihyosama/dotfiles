@@ -5,10 +5,10 @@
 #   (a2) per locked platform (macos-arm64, linux-x64, linux-arm64), a tool that
 #       select-tools installs from mise there (so missing_on / native_on are
 #       respected) lacks, in that version's lock entry: a url, a url whose
-#       asset name names the platform's OS, or a checksum (unless the home
-#       exceptions file lists `<backend> <platform>`); for macos-arm64 also a url
-#       naming an x86_64 build (x86_64/amd64/x64/intel, not universal) unless the
-#       arch exceptions file lists it: it needs Rosetta 2, which a fresh Apple
+#       asset name names the platform's OS, or a checksum (unless the tool's
+#       no_checksum_on lists the platform; listed but present also fails); for
+#       macos-arm64 also a url naming an x86_64 build (x86_64/amd64/x64/intel,
+#       not universal), no exceptions: it needs Rosetta 2, which a fresh Apple
 #       Silicon Mac lacks,
 #   (b) a tool in the repo mise.toml is missing from mise.lock at that version,
 #   (c) a .mise/locks/pipx-*/<ver>/ dir (a pipx tool's hash-pinned uv.lock) is not
@@ -16,17 +16,13 @@
 # On mismatch it prints `run scripts/relock.sh`. Needs yq (mikefarah) and jq.
 # Options override the default paths (used by tests):
 #   --root DIR --tools FILE --home-lock FILE --mise-toml FILE --repo-lock FILE
-#   --home-exceptions FILE (default .github/scripts/lock-exceptions-home.txt,
-#   the check-lock.sh format: `tool-key platform  # reason`)
-#   --arch-exceptions FILE (default .github/scripts/lock-arch-exceptions-home.txt,
-#   same format: macos-arm64 entries allowed to be an x86_64 build)
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-tools="" home_lock="" mise_toml="" repo_lock="" home_exc="" arch_exc=""
+tools="" home_lock="" mise_toml="" repo_lock=""
 while [ $# -gt 0 ]; do
 	[ $# -ge 2 ] || {
-		echo "usage: check-lock-sync.sh [--root D] [--tools F] [--home-lock F] [--mise-toml F] [--repo-lock F] [--home-exceptions F] [--arch-exceptions F]" >&2
+		echo "usage: check-lock-sync.sh [--root D] [--tools F] [--home-lock F] [--mise-toml F] [--repo-lock F]" >&2
 		exit 2
 	}
 	case "$1" in
@@ -35,8 +31,6 @@ while [ $# -gt 0 ]; do
 	--home-lock) home_lock="$2" ;;
 	--mise-toml) mise_toml="$2" ;;
 	--repo-lock) repo_lock="$2" ;;
-	--home-exceptions) home_exc="$2" ;;
-	--arch-exceptions) arch_exc="$2" ;;
 	*)
 		echo "check-lock-sync: unknown option $1" >&2
 		exit 2
@@ -48,8 +42,6 @@ done
 : "${home_lock:=$root/home/dot_config/mise-dotfiles/mise.lock}"
 : "${mise_toml:=$root/mise.toml}"
 : "${repo_lock:=$root/mise.lock}"
-: "${home_exc:=$root/.github/scripts/lock-exceptions-home.txt}"
-: "${arch_exc:=$root/.github/scripts/lock-arch-exceptions-home.txt}"
 
 status=0
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -57,7 +49,7 @@ bad() {
 	echo "check-lock-sync: $*"
 	status=1
 }
-for f in "$tools" "$home_lock" "$mise_toml" "$repo_lock" "$home_exc" "$arch_exc"; do
+for f in "$tools" "$home_lock" "$mise_toml" "$repo_lock"; do
 	[ -f "$f" ] || {
 		bad "missing file: $f"
 		echo "run scripts/relock.sh"
@@ -89,25 +81,18 @@ done < <(yq -o json '.tools' "$tools" | jq -r 'to_entries[] | select(.value.back
 # platform, a url to an asset named for the platform's OS (a man page or the
 # other OS's build passes a plain url check) and a checksum. An upstream with
 # no asset for a platform goes in tools.yaml (native_on / missing_on); one that
-# publishes no checksum goes in the home exceptions file. On macos-arm64 the
-# asset must not be an x86_64 build: it runs only under Rosetta 2, which a
-# fresh Apple Silicon Mac does not have (universal and arch-less names pass).
-# Use native_on: [darwin] (brew) instead, or list it in the arch exceptions.
-# Linux arches are not checked (no Linux asset here names the wrong one).
-# exceptions as "key<TAB>platform" lines (`*` = every platform)
-exc_lines() { sed -e 's/#.*//' "$1" | awk 'NF >= 2 { print $1 "\t" $2 }'; }
-exc="$(exc_lines "$home_exc")"
-arch_excs="$(exc_lines "$arch_exc")"
-# has_exception KEY PLATFORM [LINES]
-has_exception() { printf '%s\n' "${3-$exc}" | grep -qxF -e "$1"$'\t'"$2" -e "$1"$'\t*'; }
+# publishes no checksum in its no_checksum_on. On macos-arm64 the asset must
+# not be an x86_64 build: it runs only under Rosetta 2, which a fresh Apple
+# Silicon Mac does not have (universal and arch-less names pass). Use
+# native_on: [darwin] (brew) instead. Linux arches are not checked (no Linux
+# asset here names the wrong one).
 intel_re='x86[_-]?64|amd64|intel|(^|[^a-z0-9])x64([^a-z0-9]|$)'
 home_all="$(yq -p toml -o json '.tools // {}' "$home_lock")" || exit 2
+tools_json="$(yq -o json '.tools' "$tools")" || exit 2
 for plat in macos-arm64 linux-x64 linux-arm64; do
-	os=linux os_re='linux'
-	if [ "${plat%%-*}" = macos ]; then
-		os=darwin os_re='darwin|apple|macos|osx'
-	fi
-	while IFS=$'\t' read -r name backend version; do
+	os_re='linux'
+	[ "${plat%%-*}" = macos ] && os_re='darwin|apple|macos|osx'
+	while IFS=$'\t' read -r name backend version nocs; do
 		[ -n "$backend" ] || continue
 		# url<TAB>checksum of that version's entry for this platform ("" if none)
 		entry="$(jq -r --arg k "$backend" --arg v "$version" --arg p "$plat" '
@@ -126,14 +111,17 @@ for plat in macos-arm64 linux-x64 linux-arm64; do
 			bad "$name ($backend@$version): the $plat url does not look like a ${plat%%-*} asset ($asset); fix the backend's asset match (mise_options) or set native_on / missing_on"
 		fi
 		if [ "$plat" = macos-arm64 ] && grep -Eiq "$intel_re" <<<"$asset" &&
-			! grep -iq universal <<<"$asset" && ! has_exception "$backend" "$plat" "$arch_excs"; then
-			bad "$name ($backend@$version): the $plat url is an x86_64 asset ($asset), which needs Rosetta 2; set native_on: [darwin], or list '$backend $plat' in $arch_exc with a reason"
+			! grep -iq universal <<<"$asset"; then
+			bad "$name ($backend@$version): the $plat url is an x86_64 asset ($asset), which needs Rosetta 2; set native_on: [darwin]"
 		fi
-		if [ -z "$sum" ] && ! has_exception "$backend" "$plat"; then
-			bad "$name ($backend@$version) has no $plat checksum in $home_lock: relock, or list '$backend $plat' in $home_exc with a reason"
+		if [ -z "$sum" ] && [ "$nocs" != true ]; then
+			bad "$name ($backend@$version) has no $plat checksum in $home_lock: relock, or add $plat to its no_checksum_on in tools.yaml with a # reason"
+		elif [ -n "$sum" ] && [ "$nocs" = true ]; then
+			bad "$name ($backend@$version) now has a $plat checksum: remove $plat from its no_checksum_on in tools.yaml"
 		fi
-	done < <("$here/select-tools.sh" --os "$os" --arch "${plat#*-}" --local /nonexistent --tools "$tools" |
-		jq -r '.[] | select(.source == "mise") | [.name, .backend, .version] | @tsv')
+	done < <("$here/select-tools.sh" --platform "$plat" --local /nonexistent --tools "$tools" |
+		jq -r --argjson t "$tools_json" --arg p "$plat" '.[] | select(.source == "mise")
+			| [.name, .backend, .version, ((($t[.name].no_checksum_on // []) | index($p)) != null)] | @tsv')
 done
 
 # (b) repo mise.toml tools; the value is a version string or a table with .version

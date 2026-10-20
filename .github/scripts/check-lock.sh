@@ -1,23 +1,24 @@
 #!/usr/bin/env bash
-# Usage: check-lock.sh LOCKFILE [EXCEPTIONS_FILE]
+# Usage: check-lock.sh LOCKFILE [TOOLS_YAML]
 #
 # Gates a mise.lock: every tool needs a checksum for each locked platform, so a
-# fresh machine never installs something unverified. Exceptions (tools with no
-# upstream build for a platform) must be listed, and an exception that is no
-# longer needed fails too, so the list cannot rot.
+# fresh machine never installs something unverified. pipx tools need a uv.lock
+# digest instead (their hash-pinned .mise/locks/**/uv.lock covers them).
+# With TOOLS_YAML (home/.chezmoidata/tools.yaml): platforms where select-tools
+# does not install the tool from mise are skipped, and a tool's
+# `no_checksum_on: [platform, ...]  # reason` allows a gap there. An entry
+# whose checksum now exists fails, so the list cannot rot.
 #
 # Output lines (a contract; other scripts and tests match them):
-#   MISSING X P           tool X has no checksum for platform P and no exception
-#   STALE-EXCEPTION X P   exception for X P, but the checksum is present
-# Exceptions file: one `tool-key platform  # reason` per line, tool-key exactly
-# as written in the lock; platform `*` means all of them. Exit 0 ok, 1 problems.
-# A line without a platform or a `# reason` is rejected (exit 2).
+#   MISSING X P           tool X has no checksum for platform P
+#   STALE-EXCEPTION X P   X P is in no_checksum_on but not needed there
+# Exit 0 ok, 1 problems, 2 usage or bad no_checksum_on.
 set -uo pipefail
 
 lock="${1:-}"
-exceptions="${2:-}"
+tools="${2:-}"
 if [ -z "$lock" ] || [ ! -f "$lock" ]; then
-	echo "usage: check-lock.sh LOCKFILE [EXCEPTIONS_FILE]" >&2
+	echo "usage: check-lock.sh LOCKFILE [TOOLS_YAML]" >&2
 	exit 2
 fi
 
@@ -28,65 +29,68 @@ fi
 rows="$(yq -p toml -o tsv '
 	.tools // {} | to_entries | .[] | .key as $k |
 	((.value | select(tag == "!!seq")) // [.value]) as $els |
-	("macos-arm64", "linux-x64", "linux-arm64") as $p |
-	[$k, $p, ($els | map(.["platforms." + $p].checksum != null) | all)]
+	if ($k | test("^pipx:")) then [$k, "uv.lock digest", ($els | map(.uv.digest != null) | all)]
+	else ("macos-arm64", "linux-x64", "linux-arm64") as $p |
+		[$k, $p, ($els | map(.["platforms." + $p].checksum != null) | all)]
+	end
 ' "$lock")" || {
 	echo "check-lock: cannot parse $lock" >&2
 	exit 2
 }
 
-# Exceptions as "tool<TAB>platform" lines: drop comments and blank lines.
-exc=""
-if [ -n "$exceptions" ]; then
-	[ -f "$exceptions" ] || {
-		echo "check-lock: no such exceptions file: $exceptions" >&2
+# policy: "backend<TAB>platform<TAB>name<TAB>state" per tools.yaml tool; state is
+# "skip" when mise does not install it there, plus "nocs" if in no_checksum_on.
+policy=""
+if [ -n "$tools" ]; then
+	[ -f "$tools" ] || {
+		echo "check-lock: no such tools file: $tools" >&2
 		exit 2
 	}
-	# Every non-comment line must be `tool platform  # reason`; anything else is
-	# a hard error rather than a silently ignored (or silently broad) entry.
-	bad="$(awk '
-		/^[[:space:]]*(#|$)/ { next }
-		{
-			line = $0; reason = ""
-			if (match(line, /#/)) { reason = substr(line, RSTART + 1); line = substr(line, 1, RSTART - 1) }
-			n = split(line, f, /[[:space:]]+/); fields = 0
-			for (i = 1; i <= n; i++) if (f[i] != "") fields++
-			if (fields < 2) print FILENAME ":" FNR ": missing platform: " $0
-			else if (reason !~ /[^[:space:]]/) print FILENAME ":" FNR ": missing # reason: " $0
-		}' "$exceptions")"
+	bad="$(yq -r '.tools | to_entries[] | select(.value.no_checksum_on != null) |
+		select((.value.no_checksum_on | line_comment) == "" or
+			([.value.no_checksum_on[] | select(. != "macos-arm64" and . != "linux-x64" and . != "linux-arm64")] | length > 0)) | .key + ".no_checksum_on"' "$tools")" || exit 2
 	if [ -n "$bad" ]; then
-		echo "check-lock: malformed exception line (need 'tool platform  # reason'):" >&2
+		echo "check-lock: $tools: each no_checksum_on needs locked platforms only and a trailing # reason:" >&2
 		echo "$bad" >&2
 		exit 2
 	fi
-	exc="$(sed -e 's/#.*//' "$exceptions" | awk 'NF >= 2 { print $1 "\t" $2 }')"
+	sel_tools="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/select-tools.sh"
+	tools_json="$(yq -o json '.tools' "$tools")" || exit 2
+	for p in macos-arm64 linux-x64 linux-arm64; do
+		sel="$("$sel_tools" --platform "$p" --local /nonexistent --tools "$tools")" || exit 2
+		policy+="$(jq -r --argjson sel "$sel" --arg p "$p" '
+			to_entries[] | select(.value.backend != null) | .key as $n | .value as $t
+			| any($sel[]; .name == $n and .source == "mise") as $mise
+			| ((($t.no_checksum_on // []) | index($p)) != null) as $nocs
+			| [$t.backend, $p, $n, ((if $mise then "" else "skip" end) + (if $nocs then "nocs" else "" end))]
+			| @tsv' <<<"$tools_json")"$'\n'
+	done
 fi
-
-has_exception() { # tool platform
-	printf '%s\n' "$exc" | grep -qxF -e "$1"$'\t'"$2" -e "$1"$'\t*'
-}
 
 status=0
 while IFS=$'\t' read -r tool plat ok; do
 	[ -n "$tool" ] || continue
-	if [ "$ok" = false ] && ! has_exception "$tool" "$plat"; then
-		echo "MISSING $tool $plat"
+	IFS=$'\t' read -r name state < <(awk -F'\t' -v t="$tool" -v p="$plat" \
+		'$1 == t && $2 == p { print $3 "\t" $4; exit }' <<<"$policy")
+	case "$state" in
+	skip) continue ;;
+	skipnocs)
+		echo "STALE-EXCEPTION $tool $plat (not installed from mise there: remove $plat from $name.no_checksum_on in tools.yaml)"
 		status=1
-	fi
+		;;
+	nocs)
+		if [ "$ok" = true ]; then
+			echo "STALE-EXCEPTION $tool $plat (has a checksum now: remove $plat from $name.no_checksum_on in tools.yaml)"
+			status=1
+		fi
+		;;
+	*)
+		if [ "$ok" = false ]; then
+			echo "MISSING $tool $plat"
+			status=1
+		fi
+		;;
+	esac
 done <<<"$rows"
-
-# An exception is stale when everything it covers already has a checksum
-# (for `*`: all platforms) or the tool is not in the lock at all.
-while IFS=$'\t' read -r tool plat; do
-	[ -n "$tool" ] || continue
-	covered="$(awk -F'\t' -v t="$tool" -v p="$plat" \
-		'$1 == t && (p == "*" || $2 == p) { n++; if ($3 == "false") miss++ } END { print n + 0, miss + 0 }' <<<"$rows")"
-	n="${covered% *}"
-	miss="${covered#* }"
-	if [ "$n" -eq 0 ] || [ "$miss" -eq 0 ]; then
-		echo "STALE-EXCEPTION $tool $plat"
-		status=1
-	fi
-done <<<"$exc"
 
 exit "$status"

@@ -222,11 +222,11 @@ lint_test() {
 # mise.lock (repo toolchain and the shipped dotfiles lock) must carry a checksum
 # for every tool on every locked platform, and both locks must match their pins.
 lint_lock() {
-	.github/scripts/check-lock.sh mise.lock .github/scripts/lock-exceptions.txt || {
+	.github/scripts/check-lock.sh mise.lock || {
 		note lock "check-lock.sh mise.lock"
 		fail=1
 	}
-	.github/scripts/check-lock.sh home/dot_config/mise-dotfiles/mise.lock .github/scripts/lock-exceptions-home.txt || {
+	.github/scripts/check-lock.sh home/dot_config/mise-dotfiles/mise.lock home/.chezmoidata/tools.yaml || {
 		note lock "check-lock.sh home mise.lock"
 		fail=1
 	}
