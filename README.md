@@ -46,7 +46,12 @@ cd ~/workspace/dotfiles
 | ![Any Linux][badge-linux] | mise-pinned CLI tools, user-local — works without `sudo` |
 
 CLI tools and their versions live in `home/.chezmoidata/tools.yaml`; mise
-installs them from a checksum-verified lock (`--locked`).
+installs them from a checksum-verified lock (`--locked`). Everything else is
+pinned too (mise itself, the lint toolchain, zsh plugins, the Nerd Font, CI
+images): Renovate proposes the bumps in one weekly PR and
+`scripts/relock.sh` refreshes the checksums. If a bot PR fails `lock`, run
+`scripts/relock.sh` on its branch, commit, push. One-time setup: install the
+Renovate GitHub App for this repo. Details: [docs/mise.md](docs/mise.md#pins-and-renovate).
 
 Every distro × both paths (sudo-native and no-sudo) is provisioned for real in CI.
 WSL is supported and treated as Linux.

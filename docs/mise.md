@@ -139,3 +139,71 @@ then point inside mise's data dir. A non-mise copy further back on PATH is a
 WARN with a removal hint (`brew uninstall X`, `sudo apt remove X`, ...); one
 ahead of mise's is a FAIL. doctor also FAILs when the `mise` binary is not
 the `mise_version` pinned in `ansible/group_vars/all.yml`.
+
+## Pins and Renovate
+
+Everything the dotfiles install is pinned to an exact version, and every
+download is checked against a checksum:
+
+| Pin | Lives in | Checksum |
+| --- | --- | --- |
+| Home CLI tools | `home/.chezmoidata/tools.yaml` | `home/dot_config/mise-dotfiles/mise.lock` |
+| Repo lint toolchain | `mise.toml` | `mise.lock`, plus `.mise/locks/pipx-*/<ver>/uv.lock` |
+| mise itself (bootstrap) | `mise_version` in `ansible/group_vars/all.yml` | `mise_sha256` beside it |
+| CI's mise binary | `version:` in `.github/actions/setup-lint/action.yml` and the macOS job in `.github/workflows/provision.yml` | the `sha256:` input below it |
+| uv, ansible-core, pre-commit (install.sh) | `ansible/group_vars/all.yml` | the repo `mise.lock` (same versions, `tests/python-pins.test.sh`) |
+| JetBrainsMono Nerd Font | `nerd_font_version` in `ansible/group_vars/all.yml` | `checksum:` in `ansible/tasks/fonts.yml` |
+| zsh plugins | `rev = "<commit>"` / `tag = "X"` in `home/dot_config/sheldon/plugins.toml` | the commit itself |
+| CI container images | `image: <name>:<tag>@sha256:<digest>` in `.github/workflows/` | the digest |
+| zjstatus | `zjstatus_by_zellij_minor` in `ansible/group_vars/all.yml` | per-entry `sha256` |
+
+`scripts/relock.sh` is the one command that refreshes every checksum from
+the versions above: `mise_sha256`, CI's mise `sha256:` inputs, both
+`mise.lock` files (dropping `.mise/locks` uv.lock dirs the repo lock no
+longer references), and the nerd font zip's sha256 (from the release's
+`SHA-256.txt`). It is idempotent and prints what changed. To bump by hand,
+edit the version, run it, commit.
+
+[Renovate](https://docs.renovatebot.com/) (`renovate.json`) proposes the
+version bumps, before 6am on Mondays, all in one "pins" PR so equal pins
+across files move together:
+
+- the `mise` manager reads the repo `mise.toml`;
+- regex `customManagers` cover the tools.yaml entries (`aqua:`/`github:`
+  backends via GitHub releases, plus its bootstrap `mise:` entry), the
+  group_vars pins (`mise_version`, `uv_version`, `nerd_font_version` via
+  GitHub releases; `ansible_core_version`, `pre_commit_version` via PyPI),
+  CI's mise `version:` inputs, the workflow container images (tag and
+  digest, provision.yml and bootstrap.yml together), and the sheldon pins;
+- sheldon `rev` pins use the git-refs datasource with no branch, so they
+  follow each plugin's **default branch** (its `HEAD`): a bump is "the
+  latest commit there". forgit is pinned by release tag (`github-tags`).
+- GitHub Actions stay with Dependabot (`.github/dependabot.yml`).
+- `zjstatus_by_zellij_minor` stays manual: each entry must match a zellij
+  minor's `zellij-tile` ABI (see the comment in group_vars).
+- A container image's trailing `# <tag>` comment is not part of the match:
+  fix it by hand when Renovate changes a tag (digest-only bumps keep it right).
+
+`tests/renovate.test.sh` runs every customManager regex against the real
+files and checks the match counts and captured versions, so a regex that
+silently stops matching fails CI. It also runs the official
+`renovate-config-validator` when `npx` and Node 24+ are available.
+
+### A bot PR failed `lock`
+
+Expected: Renovate edits versions but cannot compute checksums or locks, so
+a tool, mise or nerd-font bump fails the `lock` check (or the mise sha256 /
+playbook checks) until the checksums catch up. Check out the PR branch, then:
+
+```sh
+scripts/relock.sh
+git commit -am "relock"
+git push
+```
+
+### One-time setup
+
+Install the [Renovate GitHub App](https://github.com/apps/renovate) for this
+repo (GitHub, Settings, Integrations, or the app page: "Configure", then
+select this repository). Renovate then opens its onboarding check against
+the committed `renovate.json` and starts proposing bumps on the schedule.

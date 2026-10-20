@@ -56,12 +56,13 @@ jobs:
         # `include` attaches each distro's image to its two (sudo/nosudo) combos.
         # Images are pinned to the multi-arch INDEX digest (tag kept for
         # readers), so a re-pushed tag cannot change what CI runs. Dependabot's
-        # docker ecosystem does not read workflow matrices, so bump by hand:
+        # docker ecosystem does not read workflow matrices; Renovate does
+        # (renovate.json, customManagers): it bumps these tags/digests and
+        # bootstrap.yml's ubuntu/fedora copies in the same "pins" PR
+        # (tests/ci-pins.test.sh fails if they diverge). To bump by hand:
         #   docker buildx imagetools inspect <image:tag>   # "Digest:" line
-        # and update bootstrap.yml's copies of ubuntu/fedora in the same commit
-        # (tests/ci-pins.test.sh fails if they diverge). These digests, and the
-        # mise version+sha256 pins (here and in setup-lint), are manual bumps
-        # for now; plan 03 will automate them.
+        # Renovate also bumps the mise `version:` pins (here and in
+        # setup-lint); their sha256s come from scripts/relock.sh on that PR.
         include:
           - distro: debian
             image: mirror.gcr.io/library/debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587 # bookworm-slim
