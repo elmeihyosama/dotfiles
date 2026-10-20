@@ -7,6 +7,10 @@
 #                       mise tools and only prints how to remove native ones
 #   update [--check]    pull, playbook, chezmoi, sheldon, nvim, then doctor
 #   doctor [args]       scripts/doctor.sh
+#   look --json         active theme and glass, levels, every theme's palette
+#   theme SLUG | glass LEVEL
+#                       the zsh `theme`/`glass`, headless (for the TUI)
+#   tui                 the full-screen TUI (also bare `dotfiles` on a tty)
 #   help
 # Exit codes: 0 ok, 1 an operation failed, 2 usage or validation error
 # (no subcommand, an invalid local.yml, an unsafe local.yml shape).
@@ -31,6 +35,11 @@
 #   actual            string|null, active version, else newest installed (mise only)
 # mise runs as `mise -C /` with the global config masked, as in assert-tools.sh,
 # so the repo's own mise.toml never answers.
+#
+# `look --json` is a TUI contract too: an object
+#   theme   string|null, active slug      glass   string|null, unset = null
+#   levels  [string], glass levels, lightest first, "default" last
+#   themes  [{slug, colors: {base00..base0F: "#rrggbb"}}], sorted by slug
 set -eu
 
 repo_root="$(CDPATH='' cd "$(dirname "$0")/.." && pwd)"
@@ -38,7 +47,7 @@ repo_root="$(CDPATH='' cd "$(dirname "$0")/.." && pwd)"
 usage() { # usage [FD]: to stderr by default, stdout with 1
 	{
 		echo "usage: dotfiles <subcommand> [args]"
-		echo "subcommands: list [--json] | add TOOL|GROUP... | remove TOOL|GROUP... | update [--check] | doctor [args] | help"
+		echo "subcommands: list [--json] | add TOOL|GROUP... | remove TOOL|GROUP... | update [--check] | doctor [args] | look --json | theme SLUG | glass LEVEL | tui | help"
 	} >&"${1:-2}"
 }
 
@@ -657,10 +666,69 @@ native_hint() {
 	fi
 }
 
-[ $# -gt 0 ] || {
-	usage
-	exit 2
+# cmd_look --json
+cmd_look() {
+	[ "${1:-}" = --json ] && [ $# -eq 1 ] || {
+		echo "usage: dotfiles look --json" >&2
+		exit 2
+	}
+	for t in chezmoi jq; do
+		command -v "$t" >/dev/null 2>&1 || {
+			echo "dotfiles look: $t not on PATH" >&2
+			exit 1
+		}
+	done
+	data="$(cd / && chezmoi data --format json)" || {
+		echo "dotfiles look: chezmoi data failed" >&2
+		exit 1
+	}
+	printf '%s\n' "$data" | jq '
+		def nz: if . == null or . == "" then null else . end;
+		["clear", "frosted", "tinted", "solid"] as $known
+		| (.glass_levels // {} | keys) as $have
+		| {theme: (.theme | nz), glass: (.glass | nz),
+			levels: ([$known[] | select(IN($have[]))]
+				+ [$have[] | select(. != "default" and (IN($known[]) | not))]
+				+ [$have[] | select(. == "default")]),
+			themes: [.themes // {} | to_entries[]
+				| {slug: .key, colors: (.value | with_entries(select(.key | test("^base0[0-9A-F]$"))))}]
+				| sort_by(.slug)}'
 }
+
+# cmd_zsh FUNC ARG: the zsh FUNC (theme or glass) from the repo's 45-theme.zsh,
+# without rc files and with stdin closed, so `theme` never execs a new shell.
+cmd_zsh() {
+	[ $# -eq 2 ] || {
+		echo "usage: dotfiles $1 $([ "$1" = theme ] && echo SLUG || echo LEVEL)" >&2
+		exit 2
+	}
+	command -v zsh >/dev/null 2>&1 || {
+		echo "dotfiles $1: zsh not on PATH" >&2
+		exit 1
+	}
+	# shellcheck disable=SC2016 # expanded by zsh
+	exec zsh -fc 'compdef() { :; }; source "$1" || exit 1; shift; "$@"' zsh \
+		"$repo_root/home/dot_config/zsh/conf.d/45-theme.zsh" "$@" </dev/null
+}
+
+# cmd_tui [args]: the Textual app, run by uv from its locked script env
+cmd_tui() {
+	command -v uv >/dev/null 2>&1 || {
+		echo "dotfiles tui: uv not on PATH" >&2
+		exit 1
+	}
+	exec uv run --quiet --locked --script "$repo_root/scripts/tui/dotfiles_tui.py" "$@"
+}
+
+# Bare `dotfiles` opens the TUI on a terminal; scripts keep usage + exit 2.
+if [ $# -eq 0 ]; then
+	if [ -t 0 ] && [ -t 1 ]; then
+		set -- tui
+	else
+		usage
+		exit 2
+	fi
+fi
 sub="$1"
 shift
 case "$sub" in
@@ -669,6 +737,9 @@ list) cmd_list "$@" ;;
 add | remove) cmd_edit "$sub" "$@" ;;
 update) cmd_update "$@" ;;
 doctor) exec sh "$repo_root/scripts/doctor.sh" "$@" ;;
+look) cmd_look "$@" ;;
+theme | glass) cmd_zsh "$sub" "$@" ;;
+tui) cmd_tui "$@" ;;
 *)
 	echo "dotfiles: unknown subcommand: $sub" >&2
 	usage

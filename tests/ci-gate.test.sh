@@ -37,16 +37,19 @@ done < <(grep -v '^[[:space:]]*#' "$filter" | grep -oE '(\.github/[a-z/-]+|[a-z]
 
 # closure ROOT...: repo scripts transitively referenced from ROOTs
 closure() {
-	local seen=$'\n' queue=("$@") f r
+	local seen=$'\n' queue=("$@") f r refs
 	while ((${#queue[@]})); do
 		f="${queue[0]}"
 		queue=("${queue[@]:1}")
 		[[ $seen == *$'\n'"$f"$'\n'* ]] && continue
 		seen+="$f"$'\n'
 		[ -f "$f" ] || continue
+		# a here-string, not < <(...): bash 3.2 leaks a pipe per process
+		# substitution, and at the fd limit this loop spun forever
+		refs="$(grep -ohE '(\.github/scripts|scripts)/[A-Za-z0-9_-]+\.sh' "$f" | sort -u)"
 		while IFS= read -r r; do
 			[ -f "$r" ] && queue+=("$r")
-		done < <(grep -ohE '(\.github/scripts|scripts)/[A-Za-z0-9_-]+\.sh' "$f" | sort -u)
+		done <<<"$refs"
 	done
 	printf '%s' "$seen" | grep -E '^(\.github/scripts|scripts)/.*\.sh$'
 }

@@ -118,6 +118,15 @@ saying so.
   (no file changes) and reports incoming commits, chezmoi drift and missing
   tools.
 - `dotfiles doctor` — read-only health check (also `doctor`).
+- `dotfiles tui`, or bare `dotfiles` in a terminal — a full-screen view of the
+  above: **Tools** (space marks a tool to add or remove, `a` applies),
+  **Health** (doctor), **Update** (`--check` on open, `u` updates) and
+  **Look** (theme list with a palette preview, glass level). Keys: `1`–`4`
+  switch tabs, `q` quits. It runs with uv from a locked environment
+  (`scripts/tui/`), and its colours follow the active theme.
+- `dotfiles look --json`, `dotfiles theme SLUG`, `dotfiles glass LEVEL` — what
+  the Look tab uses: the theme and glass state as JSON, and `theme`/`glass`
+  without a terminal.
 
 On macOS, Raycast has *Dotfiles Update* and *Dotfiles Doctor* commands
 ([Raycast](docs/raycast.md)).
