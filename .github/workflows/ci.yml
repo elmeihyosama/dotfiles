@@ -16,9 +16,11 @@ permissions:
   contents: read
 
 # Here only: in a called workflow `github.workflow` is this one's name, so
-# callee groups would collide with this run's.
+# callee groups would collide with this run's. Keyed on the event too, so a
+# docs push to main can't cancel the weekly full run. Any label event
+# restarts a PR's run (only `ci:full` changes what it does).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -53,7 +55,8 @@ jobs:
           *) full=--full ;;
           esac
           if [ -n "$range" ]; then
-            git diff --no-renames --name-only "$range" HEAD
+            # quotePath off: quoted non-ASCII paths would miss the filter.
+            git -c core.quotePath=false diff --no-renames --name-only "$range" HEAD
           fi | ./.github/scripts/ci-changes.sh $full | tee -a "$GITHUB_OUTPUT"
 
   # `./` not `$/`: actionlint rejects `$/` (see lint.yml's setup-lint).

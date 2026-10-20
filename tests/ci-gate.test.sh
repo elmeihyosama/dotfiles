@@ -15,7 +15,9 @@ assert_eq "provision=false bootstrap=false" "$(gate tests/glass.test.sh .github/
 assert_eq "provision=true bootstrap=true" "$(gate home/dot_zshrc.tmpl)" "home/: both"
 assert_eq "provision=true bootstrap=true" "$(gate ansible/site.yml)" "ansible/: both"
 assert_eq "provision=true bootstrap=true" "$(gate scripts/doctor.sh)" "scripts/: both"
-assert_eq "provision=true bootstrap=false" "$(gate mise.lock)" "repo toolchain: provision (macOS job)"
+for p in mise.toml mise.lock .mise/locks/pipx-ansible-core/x/uv.lock; do
+	assert_eq "provision=true bootstrap=false" "$(gate "$p")" "repo toolchain $p: provision (macOS job)"
+done
 assert_eq "provision=true bootstrap=false" "$(gate $wf/provision.yml)" "provision.yml: provision only"
 assert_eq "provision=false bootstrap=true" "$(gate install.sh)" "install.sh: bootstrap only"
 assert_eq "provision=false bootstrap=true" "$(gate $wf/bootstrap.yml)" "bootstrap.yml: bootstrap only"
@@ -25,9 +27,13 @@ assert_eq "provision=true bootstrap=true" "$(sh "$filter" --full </dev/null | pa
 assert_eq "provision=false bootstrap=false" "$(sh "$filter" </dev/null | paste -sd' ' -)" "no changes: nothing gated runs"
 
 # filter_paths_exist: a renamed file must not silently drop out of the filter
+n=0
 while IFS= read -r p; do
+	n=$((n + 1))
 	[ -e "$p" ] || fail "filter names a missing path: $p"
 done < <(grep -v '^[[:space:]]*#' "$filter" | grep -oE '(\.github/[a-z/-]+|[a-z]+)\.(sh|yml|toml|lock)|\.chezmoiroot')
+# a reformat that hides every path from the grep must not pass vacuously
+[ "$n" -ge 12 ] || fail "filter path check saw only $n paths (want >= 12)"
 
 # closure ROOT...: repo scripts transitively referenced from ROOTs
 closure() {
