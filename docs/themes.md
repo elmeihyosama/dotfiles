@@ -24,9 +24,12 @@ btop, fzf, git-delta, gh-dash, cava, nvim, vivid/LS_COLORS) renders from those
 - **Interactive:** run `theme` (fzf picker over all schemes) or `theme <slug>`.
 - **Manual:** set the slug in one of the places above, then `chezmoi apply`.
 
-New shells and new ghostty windows pick the theme up automatically; existing
-**ghostty windows, zellij sessions, nvim, and running TUIs (btop, lazydocker,
-lazygit, yazi)** need a reload/restart.
+New shells and new ghostty windows pick the theme up automatically. After
+applying, `theme`, `glass` and `wallpaper` reload what they can live: every
+running nvim (over its RPC socket, 2s limit each), cmux, and zellij (it
+reloads `config.kdl` on change). Existing **ghostty windows** need the reload
+key (`⌘⇧,`, or `ctrl+shift+,` on Linux), and **running TUIs (btop,
+lazydocker, lazygit, yazi)** need a restart.
 
 ### cmux
 

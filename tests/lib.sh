@@ -116,7 +116,9 @@ mk_home() {
 	export XDG_DATA_HOME="$d/.local/share"
 	export XDG_STATE_HOME="$d/.local/state"
 	export XDG_CACHE_HOME="$d/.cache"
-	mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME"
+	# Also where theme live-reload looks for nvim sockets: never the real ones.
+	export XDG_RUNTIME_DIR="$d/.run"
+	mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME" "$XDG_RUNTIME_DIR"
 }
 
 # run_zsh_env SCRIPT [ENV=VAL ...]: render SCRIPT (a template), source it in

@@ -62,7 +62,10 @@ source-path) echo "$STUB_SRC/home" ;;
 apply) echo apply >>"$STUB_LOG" ;;
 esac
 STUB
-chmod +x "$HOME/bin/chezmoi"
+# glass live-reloads: keep it off the real cmux and nvim sockets.
+printf '#!/bin/sh\n' >"$HOME/bin/cmux"
+chmod +x "$HOME/bin/chezmoi" "$HOME/bin/cmux"
+export THEME_NVIM_GLOB="$HOME/no-nvim/*.0"
 cfg="$HOME/chezmoi.toml"
 
 # run_glass ARGS...: run `glass ARGS` in zsh -f with stdin not a tty; prints

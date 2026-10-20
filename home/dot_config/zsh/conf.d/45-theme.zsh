@@ -53,9 +53,8 @@ theme() {
   fi
   _chezmoi_set_data theme "$slug" "$cfg" || return 1
   chezmoi apply || return 1
-  # cmux reads ~/.config/ghostty/config directly; repaint running sessions live.
-  command -v cmux >/dev/null 2>&1 && cmux reload-config >/dev/null 2>&1
-  echo "theme → ${slug}.  cmux repaints live; new shells, ghostty windows, zellij & nvim need a restart to fully apply."
+  echo "theme → ${slug}"
+  _theme_live_reload
   # Only interactive terminals: a headless caller (Raycast, cron) exec'ing an
   # interactive zsh would strand a shell waiting on stdin.
   if [[ -t 0 && -t 1 ]]; then
@@ -102,13 +101,41 @@ wallpaper() {
   esac
   _chezmoi_set_data wallpaper_mode "$next" "$cfg" || return 1
   chezmoi apply || return 1
-  command -v cmux >/dev/null 2>&1 && cmux reload-config >/dev/null 2>&1
   echo "wallpaper → ${next}"
+  _theme_live_reload
 }
 
-# _theme_live_reload: repaint running apps after a config change (no-op until
-# the live-reload task fills it in).
-_theme_live_reload() { :; }
+# _theme_live_reload: repaint running apps after `chezmoi apply`. nvim over RPC
+# (THEME_NVIM_GLOB overrides the socket glob), cmux via reload-config; zellij
+# reloads config.kdl itself; Ghostty needs its reload key.
+_theme_live_reload() {
+  emulate -L zsh
+  setopt no_monitor no_notify
+  local -a socks
+  if [[ -n ${THEME_NVIM_GLOB-} ]]; then
+    socks=(${~THEME_NVIM_GLOB}(N=))
+  else
+    socks=(${XDG_RUNTIME_DIR:-${${TMPDIR:-/tmp}%/}}/nvim.${USER}/*/nvim.*.0(N=))
+    [[ -n ${XDG_RUNTIME_DIR-} ]] && socks+=($XDG_RUNTIME_DIR/nvim.*.0(N=))
+  fi
+  local s pid wd n=0
+  if (( ${#socks} )) && command -v nvim >/dev/null 2>&1; then
+    for s in $socks; do
+      nvim --server $s --remote-expr 'luaeval("require(\"config.theme_reload\").reload()")' >/dev/null 2>&1 &
+      pid=$!
+      # 2s watchdog (no `timeout` on stock macOS): a hung nvim never answers.
+      { sleep 2; kill $pid } >/dev/null 2>&1 &
+      wd=$!
+      wait $pid 2>/dev/null && (( ++n ))
+      kill $wd 2>/dev/null
+    done
+  fi
+  # cmux reads ~/.config/ghostty/config directly.
+  command -v cmux >/dev/null 2>&1 && cmux reload-config >/dev/null 2>&1
+  print -r -- "reloaded $n nvim; ghostty: press ⌘⇧, (or ctrl+shift+, on Linux) to apply"
+  command -v zellij >/dev/null 2>&1 && print -r -- "zellij: applied"
+  return 0
+}
 
 # glass: set the Ghostty translucency level (machine-local; no git diff).
 #   glass clear|frosted|tinted|solid|default|off   (off = default)
@@ -139,8 +166,8 @@ glass() {
   fi
   _chezmoi_set_data glass "$level" "$cfg" || return 1
   chezmoi apply || return 1
-  _theme_live_reload
   echo "glass → ${level}"
+  _theme_live_reload
 }
 
 _glass_levels() {
