@@ -4,6 +4,9 @@ on:
     paths:
       - 'install.sh'
       - 'ansible/**'
+      - 'home/**'
+      - 'scripts/select-tools.sh'
+      - 'scripts/cleanup-ubi.sh'
       - '.github/scripts/bootstrap-smoke.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'
@@ -13,6 +16,9 @@ on:
     paths:
       - 'install.sh'
       - 'ansible/**'
+      - 'home/**'
+      - 'scripts/select-tools.sh'
+      - 'scripts/cleanup-ubi.sh'
       - '.github/scripts/bootstrap-smoke.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'
@@ -34,8 +40,8 @@ concurrency:
 jobs:
   bootstrap:
     # The provision matrix covers per-distro package installs; this job covers
-    # the entry point itself (install.sh end-to-end): Ubuntu for its apt
-    # branch, Fedora for its dnf branch.
+    # the entry point itself (install.sh end-to-end) on an apt (Ubuntu) and a
+    # dnf (Fedora) host.
     name: bootstrap ${{ matrix.distro }} (${{ matrix.mode }})
     runs-on: ubuntu-24.04
     strategy:

@@ -22,8 +22,9 @@ mise_sha256:
   linux-x64: "2b010104bfedca93b0dd69a8276a4f364bd9236a41d1faceae367d39b5e53f8a"
   linux-arm64: "b8994b622e2065e6bb083322bd011fd4111102bfec4883c4ce0336c1e3cb9e0d"
 # zjstatus must match the installed zellij minor (zellij-tile ABI) or the
-# server wedges at 100% CPU ("Unrecognized plugin command"). zellij is unpinned,
-# so tasks/zjstatus.yml picks the entry for `zellij --version`. To add one:
+# server wedges at 100% CPU ("Unrecognized plugin command"). zellij is pinned
+# in tools.yaml, but a user's own mise config may override it, so
+# tasks/zjstatus.yml picks the entry for `zellij --version`. To add one:
 # check zellij-tile in the tag's Cargo.toml and pin the wasm's sha256.
 zjstatus_by_zellij_minor:
   "0.42": { version: "v0.21.0", sha256: "a7a2539c0ca29b44f74e42731a1122b737372693e8bcbe64ee36fc82ffa82c3e" }
@@ -31,206 +32,35 @@ zjstatus_by_zellij_minor:
   "0.44": { version: "v0.24.0", sha256: "1ccedece1ded62cf3e209be690cdd39ca6fb9e8228ed71a951f6507f9956669b" }
   "0.45": { version: "v0.25.0", sha256: "282ceab219e56e1908c9fac33907241fe6c3e1ef7d85faab3e5f438cef87b8fe" }
 
-# Canonical tool list (installed on every machine).
-tools:
-  - chezmoi
-  - atuin
-  - sheldon
-  - zellij
-  - navi
-  - starship
-  - zoxide
-  - eza
-  - bat
-  - fd
-  - ripgrep
-  - fzf
-  - git-delta
-  - lazygit
-  - lazydocker
-  - yazi
-  - jq
-  - yq
-  - gh
-  - dust
-  - duf
-  - btop
-  - neovim
-  - gitleaks
-  - editorconfig-checker
-  - fastfetch
-  - git-absorb
-  - gh-dash
-  - mise
-  - cava
-  - vivid
-  - hyperfine
-  - xh
-  - jless
-  - watchexec
-  - age
-  - age-keygen
+# Python bootstrap toolchain. install.sh reads uv_version/ansible_core_version
+# with sed (it runs before Ansible exists): keep each on one line as
+# `key: "X.Y.Z"`. All three equal the repo mise.toml pins
+# (tests/python-pins.test.sh).
+uv_version: "0.13.1"
+ansible_core_version: "2.21.5"
+pre_commit_version: "4.7.0"
 
-# owner/repo for the ubi no-sudo fallback
-ubi_tool_repos:
-  chezmoi: twpayne/chezmoi
-  atuin: atuinsh/atuin
-  sheldon: rossmacarthur/sheldon
-  zellij: zellij-org/zellij
-  navi: denisidoro/navi
-  starship: starship/starship
-  zoxide: ajeetdsouza/zoxide
-  eza: eza-community/eza
-  bat: sharkdp/bat
-  fd: sharkdp/fd
-  ripgrep: BurntSushi/ripgrep
-  fzf: junegunn/fzf
-  git-delta: dandavison/delta
-  lazygit: jesseduffield/lazygit
-  lazydocker: jesseduffield/lazydocker
-  yazi: sxyazi/yazi
-  jq: jqlang/jq
-  yq: mikefarah/yq
-  gh: cli/cli
-  dust: bootandy/dust
-  duf: muesli/duf
-  btop: aristocratos/btop
-  neovim: neovim/neovim
-  gitleaks: gitleaks/gitleaks
-  editorconfig-checker: editorconfig-checker/editorconfig-checker
-  fastfetch: fastfetch-cli/fastfetch
-  git-absorb: tummychow/git-absorb
-  gh-dash: dlvhdr/gh-dash
-  mise: jdx/mise
-  vivid: sharkdp/vivid
-  hyperfine: sharkdp/hyperfine
-  xh: ducaale/xh
-  jless: PaulJuliusMartinez/jless
-  watchexec: watchexec/watchexec
-  age: FiloSottile/age
-  age-keygen: FiloSottile/age
-
-# tools whose extracted binary name differs from the canonical name (for ubi --exe)
-ubi_exe_overrides:
-  git-delta: delta
-  ripgrep: rg
-  gh: gh        # repo is cli/cli, but the binary inside the archive is `gh`
-  neovim: nvim  # canonical command for the neovim project; see ubi_extract_all
-  editorconfig-checker: ec  # canonical command (Arch/brew rename to it too); see ubi_archive_exe_overrides
-  age-keygen: age-keygen  # same archive as `age`; pick the keygen binary out of it
-
-# Tools whose release archive is a TREE, not a standalone binary: the program
-# locates its own files RELATIVE TO THE EXECUTABLE, so ubi's default single-exe
-# extraction silently cripples it. neovim ships bin/nvim + share/nvim/runtime
-# (~2200 files); with only the binary it still answers `--version` but dies on
-# any real use ("module 'vim.uri' not found", "E484 .../syntax/syntax.vim").
-# These are unpacked whole into {{ local_opt }}/<tool> with --extract-all and
-# the executable symlinked into {{ local_bin }} — nvim resolves the symlink, so
-# it finds ../share/nvim/runtime. Value = executable path inside the archive
-# (ubi --extract-all strips the archive's shared top-level directory).
-ubi_extract_all:
-  neovim: bin/nvim
-
-# Post-install smoke test, run by .github/scripts/assert-tools.sh on top of the
-# `--version` check. `--version` is answered by the binary alone, which is why a
-# runtime-less neovim passed every assertion while being unusable. A tool listed
-# here must exit 0 AND print nothing (nvim prints E484 but still exits 0).
-tool_smoke_tests:
-  neovim: nvim --clean --headless -c qa
-
-# File name INSIDE the release archive when it differs from the installed name
-# above: ubi extracts it with --exe and installs it as --rename-exe.
-ubi_archive_exe_overrides:
-  editorconfig-checker: editorconfig-checker # v4 renamed the binary from `ec`
-
-# Force a specific ubi release asset when a tool ships multiple (e.g. glibc vs
-# musl). yazi's gnu binary needs a very new glibc; the musl static build runs
-# on any Linux, so we always pick it.
-ubi_match_overrides:
-  yazi: musl
-  atuin: musl
-  mise: musl
-  watchexec: musl # gnu build needs GLIBC_2.29; RHEL 8 / older hosts ship 2.28
-
-# Some projects publish assets that collide with `--matching` substrings across
-# unrelated binaries. atuin's release ships atuin-server-*, cargo-dist self
-# updater helpers (*-update), and the real CLI (atuin-*.tar.gz) — all of which
-# contain "musl"/"gnu", so `--matching` alone can't tell them apart. Filter to
-# the real CLI archive first via `--matching-regex`, then let `--matching`
-# (above) pick musl vs gnu within that filtered set.
-ubi_matching_regex_overrides:
-  atuin: '^atuin-[a-z0-9_]+-unknown-linux-(gnu|musl)\.tar\.gz$'
-  # watchexec ships .deb/.rpm/.tar.xz plus checksum sidecars per target, all
-  # containing "musl" — pin the tarball, let `--matching musl` pick libc.
-  watchexec: '^watchexec-[0-9.]+-[a-z0-9_]+-unknown-linux-(gnu|musl)\.tar\.xz$'
-
-# Homebrew formula names that differ from canonical (canonical name is used when
-# a tool is absent here). Empty today — the default homebrew-core `dust` formula
-# is correct, so no override is needed.
-brew_formula_overrides:
-  age-keygen: age  # one formula ships both binaries; installing twice is a no-op
-
-# Homebrew installs a binary under a non-canonical name; symlink the canonical
-# command into ~/.local/bin. Keyed canonical-command -> Homebrew binary name.
-brew_bin_renames:
-  ec: editorconfig-checker   # brew ships `editorconfig-checker`; ubi/CI ships `ec`
-
-# --- Native package install (sudo path) ---------------------------------
-# Per-manager package name, only when it differs from the canonical tool name.
-# Tools absent here use the canonical name. dnf covers Fedora + RHEL/EPEL.
-native_pkg_overrides:
-  apt:
-    fd: fd-find
-    age-keygen: age  # one package ships both binaries
-  dnf:
-    fd: fd-find
-    age-keygen: age
-  pacman:
-    age-keygen: age
-
-# Native package that installs the binary under a non-canonical name; we
-# symlink the canonical name to it in ~/.local/bin. Keyed by manager, then tool.
-native_bin_renames:
-  apt:
-    bat: batcat
-    fd: fdfind
-  dnf: {}
-  pacman: {}
-
-# Minimum acceptable version for tools whose configs need a floor. A native
-# package below the floor is rejected in favour of ubi. Tools absent here
-# accept whatever the repo ships.
-min_versions:
-  neovim: "0.9.0"
-  # conf.d/40-fzf.zsh needs `fzf --zsh` (0.48+); Ubuntu 24.04 apt ships 0.44.
-  # A floor routes the tool to ubi on every sudo-Linux host (tasks/packages.yml).
-  fzf: "0.48.0"
-  # yq is also in force_ubi, so the native/ubi partition never consults this
-  # floor for it — kept only because .github/scripts/assert-tools.sh re-reads min_versions to
-  # verify the INSTALLED yq is 4.x (Debian apt ships the incompatible Python yq 3.x).
-  yq: "4.0.0"
-
-# Always install via ubi on Linux even when a native package exists — some distro
-# builds are unreliable (Ubuntu apt ships gitleaks 8.16, pre-`git` CLI; Arch's build
-# reports no version). The official ubi release is consistent. macOS uses Homebrew.
-force_ubi:
-  - gitleaks
-  - yq # native "yq" is often the incompatible Python/jq wrapper (Arch, Debian); we need mikefarah yq
-  - git-absorb # apt (debian/ubuntu) ships a package that installs no `git-absorb` on PATH; ubi is reliable
-
-# Tools with NO Homebrew formula at all (verified against formulae.brew.sh —
-# no homebrew-core formula/alias/oldname, and no formula in the upstream
-# maintainer's own tap). On macOS these are installed via ubi into
-# ~/.local/bin instead of `brew install`, same as the no-sudo Linux fallback.
-brew_unavailable:
-  - gh-dash # distributed as a `gh` CLI extension or raw GitHub release binaries; no brew formula/tap
-
-# Tools with NO usable ubi binary release — upstream ships source-only archives,
-# so ubi cannot install them. Provisioned via Homebrew (macOS) or the native
-# package manager (sudo Linux); SKIPPED on no-sudo Linux. Non-critical eye-candy.
-ubi_unavailable:
-  - cava # karlstav/cava releases ship only cava-<v>.tar.gz (source) + a Windows .msi
-  - jless # linux binary dynamically links libxcb (clipboard) — unusable on minimal/no-sudo hosts; macOS gets it via brew
+# CLI tools come from mise (home/.chezmoidata/tools.yaml, rendered into
+# ~/.config/mise-dotfiles/config.toml, locked by mise.lock beside it). mise
+# reads that dir as its "system" config scope via MISE_SYSTEM_CONFIG_DIR.
+# MISE_DATA_DIR is per-arch under shared_home (matches conf.d/00-env.zsh).
+mise_config_root: "{{ ansible_facts['env']['HOME'] }}/.config/mise-dotfiles"
+mise_data_dir: "{{ local_share }}/mise"
+# Environment for the playbook's tasks (site.yml): mise-installed tools
+# resolve through the shims. Tasks run with cwd inside the repo, so mise would
+# also load the repo's own mise.toml (the lint toolchain, untrusted on a fresh
+# machine) and any config in the dirs above it: ignore the former and stop the
+# upward search at the repo root.
+mise_env:
+  MISE_SYSTEM_CONFIG_DIR: "{{ mise_config_root }}"
+  MISE_DATA_DIR: "{{ mise_data_dir }}"
+  MISE_IGNORED_CONFIG_PATHS: "{{ playbook_dir | dirname }}"
+  MISE_CEILING_PATHS: "{{ playbook_dir | dirname }}"
+  PATH: "{{ mise_data_dir }}/shims:{{ local_bin }}:{{ ansible_facts['env']['PATH'] }}"
+# Installs only the dotfiles pins: the user's global config is masked (a tool
+# there with no lock entry would fail --locked); callers also pass -C / so no
+# cwd mise.toml joins in.
+mise_install_env: "{{ mise_env | combine({'MISE_GLOBAL_CONFIG_FILE': '/nonexistent/mise-user.toml', 'MISE_YES': '1'}) }}"
 
 # GUI apps installed via Homebrew cask on macOS (skipped on Linux). The value
 # is the app bundle name, used to detect a pre-existing manual install —

@@ -27,7 +27,7 @@ fi
 # ^T (files) and Alt-C (cd). 40 loads after 35, so re-assert atuin's ^R here.
 if command -v fzf >/dev/null 2>&1; then
   # `fzf --zsh` needs >= 0.48 (Ubuntu 24.04 apt ships 0.44 and errors on every
-  # shell start). min_versions routes fzf to ubi; guard for other sources too.
+  # shell start). fzf is mise-pinned (tools.yaml); guard for other sources too.
   if _fzf_init=$(fzf --zsh 2>/dev/null); then
     eval "$_fzf_init"
   else

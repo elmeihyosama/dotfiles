@@ -10,7 +10,7 @@
 
 - name: Fail clearly if chezmoi is missing
   ansible.builtin.fail:
-    msg: "chezmoi not found — the packages task must run before chezmoi."
+    msg: "chezmoi not found (a core mise tool) — the packages task must run before chezmoi."
   when: _chezmoi.rc != 0
 
 - name: Ensure chezmoi config dir
@@ -114,5 +114,15 @@
 # Pre-existing files are backed up first by the run_once backup script.
 - name: Apply chezmoi (only when there are pending changes)
   ansible.builtin.command: "{{ _chezmoi.stdout }} apply --force"
+  register: _cz_apply
   when: _cz_status.stdout | length > 0
   changed_when: true
+
+# Surfaces run_onchange script noise (a "command not found" here means a
+# script ran before the tool it needs was installed; CI greps for it).
+- name: Show chezmoi apply output
+  ansible.builtin.debug:
+    msg: "{{ (_cz_apply.stdout_lines | default([])) + (_cz_apply.stderr_lines | default([])) }}"
+  when: >-
+    _cz_apply is changed
+    and ((_cz_apply.stdout | default('')) ~ (_cz_apply.stderr | default(''))) | length > 0

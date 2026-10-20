@@ -38,7 +38,7 @@ assert_eq "$(sha_of macos-arm64)" "$(grep -E '^[[:space:]]*sha256:' .github/work
 assert_contains "$(cat ansible/tasks/mise.yml 2>/dev/null)" "mise_sha256" "tasks/mise.yml uses mise_sha256"
 site="$(cat ansible/site.yml)"
 assert_contains "$site" "tasks/mise.yml" "site.yml imports tasks/mise.yml"
-assert_contains "$site" "tags: [mise]" "mise import is tagged"
+assert_contains "$site" "tags: [mise, packages]" "mise import is tagged (packages runs it too)"
 mi="$(grep -n 'import_tasks: tasks/mise.yml' ansible/site.yml | head -1 | cut -d: -f1)"
 pk="$(grep -n 'import_tasks: tasks/packages.yml' ansible/site.yml | head -1 | cut -d: -f1)"
 [ -n "$mi" ] && [ -n "$pk" ] && [ "$mi" -lt "$pk" ] || fail "mise import precedes packages"

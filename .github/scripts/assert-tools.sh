@@ -1,38 +1,56 @@
 #!/usr/bin/env sh
-# Assert every canonical tool binary resolves, runs, and meets its version floor.
-# Usage: .github/scripts/assert-tools.sh [path/to/group_vars/all.yml]
-# Reads the tool list + overrides from group_vars so there is one source of truth.
+# Assert every tool this machine selects resolves, runs, and passes its smoke test.
+# Usage: .github/scripts/assert-tools.sh [LOCAL_YML]   (default: ansible/local.yml)
+# The tool set comes from scripts/select-tools.sh over home/.chezmoidata/tools.yaml
+# (one source of truth with the playbook). mise / bootstrap / bundled tools are
+# required; native tools (brew/distro packages, best effort) are checked only
+# when present. Runs from / so no repo mise.toml shadows the dotfiles pins.
 set -eu
 
-VARS="${1:-ansible/group_vars/all.yml}"
-export PATH="$HOME/.local/bin:$PATH"
+repo="$(CDPATH='' cd "$(dirname "$0")/../.." && pwd)"
+local_yml="${1:-$repo/ansible/local.yml}"
 
-command -v yq >/dev/null 2>&1 || {
-	echo "FAIL: yq not on PATH (provision did not install it)"
-	exit 1
-}
+# Same layout as ansible/group_vars/all.yml (mise_env): the dotfiles pins dir
+# and the (per-arch under shared_home) shims first, then the local bin.
+shared_home=false
+if [ -f "$local_yml" ] && grep -Eq '^[[:space:]]*shared_home:[[:space:]]*true' "$local_yml"; then
+	shared_home=true
+fi
+if [ "$shared_home" = true ]; then
+	sfx="-$(uname -m)"
+else
+	sfx=""
+fi
+export MISE_SYSTEM_CONFIG_DIR="${MISE_SYSTEM_CONFIG_DIR:-$HOME/.config/mise-dotfiles}"
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share$sfx/mise}"
+export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin$sfx:$HOME/.local/bin:$PATH"
+cd /
 
-# $1 >= $2  (semantic version compare via sort -V)
-vge() { [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$2" ]; }
+for t in yq jq; do
+	command -v "$t" >/dev/null 2>&1 || {
+		echo "FAIL: $t not on PATH (provision did not install the core tools)"
+		exit 1
+	}
+done
 
-# Tools with no ubi binary (source-only, e.g. cava) are best-effort: installed
-# only where a native package or brew exists, and deliberately skipped on no-sudo
-# Linux. They are not a hard requirement, so exempt them from the assertion.
-ubi_unavailable=" $(yq '.ubi_unavailable // [] | .[]' "$VARS" | tr '\n' ' ') "
+case "$(uname -s)" in Darwin) os=darwin ;; *) os=linux ;; esac
+sel="$("$repo/scripts/select-tools.sh" --os "$os" --local "$local_yml")"
+tools_yaml="$repo/home/.chezmoidata/tools.yaml"
 
 fail=0
-for tool in $(yq '.tools[]' "$VARS"); do
-	case "$ubi_unavailable" in
-	*" $tool "*)
-		echo "SKIP: $tool (ubi_unavailable — optional, platform-conditional)"
-		continue
-		;;
-	esac
-	bin="$(yq ".ubi_exe_overrides.\"$tool\" // \"$tool\"" "$VARS")"
+for row in $(printf '%s\n' "$sel" | jq -r '.[] | "\(.name):\(.bin):\(.source)"'); do
+	tool="${row%%:*}"
+	rest="${row#*:}"
+	bin="${rest%%:*}"
+	source="${rest#*:}"
 
 	if ! command -v "$bin" >/dev/null 2>&1; then
-		echo "FAIL: $tool -> '$bin' not found on PATH"
-		fail=1
+		if [ "$source" = native ]; then
+			echo "SKIP: $tool -> '$bin' (native, best effort: not installed here)"
+		else
+			echo "FAIL: $tool -> '$bin' not found on PATH"
+			fail=1
+		fi
 		continue
 	fi
 	if ! out="$("$bin" --version 2>&1)"; then
@@ -45,7 +63,7 @@ for tool in $(yq '.tools[]' "$VARS"); do
 	# install tree (a neovim without share/nvim/runtime passes it and is still
 	# unusable). Tools with a smoke test must also exit 0 AND stay silent —
 	# nvim prints E484 on a broken runtime but still exits 0, so check output.
-	smoke="$(yq ".tool_smoke_tests.\"$tool\" // \"\"" "$VARS")"
+	smoke="$(yq ".tools.\"$tool\".smoke // \"\"" "$tools_yaml")"
 	if [ -n "$smoke" ]; then
 		if ! sout="$(sh -c "$smoke" 2>&1)" || [ -n "$sout" ]; then
 			echo "FAIL: $tool -> smoke test failed: $(printf '%s' "$sout" | head -n1)"
@@ -53,19 +71,7 @@ for tool in $(yq '.tools[]' "$VARS"); do
 			continue
 		fi
 	fi
-
-	floor="$(yq ".min_versions.\"$tool\" // \"\"" "$VARS")"
-	if [ -n "$floor" ]; then
-		have="$("$bin" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
-		if [ -z "$have" ] || ! vge "$have" "$floor"; then
-			echo "FAIL: $tool -> '$bin' version '${have:-?}' below floor '$floor'"
-			fail=1
-			continue
-		fi
-		echo "OK:   $tool -> $bin ($have >= $floor)"
-	else
-		echo "OK:   $tool -> $bin"
-	fi
+	echo "OK:   $tool -> $bin ($source: $(command -v "$bin"))"
 done
 
 [ "$fail" -eq 0 ] && echo "All tool assertions passed." || echo "Tool assertions FAILED."

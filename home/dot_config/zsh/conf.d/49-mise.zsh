@@ -16,15 +16,14 @@ if command -v mise >/dev/null 2>&1; then
 
   # Completions.
   #
-  # On macOS (Homebrew install, see Task 1) the `mise` formula already
-  # symlinks a static `_mise` completion function into
-  # /opt/homebrew/share/zsh/site-functions, which is a default zsh fpath
-  # component scanned by `compinit` in 20-completion.zsh — that file loads
+  # A Homebrew `mise` formula (if the user has one) symlinks a static
+  # `_mise` completion function into /opt/homebrew/share/zsh/site-functions,
+  # a default zsh fpath component scanned by `compinit` in 20-completion.zsh — that file loads
   # at position 20, before this one (49), so it's already picked up with
   # zero code here and without touching the 24h zcompdump cache at all.
   #
-  # On Linux (mise installed via ubi as a bare static binary, no package
-  # manager involved) there is no such file anywhere, so provide a portable
+  # The dotfiles install mise as a bare pinned binary (ansible/tasks/mise.yml,
+  # every OS), which ships no completion file, so provide a portable
   # fallback: cache `mise completion zsh` to a stable fpath dir, regenerated
   # only when missing/empty or older than the mise binary (so an upgrade
   # doesn't leave a stale completion behind) — never on every shell, which

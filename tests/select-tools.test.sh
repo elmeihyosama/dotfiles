@@ -89,12 +89,22 @@ assert_eq bootstrap "$(field mise source)" "mise is bootstrap"
 out="$("$sel" --os linux --local "$d/absent.yml")"
 assert_eq "$all" "$(names)" "missing local.yml: default selection"
 
-# yaml_has_every_legacy_tool
-legacy="$(yq '.tools[]' "$TESTS_REPO/ansible/group_vars/all.yml")"
-for t in $legacy; do
+# yaml_has_every_legacy_tool: the pre-mise group_vars `tools` list (removed
+# from group_vars; tools.yaml is now the only catalog)
+for t in chezmoi atuin sheldon zellij navi starship zoxide eza bat fd ripgrep fzf \
+	git-delta lazygit lazydocker yazi jq yq gh dust duf btop neovim gitleaks \
+	editorconfig-checker fastfetch git-absorb gh-dash mise cava vivid hyperfine xh \
+	jless watchexec age age-keygen; do
 	if [ "$(yq ".tools | has(\"$t\")" "$tools_yaml")" != true ]; then
 		fail "yaml_has_every_legacy_tool: $t missing from tools.yaml"
 	fi
+done
+# legacy_keys_gone: group_vars no longer carries the ubi/brew/native install keys
+for k in tools ubi_tool_repos ubi_exe_overrides ubi_extract_all ubi_archive_exe_overrides \
+	ubi_match_overrides ubi_matching_regex_overrides ubi_unavailable force_ubi min_versions \
+	brew_formula_overrides brew_bin_renames brew_unavailable native_pkg_overrides \
+	native_bin_renames tool_smoke_tests; do
+	assert_eq false "$(yq "has(\"$k\")" "$TESTS_REPO/ansible/group_vars/all.yml")" "legacy group_vars key removed: $k"
 done
 
 # no tool may pin "latest"

@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - 'ansible/**'
+      - 'home/**'
+      - 'scripts/select-tools.sh'
+      - 'scripts/cleanup-ubi.sh'
       - '.github/scripts/provision-ci.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'
@@ -11,6 +14,9 @@ on:
     branches: [main]
     paths:
       - 'ansible/**'
+      - 'home/**'
+      - 'scripts/select-tools.sh'
+      - 'scripts/cleanup-ubi.sh'
       - '.github/scripts/provision-ci.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'
@@ -113,10 +119,9 @@ jobs:
         with:
           persist-credentials: false
       # ansible-core comes from the repo toolchain (mise.toml + mise.lock), the
-      # same pins the lint jobs use. Only the mise binary goes on PATH (no
-      # shims, no exported tool paths): the playbook installs chezmoi, yq, …
-      # itself, and mise copies must not mask a broken brew install from
-      # assert-tools.sh.
+      # same pins the lint jobs use. Only the mise binary and ansible go on
+      # PATH: the playbook installs the home tools itself (its own pinned mise,
+      # the dotfiles pins); "Expose the dotfiles mise shims" adds them after.
       - name: Install mise
         uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
         with:
@@ -137,7 +142,12 @@ jobs:
           mise install --locked
           bin="$(dirname "$(mise which ansible-playbook)")"
           echo "$bin" >>"$GITHUB_PATH"
+          echo "ANSIBLE_BIN=$bin" >>"$GITHUB_ENV"
           "$bin/ansible-playbook" --version
+      # Review focus: a Homebrew copy of a pinned tool already on the machine
+      # must not win over the dotfiles' mise one (asserted after provisioning).
+      - name: Preinstall a Homebrew fzf
+        run: brew install fzf
       - name: Install Ansible collections
         run: ansible-galaxy collection install -r ansible/requirements.yml
       - name: Write the CI machine vars (ansible/local.yml)
@@ -146,11 +156,43 @@ jobs:
       - name: Provision (first run)
         working-directory: ansible
         env:
-          # ubi (tools with no brew formula) reads it to raise its API limit.
+          # mise reads it to raise its GitHub API limit.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ansible-playbook site.yml --skip-tags casks
+      - name: Expose the dotfiles mise shims
+        run: |
+          # Shims, then ansible again ahead of them (each GITHUB_PATH line is
+          # prepended), so later steps resolve the home tools through mise.
+          echo "$HOME/.local/share/mise/shims" >>"$GITHUB_PATH"
+          echo "$ANSIBLE_BIN" >>"$GITHUB_PATH"
+          echo "MISE_SYSTEM_CONFIG_DIR=$HOME/.config/mise-dotfiles" >>"$GITHUB_ENV"
       - name: Assert tools
-        run: ./.github/scripts/assert-tools.sh ansible/group_vars/all.yml
+        run: ./.github/scripts/assert-tools.sh
+      - name: Assert mise's fzf wins over Homebrew's
+        run: |
+          brew list fzf >/dev/null || {
+            echo "FAIL: the Homebrew fzf is not installed (test precondition)" >&2
+            exit 1
+          }
+          want="$(yq '.tools.fzf.version' home/.chezmoidata/tools.yaml)"
+          for flags in -c -ic; do
+            # From / (no repo mise.toml), through the deployed ~/.zshenv
+            # (plus ~/.zshrc for -i).
+            path="$(cd / && zsh "$flags" 'command -v fzf' 2>/dev/null | tail -n1)"
+            ver="$(cd / && zsh "$flags" 'fzf --version' 2>/dev/null | tail -n1 | awk '{print $1}')"
+            echo "zsh $flags: fzf -> $path ($ver)"
+            case "$path" in
+            "$HOME/.local/share/mise/"*) ;;
+            *)
+              echo "FAIL: zsh $flags resolves fzf outside mise: $path" >&2
+              exit 1
+              ;;
+            esac
+            if [ "$ver" != "$want" ]; then
+              echo "FAIL: zsh $flags runs fzf $ver, tools.yaml pins $want" >&2
+              exit 1
+            fi
+          done
       - name: Provision (second run must be a no-op)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

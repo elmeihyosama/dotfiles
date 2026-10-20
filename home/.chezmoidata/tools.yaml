@@ -82,6 +82,7 @@ tools:
     group: core
     backend: github:eza-community/eza
     version: "0.23.4"
+    native_on: [darwin] # upstream ships no macOS binary (the github: backend picks the man-page tarball); brew builds it
   ripgrep:
     group: core
     bin: rg
@@ -122,6 +123,8 @@ tools:
     group: git
     backend: github:tummychow/git-absorb
     version: "0.9.0"
+    native_on: [darwin] # macOS asset is x86_64 only (the github: backend picks the man page on arm64); brew has it
+    missing_on: [linux-arm64] # only a 32-bit arm (gnueabihf) Linux asset
   gitleaks:
     group: git
     backend: aqua:gitleaks/gitleaks
