@@ -38,12 +38,15 @@ cd ~/workspace/dotfiles
 
 | Platform | Install strategy |
 | --- | --- |
-| ![macOS][badge-macos] | Homebrew (native) |
-| ![Debian][badge-debian] ![Ubuntu][badge-ubuntu] | apt native + ubi fallback |
-| ![Arch Linux][badge-arch] | pacman native + ubi fallback |
-| ![Fedora][badge-fedora] | dnf native + ubi fallback |
-| ![Rocky Linux][badge-rocky] ![AlmaLinux][badge-alma] | dnf + EPEL native (EL9+) + ubi fallback |
-| ![Any Linux][badge-linux] | ubi user-local binaries — works without `sudo` |
+| ![macOS][badge-macos] | mise-pinned CLI tools; Homebrew for the few native ones |
+| ![Debian][badge-debian] ![Ubuntu][badge-ubuntu] | mise-pinned CLI tools; apt for essentials + native ones |
+| ![Arch Linux][badge-arch] | mise-pinned CLI tools; pacman for essentials + native ones |
+| ![Fedora][badge-fedora] | mise-pinned CLI tools; dnf for essentials + native ones |
+| ![Rocky Linux][badge-rocky] ![AlmaLinux][badge-alma] | mise-pinned CLI tools; dnf for essentials + native ones |
+| ![Any Linux][badge-linux] | mise-pinned CLI tools, user-local — works without `sudo` |
+
+CLI tools and their versions live in `home/.chezmoidata/tools.yaml`; mise
+installs them from a checksum-verified lock (`--locked`).
 
 Every distro × both paths (sudo-native and no-sudo) is provisioned for real in CI.
 WSL is supported and treated as Linux.

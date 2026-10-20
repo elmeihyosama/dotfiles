@@ -9,8 +9,13 @@ _mise_shims="$HOME/.local/share-$(uname -m)/mise/shims"
 {{ else -}}
 _mise_shims="${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims"
 {{ end -}}
-if [[ -d $_mise_shims && ":$PATH:" != *":$_mise_shims:"* ]]; then
-  export PATH="$_mise_shims:$PATH"
+# Always FIRST, even when an inherited PATH already has it further back (a
+# nested shell under one that put ~/.local/bin or Homebrew ahead): the
+# dotfiles' pinned tools must win. conf.d/00-env re-applies this after its own
+# prepends.
+if [[ -d $_mise_shims ]]; then
+  path=("$_mise_shims" ${path:#$_mise_shims})
+  export PATH
 fi
 unset _mise_shims
 

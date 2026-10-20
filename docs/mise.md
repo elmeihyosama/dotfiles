@@ -74,18 +74,21 @@ gitignored per-project (add `mise.local.toml` to that project's
 - **Non-interactive / child shells:** `~/.zshenv` prepends mise's shims dir
   to `PATH` instead, since the dynamic activation hook isn't loaded there.
 
-## Coexistence with the ansible toolchain
+## The dotfiles CLI toolchain (also mise)
 
-The ansible-provisioned tools in `~/.local/bin` (atuin, starship, eza, bat,
-ripgrep, fzf, lazygit, yazi, jq, yq, gh, and friends — see
-`ansible/group_vars/all.yml`) are a fixed, versionless CLI toolchain
-installed once per machine. mise doesn't touch or replace any of that — it
-only manages **language/runtime versions** (node, python, ruby, go, …) that
-vary per project. The two layers are independent: fixed CLI tools come from
-ansible, per-project runtimes come from mise.
+The CLI tools (atuin, starship, eza, bat, ripgrep, fzf, lazygit, yazi, jq,
+yq, gh, and friends) are listed with exact versions in
+`home/.chezmoidata/tools.yaml`. chezmoi renders the selected ones into
+`~/.config/mise-dotfiles/config.toml` with the checksum lock `mise.lock`
+beside it; mise reads that dir as its lowest-precedence "system" scope
+(`MISE_SYSTEM_CONFIG_DIR`, exported in `.zshenv`, the bash rc files and the
+Ansible environment). The playbook installs exactly those pins with
+`MISE_GLOBAL_CONFIG_FILE=/nonexistent/mise-user.toml mise -C / install --locked`.
+Your own `mise use -g` (writes `~/.config/mise/config.toml`) and project
+`mise.toml` files outrank the dotfiles pins and keep working.
 
-PATH precedence differs by shell type: interactive shells put `~/.local/bin`
-ahead of mise's shims (see `conf.d/00-env.zsh.tmpl`), while non-interactive
-shells — which source only `.zshenv` — put mise's shims first, so a tool
-pinned via mise can take precedence over an ansible-provisioned binary of
-the same name in non-interactive contexts.
+PATH precedence: mise wins over `~/.local/bin` and Homebrew in every shell.
+`.zshenv` moves the shims dir to the front (non-interactive shells), and
+`conf.d/00-env.zsh.tmpl` puts it back in front after prepending
+`~/.local/bin`; interactive shells then run `mise activate`, which puts the
+pinned install dirs first (`tests/path-precedence.test.sh`).

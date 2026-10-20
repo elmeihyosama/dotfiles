@@ -1,344 +1,148 @@
 ---
-# Install strategy: native package manager when usable, else ubi user-local binaries.
-#  - macOS  → Homebrew. brew needs NO sudo, so allow_sudo is irrelevant here;
-#             fall back to ubi only if brew is genuinely absent.
-#  - Linux  → apt/pacman only when passwordless sudo is available (we run without a
-#             become password); otherwise ubi user-local (no-sudo hosts).
-- name: Check for Homebrew (macOS)
-  ansible.builtin.command: command -v brew
-  register: _brew
-  changed_when: false
-  failed_when: false
-  check_mode: false
-  when: ansible_facts.os_family == 'Darwin'
-
-- name: Compute whether to use the no-sudo fallback
+# Packages. CLI tools come from mise (pinned, checksum-locked); the OS package
+# manager only provides the bootstrap essentials and the few tools mise
+# cannot (tools.yaml native_on / native_only / missing_on). Runs after
+# tasks/mise.yml (the pinned mise binary). Fresh-machine order, since chezmoi
+# is itself a mise tool and cannot render the first pins:
+#   1. essentials (sudo Linux)
+#   2. CORE-only pins + the repo lock into ~/.config/mise-dotfiles (only when
+#      absent: on a re-run the chezmoi-deployed full pins and lock are a
+#      consistent pair, and rewriting them would ping-pong with chezmoi)
+#   3. locked install of those pins (tasks/mise-install.yml)
+#   4. legacy ubi cleanup, select-tools, native tools
+# then tasks/chezmoi.yml deploys the full pins and site.yml runs the locked
+# install again for the full selection.
+- name: Set package-manager facts
   ansible.builtin.set_fact:
-    use_ubi_fallback: >-
-      {{ not (
-           (ansible_facts.os_family == 'Darwin' and (_brew.rc | default(1)) == 0)
-           or (ansible_facts.pkg_mgr in ['apt', 'pacman', 'dnf', 'dnf5'] and allow_sudo)
-         ) }}
-
-# ---- No-sudo / fallback path: ubi → ~/.local/bin -------------------------
-- name: Ensure ~/.local/bin exists
-  ansible.builtin.file:
-    path: "{{ local_bin }}"
-    state: directory
-    mode: "0755"
-  when: >-
-    use_ubi_fallback
-    or (ansible_facts.system == 'Linux' and allow_sudo)
-    or (ansible_facts.os_family == 'Darwin' and not use_ubi_fallback)
-
-- name: Check for ubi
-  ansible.builtin.stat:
-    path: "{{ local_bin }}/ubi"
-  register: _ubi
-  when: use_ubi_fallback
-
-- name: Bootstrap ubi into ~/.local/bin  # noqa: command-instead-of-module risky-shell-pipe
-  # Piped `curl | sh` installer: no module equivalent, and the script handles its
-  # own errors. `creates` keeps the task idempotent.
-  ansible.builtin.shell: >
-    curl --silent --location
-    https://raw.githubusercontent.com/houseabsolute/ubi/v0.10.0/bootstrap/bootstrap-ubi.sh
-    | TARGET={{ local_bin }} sh
-  args:
-    creates: "{{ local_bin }}/ubi"
-  when: use_ubi_fallback and not _ubi.stat.exists
-
-- name: Install each tool via ubi (idempotent — skips if the binary exists)
-  ansible.builtin.command:
-    cmd: >
-      {{ local_bin }}/ubi --project {{ ubi_tool_repos[item] }} --in {{ local_bin }}
-      {% if item in ubi_archive_exe_overrides %}
-      --exe {{ ubi_archive_exe_overrides[item] }} --rename-exe {{ ubi_exe_overrides[item] | default(item) }}
-      {% elif item in ubi_exe_overrides %}--exe {{ ubi_exe_overrides[item] }}{% endif %}
-      {% if item in ubi_matching_regex_overrides %}--matching-regex '{{ ubi_matching_regex_overrides[item] }}'{% endif %}
-      {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
-    creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
-  loop: "{{ tools | difference(ubi_unavailable | default([])) | difference(ubi_extract_all | default({}) | list) }}"
-  register: _ubi_installs
-  # A tool with no release asset for this OS/arch (e.g. git-absorb ships no
-  # aarch64 Linux build) must not abort provisioning of everything else — skip
-  # it and report below. Any OTHER non-zero exit (network, bad project) still fails.
-  #
-  # changed only when the command ACTUALLY ran and installed: a `creates`-skip
-  # (binary already present, second run) reports changed=false but rc=0, so
-  # keying on rc alone would flag every skip as changed and break idempotence.
-  changed_when: _ubi_installs.changed and (_ubi_installs.rc | default(1)) == 0
-  failed_when: >-
-    (_ubi_installs.rc | default(0)) != 0
-    and 'could not find a release asset' not in (_ubi_installs.stderr | default(''))
-  when: use_ubi_fallback
-
-- name: Report tools skipped for lack of a platform binary (no silent gaps)
-  ansible.builtin.debug:
-    msg: >-
-      Skipped (no {{ ansible_facts.architecture }} release asset via ubi):
-      {{ _ubi_installs.results | selectattr('rc', 'defined') | selectattr('rc', 'ne', 0)
-         | map(attribute='item') | list }}
-  when:
-    - use_ubi_fallback
-    - _ubi_installs.results | default([]) | selectattr('rc', 'defined') | selectattr('rc', 'ne', 0) | list | length > 0
-
-# ---- Native path: macOS Homebrew ----------------------------------------
-- name: Install tools via Homebrew (macOS)
-  community.general.homebrew:
-    name: "{{ brew_formula_overrides[item] | default(item) }}"
-    state: present
-  loop: "{{ tools }}"
-  when: >-
-    ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
-    and item not in (brew_unavailable | default([]))
-
-- name: Shim Homebrew binaries to canonical names in ~/.local/bin (macOS)  # noqa command-instead-of-shell
-  ansible.builtin.shell: 'ln -sf "$(command -v {{ item.value }})" "{{ local_bin }}/{{ item.key }}"'
-  args:
-    creates: "{{ local_bin }}/{{ item.key }}"
-  loop: "{{ brew_bin_renames | dict2items }}"
-  loop_control:
-    label: "{{ item.key }}"
-  when: ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
-
-# Tools with no Homebrew formula at all still need ubi on macOS (brew present,
-# but nothing to install). Reuses the same bootstrap-ubi-into-~/.local/bin
-# approach as the no-sudo fallback above.
-- name: Check for ubi (macOS, tools with no brew formula)
-  ansible.builtin.stat:
-    path: "{{ local_bin }}/ubi"
-  register: _ubi_macos
-  when: >-
-    ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
-    and (tools | intersect(brew_unavailable | default([])) | length > 0)
-
-- name: Bootstrap ubi into ~/.local/bin (macOS, tools with no brew formula)  # noqa: command-instead-of-module risky-shell-pipe
-  ansible.builtin.shell: >
-    curl --silent --location
-    https://raw.githubusercontent.com/houseabsolute/ubi/v0.10.0/bootstrap/bootstrap-ubi.sh
-    | TARGET={{ local_bin }} sh
-  args:
-    creates: "{{ local_bin }}/ubi"
-  when: >-
-    ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
-    and (tools | intersect(brew_unavailable | default([])) | length > 0)
-    and not _ubi_macos.stat.exists
-
-- name: Install tools with no brew formula via ubi (macOS)
-  ansible.builtin.command:
-    cmd: >
-      {{ local_bin }}/ubi --project {{ ubi_tool_repos[item] }} --in {{ local_bin }}
-      {% if item in ubi_archive_exe_overrides %}
-      --exe {{ ubi_archive_exe_overrides[item] }} --rename-exe {{ ubi_exe_overrides[item] | default(item) }}
-      {% elif item in ubi_exe_overrides %}--exe {{ ubi_exe_overrides[item] }}{% endif %}
-      {% if item in ubi_matching_regex_overrides %}--matching-regex '{{ ubi_matching_regex_overrides[item] }}'{% endif %}
-      {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
-    creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
-  loop: "{{ tools | intersect(brew_unavailable | default([])) | difference(ubi_extract_all | default({}) | list) }}"
-  when: ansible_facts.os_family == 'Darwin' and not use_ubi_fallback
-
-# ---- Native path: decision engine (Linux, sudo) -------------------------
-# Query each tool's candidate version via the host package manager, then
-# split `tools` into natives (present AND at/above any floor) and ubi tools.
-- name: Set native-path flags
-  ansible.builtin.set_fact:
-    _native_path: "{{ ansible_facts.pkg_mgr in ['apt', 'pacman', 'dnf', 'dnf5'] and allow_sudo and not use_ubi_fallback }}"
     _pkgmgr: "{{ 'dnf' if ansible_facts.pkg_mgr == 'dnf5' else ansible_facts.pkg_mgr }}"
+    _native_linux: "{{ ansible_facts.system == 'Linux' and ansible_facts.pkg_mgr in ['apt', 'pacman', 'dnf', 'dnf5'] and (allow_sudo | bool) }}"
 
-- name: Build canonical->package-name map for this manager
-  ansible.builtin.set_fact:
-    _pkg_map: >-
-      {{ dict(tools | zip(tools)) | combine(native_pkg_overrides[_pkgmgr] | default({})) }}
-  when: _native_path
-
-- name: Refresh apt metadata before querying  # noqa command-instead-of-module
+# ---- 1. Bootstrap essentials (sudo Linux) --------------------------------
+- name: Refresh apt metadata
   become: true
   ansible.builtin.apt:
     update_cache: true
-    cache_valid_time: 3600  # skip the refresh if apt metadata is < 1h old
-  when: _native_path and _pkgmgr == 'apt'
+    cache_valid_time: 3600 # skip the refresh if apt metadata is < 1h old
+  when: _native_linux and _pkgmgr == 'apt'
 
-- name: Refresh pacman metadata before querying
+- name: Refresh pacman metadata
   become: true
   ansible.builtin.command: pacman -Sy --noconfirm
   changed_when: false
-  when: _native_path and _pkgmgr == 'pacman'
+  when: _native_linux and _pkgmgr == 'pacman'
 
-- name: Enable EPEL on the RHEL family (not Fedora)
-  become: true
-  ansible.builtin.dnf:
-    name: epel-release
-    state: present
-  when: _native_path and _pkgmgr == 'dnf' and ansible_facts.distribution != 'Fedora'
-
-- name: Refresh dnf metadata before querying
-  become: true
-  ansible.builtin.command: dnf -q makecache
-  changed_when: false
-  when: _native_path and _pkgmgr == 'dnf'
-
-- name: Query apt candidate versions  # noqa command-instead-of-shell risky-shell-pipe
-  ansible.builtin.shell: "apt-cache policy {{ _pkg_map[item] }} | awk '/Candidate:/ {print $2}'"
-  loop: "{{ tools }}"
-  register: _apt_q
-  changed_when: false
-  when: _native_path and _pkgmgr == 'apt'
-
-- name: Query pacman candidate versions  # noqa command-instead-of-shell risky-shell-pipe
-  ansible.builtin.shell: "pacman -Si {{ _pkg_map[item] }} 2>/dev/null | awk -F': +' '/^Version/ {print $2; exit}'"
-  loop: "{{ tools }}"
-  register: _pacman_q
-  changed_when: false
-  failed_when: false
-  when: _native_path and _pkgmgr == 'pacman'
-
-- name: Query dnf candidate versions  # noqa command-instead-of-shell risky-shell-pipe
-  # repoquery (not `dnf info`): queries the REPOS for the candidate, so it can't
-  # accidentally report the *installed* version — `dnf info` lists the Installed
-  # stanza first when a package is present, which the old awk would pick up.
-  ansible.builtin.shell: "dnf -q repoquery --qf '%{version}\\n' {{ _pkg_map[item] }} 2>/dev/null | sort -V | tail -n1"
-  loop: "{{ tools }}"
-  register: _dnf_q
-  changed_when: false
-  failed_when: false
-  when: _native_path and _pkgmgr == 'dnf'
-
-- name: Collect candidate versions keyed by tool
-  ansible.builtin.set_fact:
-    _candidate_versions: >-
-      {{ dict(_q.results | map(attribute='item')
-              | zip(_q.results | map(attribute='stdout') | map('trim'))) }}
-  vars:
-    _q: "{{ _apt_q if _pkgmgr == 'apt' else (_pacman_q if _pkgmgr == 'pacman' else _dnf_q) }}"
-  when: _native_path
-
-- name: Partition tools into native vs ubi
-  # A tool with a min_version floor always goes to ubi (a static latest binary,
-  # guaranteed >= floor). Rationale: native installs use `state: present`, so a
-  # floored tool installed once can silently drift below its floor and never
-  # upgrade; and on Arch a native latest-against-a-frozen-base is a partial-
-  # upgrade hazard. ubi sidesteps both. Non-floored tools still prefer native
-  # when the repo has them; assert-tools.sh re-verifies floors on the installed
-  # binaries either way.
-  ansible.builtin.set_fact:
-    native_tools: "{{ (native_tools | default([])) + ([item] if _ok else []) }}"
-    ubi_tools: "{{ (ubi_tools | default([])) + ([] if (_ok or item in (ubi_unavailable | default([]))) else [item]) }}"
-  vars:
-    _cand: "{{ _candidate_versions[item] | default('') }}"
-    _available: "{{ _cand | length > 0 and _cand != '(none)' }}"
-    _floor: "{{ min_versions[item] | default('') }}"
-    _ok: "{{ item not in (force_ubi | default([])) and _floor == '' and _available }}"
-  loop: "{{ tools }}"
-  when: _native_path
-
-- name: Map native tools to package names
-  # native_tools ⊆ tools ⊆ keys(_pkg_map), so extract always resolves.
-  ansible.builtin.set_fact:
-    _native_pkgs: "{{ native_tools | default([]) | map('extract', _pkg_map) | list }}"
-  when: _native_path
-
-- name: Show native/ubi partition
-  ansible.builtin.debug:
-    msg: "native={{ native_tools | default([]) }} ubi={{ ubi_tools | default([]) }}"
-  when: _native_path
-
-# ---- Native path: Debian/Ubuntu apt -------------------------------------
-- name: Install native tools via apt (Debian/Ubuntu, sudo)
-  become: true
-  ansible.builtin.apt:
-    name: "{{ _native_pkgs }}"
-    state: present
-  when: _native_path and _pkgmgr == 'apt' and (_native_pkgs | default([])) | length > 0
-
-- name: Shim renamed native binaries to canonical names in ~/.local/bin  # noqa command-instead-of-shell
-  ansible.builtin.shell: 'ln -sf "$(command -v {{ item.value }})" "{{ local_bin }}/{{ item.key }}"'
-  args:
-    creates: "{{ local_bin }}/{{ item.key }}"
-  loop: "{{ (native_bin_renames[_pkgmgr] | default({})) | dict2items }}"
-  loop_control:
-    label: "{{ item.key }}"
-  when: _native_path and item.key in (native_tools | default([]))
-
-# ---- Native path: ubi fallback for tools absent/below-floor in the repo ----
-# Tools that failed the native check (absent or below floor) still need ubi.
-- name: Bootstrap ubi for native-path ubi_tools  # noqa command-instead-of-module risky-shell-pipe
-  ansible.builtin.shell: >
-    curl --silent --location
-    https://raw.githubusercontent.com/houseabsolute/ubi/v0.10.0/bootstrap/bootstrap-ubi.sh
-    | TARGET={{ local_bin }} sh
-  args:
-    creates: "{{ local_bin }}/ubi"
-  when: _native_path and (ubi_tools | default([]) | length > 0)
-
-- name: Install ubi_tools via ubi on the native path
-  ansible.builtin.command:
-    cmd: >
-      {{ local_bin }}/ubi --project {{ ubi_tool_repos[item] }} --in {{ local_bin }}
-      {% if item in ubi_archive_exe_overrides %}
-      --exe {{ ubi_archive_exe_overrides[item] }} --rename-exe {{ ubi_exe_overrides[item] | default(item) }}
-      {% elif item in ubi_exe_overrides %}--exe {{ ubi_exe_overrides[item] }}{% endif %}
-      {% if item in ubi_matching_regex_overrides %}--matching-regex '{{ ubi_matching_regex_overrides[item] }}'{% endif %}
-      {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
-    creates: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
-  loop: "{{ ubi_tools | default([]) | difference(ubi_extract_all | default({}) | list) }}"
-  when: _native_path and (ubi_tools | default([]) | length > 0)
-
-# ---- Native path: Arch pacman -------------------------------------------
-- name: Install native tools via pacman (Arch, sudo)
-  become: true
-  community.general.pacman:
-    name: "{{ _native_pkgs }}"
-    state: present
-  when: _native_path and _pkgmgr == 'pacman' and (_native_pkgs | default([])) | length > 0
-
-# ---- Native path: Fedora / RHEL family dnf ------------------------------
-- name: Install native tools via dnf (Fedora/RHEL family, sudo)
+- name: Install bootstrap essentials (git, curl, zsh, unzip, tar)
   become: true
   ansible.builtin.package:
-    name: "{{ _native_pkgs }}"
+    name: [git, curl, zsh, unzip, tar]
     state: present
-  when: _native_path and _pkgmgr == 'dnf' and (_native_pkgs | default([])) | length > 0
+  when: _native_linux
 
-# ---- Tools whose archive is a tree, not a bare binary --------------------
-# ubi's default extraction takes ONLY the executable, which breaks any tool that
-# loads its own files relative to itself (neovim -> share/nvim/runtime). Those
-# tools are listed in ubi_extract_all and handled here instead: unpacked whole
-# into {{ local_opt }}/<tool>, then symlinked onto PATH. Runs last so the facts
-# set by both the fallback and native paths are available.
-- name: Select tree-style tools this host installs via ubi
-  ansible.builtin.set_fact:
-    _tree_tools: "{{ (ubi_extract_all | default({}) | list) | intersect(_ubi_set) }}"
-  vars:
-    # Whichever set this host's install path actually routes through ubi.
-    _ubi_set: >-
-      {{ (ubi_tools | default([])) if (_native_path | default(false) | bool)
-         else ((tools | intersect(brew_unavailable | default([])))
-               if (ansible_facts.os_family == 'Darwin' and not (use_ubi_fallback | default(false) | bool))
-               else (tools | difference(ubi_unavailable | default([])))) }}
-
-- name: Ensure the unpack root exists
+# ---- 2. Core pins + lock (fresh machine only) ----------------------------
+- name: Ensure the dotfiles mise config dir
   ansible.builtin.file:
-    path: "{{ local_opt }}"
+    path: "{{ mise_config_root }}"
     state: directory
     mode: "0755"
-  when: _tree_tools | default([]) | length > 0
 
-- name: Unpack tree-style tools whole into their own prefix
+- name: Write the core-only bootstrap pins (only when no pins exist yet)
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/mise-pins.toml.j2"
+    dest: "{{ mise_config_root }}/config.toml"
+    mode: "0644"
+    force: false
+  vars:
+    mise_pin_names: >-
+      {{ tool_catalog.tools | dict2items | selectattr('value.group', 'equalto', 'core')
+         | map(attribute='key') | sort }}
+    mise_pin_os: "{{ 'darwin' if ansible_facts.system == 'Darwin' else 'linux' }}"
+    mise_pin_plat: "{{ _mise_os }}-{{ _mise_arch }}"
+
+- name: Copy the repo mise lock beside them (only when absent)
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../home/dot_config/mise-dotfiles/mise.lock"
+    dest: "{{ mise_config_root }}/mise.lock"
+    mode: "0644"
+    force: false
+
+# ---- 3. Locked install of whatever is pinned now -------------------------
+- name: Install the pinned core tools
+  ansible.builtin.import_tasks: mise-install.yml
+
+# ---- 4. Legacy cleanup, selection, native tools --------------------------
+# Before mise, tools were ubi binaries in local_bin (plus rename symlinks and
+# the neovim tree in local_opt). The shims come first on PATH now, but those
+# files are stale; remove only what that path created.
+- name: Remove legacy ubi installs
   ansible.builtin.command:
-    cmd: >
-      {{ local_bin }}/ubi --project {{ ubi_tool_repos[item] }}
-      --in {{ local_opt }}/{{ item }} --extract-all
-      {% if item in ubi_matching_regex_overrides %}--matching-regex '{{ ubi_matching_regex_overrides[item] }}'{% endif %}
-      {% if item in ubi_match_overrides %}--matching {{ ubi_match_overrides[item] }}{% endif %}
-    creates: "{{ local_opt }}/{{ item }}/{{ ubi_extract_all[item] }}"
-  loop: "{{ _tree_tools | default([]) }}"
+    argv:
+      - "{{ playbook_dir }}/../scripts/cleanup-ubi.sh"
+      - "{{ local_bin }}"
+      - "{{ local_opt }}"
+      - "{{ playbook_dir }}/../home/.chezmoidata/tools.yaml"
+  register: _ubi_cleanup
+  changed_when: _ubi_cleanup.stdout | length > 0
 
-# A symlink, not a copy: neovim resolves it to find ../share/nvim/runtime.
-- name: Link tree-style tool executables onto PATH
-  ansible.builtin.file:
-    src: "{{ local_opt }}/{{ item }}/{{ ubi_extract_all[item] }}"
-    dest: "{{ local_bin }}/{{ ubi_exe_overrides[item] | default(item) }}"
-    state: link
-    force: true
-  loop: "{{ _tree_tools | default([]) }}"
+- name: Report removed legacy files
+  ansible.builtin.debug:
+    msg: "{{ _ubi_cleanup.stdout_lines }}"
+  when: _ubi_cleanup.stdout | length > 0
+
+- name: Select tools for this machine
+  ansible.builtin.command:
+    argv:
+      - "{{ playbook_dir }}/../scripts/select-tools.sh"
+      - --os
+      - "{{ 'darwin' if ansible_facts.system == 'Darwin' else 'linux' }}"
+      - --arch
+      - "{{ _mise_arch }}"
+      - --local
+      - "{{ playbook_dir }}/local.yml"
+  register: _tool_selection
+  changed_when: false
+  check_mode: false
+
+- name: List the native tools (brew / distro packages)
+  ansible.builtin.set_fact:
+    _native_tools: "{{ _tool_selection.stdout | from_json | selectattr('source', 'equalto', 'native') | map(attribute='name') | list }}"
+
+# A missing package is a warning, not a failure: native tools are the
+# best-effort ones (source-only upstreams, no asset for this platform).
+- name: Install native tools via Homebrew (macOS)
+  community.general.homebrew:
+    name: "{{ (tool_catalog.tools[item].native_pkg | default({})).brew | default(item) }}"
+    state: present
+  loop: "{{ _native_tools }}"
+  register: _native_brew
+  ignore_errors: true # noqa ignore-errors
+  when: ansible_facts.os_family == 'Darwin'
+
+- name: Install native tools via the distro package manager (sudo Linux)
+  become: true
+  ansible.builtin.package:
+    name: "{{ (tool_catalog.tools[item].native_pkg | default({}))[_pkgmgr] | default(item) }}"
+    state: present
+  loop: "{{ _native_tools }}"
+  register: _native_linux_pkgs
+  ignore_errors: true # noqa ignore-errors
+  when: _native_linux
+
+- name: Warn about native tools that could not be installed
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: no package for {{ _missing }} on this host
+      ({{ ansible_facts.distribution }} {{ _pkgmgr }}); they stay uninstalled.
+  vars:
+    _results: "{{ (_native_brew.results | default([])) + (_native_linux_pkgs.results | default([])) }}"
+    _missing: "{{ _results | selectattr('failed', 'defined') | selectattr('failed') | map(attribute='item') | list }}"
+  when: _missing | length > 0
+
+- name: Warn about native tools skipped without sudo
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: {{ _native_tools }} need the system package manager (no sudo
+      here); they stay uninstalled.
+  when:
+    - ansible_facts.system == 'Linux'
+    - not _native_linux
+    - _native_tools | length > 0

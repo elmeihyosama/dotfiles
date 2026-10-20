@@ -29,8 +29,8 @@ case ":$PATH:" in
 esac
 
 # --- Tools -----------------------------------------------------------------
-if tools_out="$("$repo_root/.github/scripts/assert-tools.sh" "$repo_root/ansible/group_vars/all.yml" 2>&1)"; then
-	ok "canonical tools all present and at floor versions"
+if tools_out="$("$repo_root/.github/scripts/assert-tools.sh" 2>&1)"; then
+	ok "selected tools all present and runnable"
 else
 	bad "tool assertion failed:"
 	printf '%s\n' "$tools_out" | grep -v '^SKIP' | sed 's/^/      /'

@@ -8,9 +8,9 @@
     state: directory
     mode: "0755"
 
-# shell: ubi's local_bin is not on Ansible's PATH.
-- name: Read the installed zellij version  # noqa command-instead-of-shell
-  ansible.builtin.shell: 'PATH="{{ local_bin }}:$PATH" zellij --version'
+# zellij is a mise tool: mise_env (site.yml) puts its shim on PATH.
+- name: Read the installed zellij version
+  ansible.builtin.command: zellij --version
   register: _zellij_v
   changed_when: false
   failed_when: false
