@@ -34,7 +34,7 @@ _dotfiles() {
       names=(${(f)"$(yq '(.tools | keys | .[]), .tool_groups[]' "$src/.chezmoidata/tools.yaml" 2>/dev/null)"})
       _describe 'tool or group' names
       ;;
-    list) _describe 'option' '(--json:machine-readable output)' ;;
+    list) compadd -- --json ;;
   esac
 }
 compdef _dotfiles dotfiles

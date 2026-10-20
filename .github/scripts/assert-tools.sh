@@ -39,18 +39,11 @@ while [ $# -gt 0 ]; do
 	shift 2
 done
 
-# Same layout as ansible/group_vars/all.yml (mise_env): the dotfiles pins dir
-# and the (per-arch under shared_home) data dir and local bin.
-sfx=""
-if [ -f "$local_yml" ] && grep -Eq '^[[:space:]]*shared_home:[[:space:]]*true' "$local_yml"; then
-	sfx="-$(uname -m)"
-fi
-export MISE_SYSTEM_CONFIG_DIR="${MISE_SYSTEM_CONFIG_DIR:-$HOME/.config/mise-dotfiles}"
-export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share$sfx/mise}"
-# The user's own global config (what `mise use -g` writes), before masking it:
-# an override there is reported as such, not as a broken install.
-user_global="${MISE_GLOBAL_CONFIG_FILE:-${MISE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/mise}/config.toml}"
-export MISE_GLOBAL_CONFIG_FILE=/nonexistent/mise-user.toml
+# The dotfiles pins dir, the (per-arch under shared_home) data dir, and the
+# masked global config: scripts/mise-env.sh sets sfx, user_global and MISE_*.
+# shellcheck source=../../scripts/mise-env.sh
+. "$repo/scripts/mise-env.sh"
+mise_env "$local_yml"
 # A shell that never read the dotfiles' .zshenv/.bashrc (a CI step, a fresh
 # container) lacks the shims: put them in front, as those files do. The local
 # bin (mise itself) is appended when missing, never moved ahead of anything.
