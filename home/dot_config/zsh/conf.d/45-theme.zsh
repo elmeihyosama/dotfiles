@@ -105,3 +105,47 @@ wallpaper() {
   command -v cmux >/dev/null 2>&1 && cmux reload-config >/dev/null 2>&1
   echo "wallpaper → ${next}"
 }
+
+# _theme_live_reload: repaint running apps after a config change (no-op until
+# the live-reload task fills it in).
+_theme_live_reload() { :; }
+
+# glass: set the Ghostty translucency level (machine-local; no git diff).
+#   glass clear|frosted|tinted|solid|default|off   (off = default)
+#   glass            fzf-pick, else usage
+# Levels come from .chezmoidata/glass.toml.
+glass() {
+  emulate -L zsh
+  local cfg level lv
+  command -v chezmoi >/dev/null 2>&1 || { echo "glass: chezmoi not found" >&2; return 1; }
+  command -v jq >/dev/null 2>&1 || { echo "glass: jq not found" >&2; return 1; }
+  cfg=${CHEZMOI_CONFIG:-$HOME/.config/chezmoi/chezmoi.toml}
+  [[ -f $cfg ]] || { echo "glass: missing $cfg" >&2; return 1; }
+  local -a levels
+  levels=(${(f)"$(chezmoi data --format json 2>/dev/null | jq -r '.glass_levels // {} | keys_unsorted[]')"})
+  (( ${#levels} )) || { echo "glass: no levels in chezmoi data" >&2; return 1; }
+  if (( $# )); then
+    level=$1
+  elif command -v fzf >/dev/null 2>&1; then
+    level=$(print -l -- $levels off | fzf --prompt='glass ❯ ' --height 40% --reverse) || return 0
+  else
+    echo "usage: glass ${(j:|:)levels}|off" >&2; print -l -- $levels off >&2; return 1
+  fi
+  [[ -z $level ]] && return 0
+  [[ $level == off ]] && level=default
+  if (( ! ${levels[(Ie)$level]} )); then
+    echo "glass: unknown level '${level}'" >&2
+    echo "usage: glass ${(j:|:)levels}|off" >&2; print -l -- $levels off >&2; return 1
+  fi
+  _chezmoi_set_data glass "$level" "$cfg" || return 1
+  chezmoi apply || return 1
+  _theme_live_reload
+  echo "glass → ${level}"
+}
+
+_glass_levels() {
+  local -a levels
+  levels=(${(f)"$(chezmoi data --format json 2>/dev/null | jq -r '.glass_levels // {} | keys_unsorted[]')"} off)
+  _describe 'level' levels
+}
+compdef _glass_levels glass
