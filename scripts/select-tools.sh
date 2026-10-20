@@ -5,15 +5,20 @@
 # Reads the catalog (default home/.chezmoidata/tools.yaml) and the per-machine
 # ansible/local.yml, prints a JSON array sorted by name:
 #   [{"name","bin","source","version","backend","provided_by"}]
-# source is "mise" (installed by mise), "native" (brew/apt/dnf/pacman) or
-# "bootstrap" (mise itself, installed by Ansible); version/backend are null
-# unless source is "mise" (bootstrap keeps its version). provided_by names the
-# tool whose package ships this bin (age-keygen -> age), else null.
+# source is the output contract, exactly one of:
+#   mise      installed from the dotfiles mise pins (backend and version set)
+#   native    installed by brew/apt/dnf/pacman (backend/version null)
+#   bootstrap installed by Ansible before mise exists (only `mise` itself;
+#             version set, backend null)
+#   bundled   ships inside another tool's install, see provided_by
+#             (age-keygen -> age); version/backend null
+# provided_by names that other tool, else null.
 #
 # Selection = core U tools in tool_groups (default: every group) U tools_add
 #             - tools_remove. Removing a core tool is an error. A provided_by
 # tool follows its provider. Nothing here ever uninstalls anything.
-# Exit 2 with a message on stderr for unknown groups/tools or a core removal.
+# Exit 2 with a message on stderr for bad input: unknown groups/tools, a core
+# removal, a non-list value, or a provided_by tool added without its provider.
 set -eu
 
 repo_root="$(CDPATH='' cd "$(dirname "$0")/.." && pwd)"
@@ -66,7 +71,10 @@ def die($m): ($m + "\n") | halt_error(2);
 | ($l.tool_groups // $groups) as $sel
 | ($l.tools_add // []) as $add
 | ($l.tools_remove // []) as $rm
-| ($sel[] | select(. as $g | ($groups | index($g)) == null)
+| (["tool_groups", "tools_add", "tools_remove"][] | . as $k
+		| select($l[$k] != null and ($l[$k] | type) != "array")
+		| die("\($k) must be a list, e.g. \($k): [x] (got \($l[$k] | type))")),
+	($sel[] | select(. as $g | ($groups | index($g)) == null)
 		| die("unknown group: \(.) (valid: \($groups | join(", ")))")),
 	(($add + $rm)[] | select(. as $t | ($names | index($t)) == null)
 		| die("unknown tool: \(.)")),
@@ -76,13 +84,18 @@ def die($m): ($m + "\n") | halt_error(2);
 				| select(($c.tools[$n].group == "core") or ($sel | index($c.tools[$n].group)) != null
 								or ($add | index($n)) != null)
 				| select(($rm | index($n)) == null)]) as $base
-		| [$names[] | . as $n | $c.tools[$n] as $t
+		| ($add[] | select($c.tools[.].provided_by != null)
+				| . as $n | $c.tools[$n].provided_by as $p
+				| select(($base | index($p)) == null)
+				| die("\($n) comes with \($p); add \($p) instead")),
+		[$names[] | . as $n | $c.tools[$n] as $t
 				| select(($base | index($n)) != null
 								or ($t.provided_by != null and ($base | index($t.provided_by)) != null
 										and ($rm | index($n)) == null))
 				| ($t.provided_by // null) as $p
 				| ($c.tools[$p // $n]) as $src
-				| (if $src.bootstrap == true then "bootstrap"
+				| (if $p != null then "bundled"
+					elif $src.bootstrap == true then "bootstrap"
 					elif $src.native_only == true or (($src.native_on // []) | index($os)) != null then "native"
 					else "mise" end) as $s
 				| {name: $n,
