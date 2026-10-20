@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Apply the Claude baseline (statusline, plugins, allow-list; see claude.toml)
+# to each profile's settings.json. Additive, so machine-local keys survive.
+# Baseline and merge script are hashed here, so changing either re-runs it.
+# merge-settings sha256: {{ include "../scripts/claude-merge-settings.sh" | sha256sum }}
+set -euo pipefail
+baseline="$(mktemp)"
+trap 'rm -f "$baseline"' EXIT
+# Quoted heredocs: entries may contain quotes, $ or backticks.
+IFS= read -r -d '' plugins <<'JSON' || true
+{{ .claude_baseline_plugins | toJson }}
+JSON
+IFS= read -r -d '' allow <<'JSON' || true
+{{ .claude_baseline_allow | toJson }}
+JSON
+jq -n --arg cmd "$HOME/.claude/statusline.sh" \
+	--argjson plugins "$plugins" --argjson allow "$allow" \
+	'{statusLine: {type: "command", command: $cmd},
+		enabledPlugins: ($plugins | map({(.): true}) | add // {}),
+		permissions: {allow: $allow}}' >"$baseline"
+for dir in {{ range $i, $p := .claude_profiles }}{{ if $i }} "$HOME/.claude-{{ $p }}"{{ else }}"$HOME/.claude"{{ end }}{{ end }}; do
+	if out="$("{{ .chezmoi.sourceDir }}/../scripts/claude-merge-settings.sh" "$dir/settings.json" "$baseline")"; then
+		echo "$dir: $out"
+	else
+		echo "claude settings: $dir failed" >&2
+	fi
+done

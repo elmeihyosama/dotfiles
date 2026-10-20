@@ -84,7 +84,7 @@ saying so.
 | Terminal · Prompt · Multiplexer | Ghostty · Starship · zellij |
 | Editor | Neovim ([LazyVim]) |
 | Files & CLI | yazi, bat, ripgrep, fzf, navi, git-delta, lazygit |
-| Claude Code | Themed statusline (cwd · git · model · context · usage + reset countdown / cost) · account profiles (`claude-profile work`, `claude-work`) |
+| Claude Code | Themed statusline (cwd · git · model · context · usage + reset countdown / cost) · account profiles (`claude-profile work`, `claude-work`) · every profile gets the shared plugins and a read-only allow-list merged in on apply (additive; entries you delete by hand come back) |
 | Theme | base16 — 300+ palettes, `theme` switcher (Rosé Pine Moon default) |
 
 ## How it works

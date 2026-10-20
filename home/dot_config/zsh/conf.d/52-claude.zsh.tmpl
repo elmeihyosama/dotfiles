@@ -1,7 +1,7 @@
 {{- /* One Claude Code account per config dir (CLAUDE_CONFIG_DIR). Profiles come
 from home/.chezmoidata/claude.toml: the first is the default (plain ~/.claude),
 the rest live in ~/.claude-<name>. The statusline is wired into every one by
-.chezmoiscripts/run_onchange_after_30-claude-statusline.sh. */ -}}
+.chezmoiscripts/run_onchange_after_30-claude-settings.sh.tmpl. */ -}}
 typeset -ga _claude_profiles=({{ range .claude_profiles }}{{ . }} {{ end }})
 typeset -gA _claude_profile_dirs=(
 {{- range $i, $p := .claude_profiles }}

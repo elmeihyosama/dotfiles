@@ -2,3 +2,22 @@
 # `claude-profile <name>` switches without a logout. The first keeps plain
 # ~/.claude, the rest ~/.claude-<name>. Override in chezmoi.toml [data].
 claude_profiles = ["personal", "work"]
+
+# Merged into every profile's settings.json on apply. Additive: never removes
+# or reorders, but an entry you delete by hand is re-added on the next apply.
+# Wildcards only where no flag (incl. global/negation ones like --yes, --no-list)
+# can write, exec or trust; else exact. Accepted gh risks: -R names another
+# host, --web opens a browser, --jq 'env' prints the environment. chezmoi diff
+# prints decrypted contents of changed encrypted files (revisit with secrets).
+claude_baseline_plugins = ["superpowers@claude-plugins-official"]
+claude_baseline_allow = [
+  "Bash(git branch --show-current)",
+  "Bash(gh pr view *)",
+  "Bash(gh pr list *)",
+  "Bash(gh pr checks *)",
+  "Bash(gh issue view *)",
+  "Bash(gh run view *)",
+  "Bash(mise ls)",
+  "Bash(chezmoi diff)",
+  "Bash(chezmoi status)",
+]
