@@ -47,7 +47,7 @@ run linux ''
 assert_eq age "$(field age-keygen provided_by)" "provided_by recorded"
 assert_eq null "$(field age-keygen version)" "provided_by has no version"
 assert_eq null "$(field age-keygen backend)" "provided_by has no backend"
-assert_eq mise "$(field age-keygen source)" "provided_by source follows provider"
+assert_eq bundled "$(field age-keygen source)" "age-keygen is bundled"
 
 # core_cannot_be_removed
 run linux 'tools_remove: [fzf]'
@@ -97,6 +97,43 @@ for t in $legacy; do
 	fi
 done
 
-# no tool may pin "latest"; mise-sourced tools need backend+version
+# no tool may pin "latest"
 bad="$(yq -o=json '.' "$tools_yaml" | jq -r '.tools | to_entries[] | select((.value.version // "") == "latest") | .key')"
 assert_eq "" "$bad" "no latest pins"
+
+# source enum, and mise entries are fully pinned (both OSes)
+for os in darwin linux; do
+	run "$os" ''
+	bad="$(jq -r '.[] | select([.source] | inside(["mise", "native", "bootstrap", "bundled"]) | not) | .name' <<<"$out")"
+	assert_eq "" "$bad" "source enum ($os)"
+	bad="$(jq -r '.[] | select(.source == "mise" and (.backend == null or .version == null)) | .name' <<<"$out")"
+	assert_eq "" "$bad" "mise entries have backend and version ($os)"
+done
+
+# versions shared with the repo mise.toml must agree (matched on backend)
+yq -o=json '.' "$tools_yaml" | jq -r '.tools | to_entries[] | select(.value.backend) | "\(.value.backend)\t\(.key)\t\(.value.version)"' >"$d/cat.tsv"
+yq -p toml -o json '.tools' "$TESTS_REPO/mise.toml" |
+	jq -r 'to_entries[] | "\(.key)\t\(.value | if type == "object" then .version else . end)"' >"$d/pins.tsv"
+overlap=0
+while IFS=$'\t' read -r backend name ver; do
+	pin="$(awk -F'\t' -v b="$backend" '$1 == b { print $2 }' "$d/pins.tsv")"
+	[ -n "$pin" ] || continue
+	overlap=$((overlap + 1))
+	assert_eq "$pin" "$ver" "tools.yaml pin for $name matches mise.toml"
+done <"$d/cat.tsv"
+[ "$overlap" -ge 4 ] || fail "expected >=4 overlapping tools with mise.toml, found $overlap"
+
+# scalar instead of list -> friendly exit 2
+for k in tool_groups tools_add tools_remove; do
+	run linux "$k: git"
+	assert_eq 2 "$rc" "scalar $k: exit 2"
+	assert_contains "$(cat "$d/err")" "$k must be a list" "scalar $k: message"
+	assert_not_contains "$(cat "$d/err")" "jq: error" "scalar $k: no raw jq error"
+done
+
+# provided_by tool added without its provider
+run linux $'tool_groups: [git]\ntools_add: [age-keygen]'
+assert_eq 2 "$rc" "age-keygen without age: exit 2"
+assert_contains "$(cat "$d/err")" "age-keygen comes with age; add age instead" "age-keygen without age: message"
+run linux $'tool_groups: [git]\ntools_add: [age, age-keygen]'
+assert_eq 0 "$rc" "age-keygen with age: ok"
