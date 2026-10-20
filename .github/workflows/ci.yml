@@ -1,0 +1,91 @@
+name: CI
+# The one PR workflow: `changes` picks which gated workflows run, and
+# `ci-gate` (the only required check) passes when every job passed or was
+# skipped. Label a PR `ci:full` to run everything.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  push:
+    branches: [main]
+  # Weekly, everything: catches upstream drift (tool releases, base images).
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Here only: in a called workflow `github.workflow` is this one's name, so
+# callee groups would collide with this run's. Keyed on the event too, so a
+# docs push to main can't cancel the weekly full run. Any label event
+# restarts a PR's run (only `ci:full` changes what it does).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      provision: ${{ steps.filter.outputs.provision }}
+      bootstrap: ${{ steps.filter.outputs.bootstrap }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Pushes diff against `before`, which can be many commits back.
+          fetch-depth: 0
+          persist-credentials: false
+      - id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'ci:full') }}
+        run: |
+          full='' range=''
+          case "$EVENT" in
+          pull_request)
+            # The merge ref's first parent is the base tip.
+            range='HEAD^1'
+            [ "$FULL_LABEL" = true ] && full=--full
+            ;;
+          push)
+            # New branch or force push: no usable `before`, run everything.
+            if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then range="$BEFORE"; else full=--full; fi
+            ;;
+          *) full=--full ;;
+          esac
+          if [ -n "$range" ]; then
+            # quotePath off: quoted non-ASCII paths would miss the filter.
+            git -c core.quotePath=false diff --no-renames --name-only "$range" HEAD
+          fi | ./.github/scripts/ci-changes.sh $full | tee -a "$GITHUB_OUTPUT"
+
+  # `./` not `$/`: actionlint rejects `$/` (see lint.yml's setup-lint).
+  lint:
+    uses: ./.github/workflows/lint.yml # zizmor: ignore[self-repository]
+
+  provision:
+    needs: changes
+    if: needs.changes.outputs.provision == 'true'
+    uses: ./.github/workflows/provision.yml # zizmor: ignore[self-repository]
+
+  bootstrap:
+    needs: changes
+    if: needs.changes.outputs.bootstrap == 'true'
+    uses: ./.github/workflows/bootstrap.yml # zizmor: ignore[self-repository]
+
+  ci-gate:
+    name: ci-gate
+    if: always()
+    needs: [changes, lint, provision, bootstrap]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Every job passed or was skipped
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$NEEDS"
+          bad="$(jq -r '[to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key] | join(" ")' <<<"$NEEDS")"
+          if [ -n "$bad" ]; then
+            echo "::error::did not pass: $bad"
+            exit 1
+          fi

@@ -1,7 +1,6 @@
 # Dotfiles
 
-[![Lint](https://github.com/elmeihyosama/dotfiles/actions/workflows/lint.yml/badge.svg)](https://github.com/elmeihyosama/dotfiles/actions/workflows/lint.yml)
-[![Provision](https://github.com/elmeihyosama/dotfiles/actions/workflows/provision.yml/badge.svg)](https://github.com/elmeihyosama/dotfiles/actions/workflows/provision.yml)
+[![CI](https://github.com/elmeihyosama/dotfiles/actions/workflows/ci.yml/badge.svg)](https://github.com/elmeihyosama/dotfiles/actions/workflows/ci.yml)
 
 A cross-platform (macOS and Linux) terminal environment — managed with
 [chezmoi], provisioned with [Ansible], and themed with [base16] (300+ palettes,
@@ -73,7 +72,7 @@ saying so.
 | --- | --- |
 | `home/` | chezmoi source tree (`.chezmoiroot` → `home`) |
 | `ansible/` | Provisioning: tools, GUI apps (macOS casks), fonts, plugins, then `chezmoi apply` |
-| `.github/` | CI workflows + shared lint/provision scripts (used by CI and pre-commit) |
+| `.github/` | CI: `ci.yml` runs lint and, when the change needs them, provision and bootstrap; `ci-gate` is the one required check. Label a PR `ci:full` to run everything. Plus the shared lint/provision scripts (used by CI and pre-commit) |
 | `install.sh` | Fresh-machine entry point (clone + provision) |
 
 ## The stack

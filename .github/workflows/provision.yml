@@ -1,48 +1,12 @@
 name: Provision
+# Called by ci.yml, which decides when this runs; dispatchable by hand.
 on:
-  pull_request:
-    paths:
-      - 'ansible/**'
-      - 'home/**'
-      - 'scripts/select-tools.sh'
-      - 'scripts/cleanup-ubi.sh'
-      - 'scripts/remove-hint.sh' # sourced by assert-tools.sh / doctor.sh
-      - 'scripts/doctor.sh'
-      - 'scripts/dotfiles.sh'
-      - 'scripts/claude-merge-settings.sh' # run by the claude-settings chezmoi script
-      - 'scripts/mise-env.sh' # sourced by assert-tools.sh / doctor.sh / dotfiles.sh
-      - '.github/scripts/provision-ci.sh'
-      - '.github/scripts/assert-tools.sh'
-      - '.github/scripts/assert-idempotent.sh'
-      - '.github/workflows/provision.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'ansible/**'
-      - 'home/**'
-      - 'scripts/select-tools.sh'
-      - 'scripts/cleanup-ubi.sh'
-      - 'scripts/remove-hint.sh' # sourced by assert-tools.sh / doctor.sh
-      - 'scripts/doctor.sh'
-      - 'scripts/dotfiles.sh'
-      - 'scripts/claude-merge-settings.sh' # run by the claude-settings chezmoi script
-      - 'scripts/mise-env.sh' # sourced by assert-tools.sh / doctor.sh / dotfiles.sh
-      - '.github/scripts/provision-ci.sh'
-      - '.github/scripts/assert-tools.sh'
-      - '.github/scripts/assert-idempotent.sh'
-      - '.github/workflows/provision.yml'
-  # Weekly: catches upstream drift (tool releases, base images) between PRs.
-  schedule:
-    - cron: "17 5 * * 1"
+  workflow_call:
   workflow_dispatch:
 
 # GITHUB_TOKEN goes into the container only to raise mise's API rate limit.
 permissions:
   contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   provision:
