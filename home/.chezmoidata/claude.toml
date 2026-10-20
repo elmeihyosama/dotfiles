@@ -6,9 +6,9 @@ claude_profiles = ["personal", "work"]
 # Merged into every profile's settings.json on apply. Additive: never removes
 # or reorders, but an entry you delete by hand is re-added on the next apply.
 # Wildcards only where no flag (incl. global/negation ones like --yes, --no-list)
-# can write, exec, trust or dump env; else exact. gh: -R can name another host,
-# --web opens a browser. chezmoi diff prints decrypted contents of changed
-# encrypted files (revisit when secrets land).
+# can write, exec or trust; else exact. Accepted gh risks: -R names another
+# host, --web opens a browser, --jq 'env' prints the environment. chezmoi diff
+# prints decrypted contents of changed encrypted files (revisit with secrets).
 claude_baseline_plugins = ["superpowers@claude-plugins-official"]
 claude_baseline_allow = [
   "Bash(git branch --show-current)",
