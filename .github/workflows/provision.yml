@@ -9,6 +9,7 @@ on:
       - 'scripts/remove-hint.sh' # sourced by assert-tools.sh / doctor.sh
       - 'scripts/doctor.sh'
       - 'scripts/dotfiles.sh'
+      - 'scripts/claude-merge-settings.sh' # run by the claude-settings chezmoi script
       - 'scripts/mise-env.sh' # sourced by assert-tools.sh / doctor.sh / dotfiles.sh
       - '.github/scripts/provision-ci.sh'
       - '.github/scripts/assert-tools.sh'
@@ -24,6 +25,7 @@ on:
       - 'scripts/remove-hint.sh' # sourced by assert-tools.sh / doctor.sh
       - 'scripts/doctor.sh'
       - 'scripts/dotfiles.sh'
+      - 'scripts/claude-merge-settings.sh' # run by the claude-settings chezmoi script
       - 'scripts/mise-env.sh' # sourced by assert-tools.sh / doctor.sh / dotfiles.sh
       - '.github/scripts/provision-ci.sh'
       - '.github/scripts/assert-tools.sh'

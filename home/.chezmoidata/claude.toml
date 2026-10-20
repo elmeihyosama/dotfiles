@@ -2,3 +2,32 @@
 # `claude-profile <name>` switches without a logout. The first keeps plain
 # ~/.claude, the rest ~/.claude-<name>. Override in chezmoi.toml [data].
 claude_profiles = ["personal", "work"]
+
+# Baseline merged into every profile's settings.json on apply (additive: never
+# removes or reorders). Allow-list is read/inspect only: no write, delete,
+# network, exec or interpreter commands; no find/fd/rg/yq (-exec/-x/--pre/-i);
+# git branch only with --list. `git diff|log|show --output=FILE` is accepted.
+claude_baseline_plugins = ["superpowers@claude-plugins-official"]
+claude_baseline_allow = [
+  "Bash(git status *)",
+  "Bash(git log *)",
+  "Bash(git diff *)",
+  "Bash(git show *)",
+  "Bash(git branch --list *)",
+  "Bash(git branch --show-current)",
+  "Bash(gh pr view *)",
+  "Bash(gh pr list *)",
+  "Bash(gh pr checks *)",
+  "Bash(gh issue view *)",
+  "Bash(gh run view *)",
+  "Bash(ls *)",
+  "Bash(cat *)",
+  "Bash(head *)",
+  "Bash(tail *)",
+  "Bash(wc *)",
+  "Bash(grep *)",
+  "Bash(jq *)",
+  "Bash(mise ls *)",
+  "Bash(chezmoi diff *)",
+  "Bash(chezmoi status *)",
+]

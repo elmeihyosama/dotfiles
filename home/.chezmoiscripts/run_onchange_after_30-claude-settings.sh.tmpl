@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Apply the Claude baseline (statusline, plugins, allow-list; see claude.toml)
+# to each profile's settings.json. Additive, so machine-local keys survive.
+# The baseline is in this file's text, so changing it re-runs the script.
+set -euo pipefail
+baseline="$(mktemp)"
+trap 'rm -f "$baseline"' EXIT
+jq -n --arg cmd "$HOME/.claude/statusline.sh" \
+	--argjson plugins {{ .claude_baseline_plugins | toJson | quote }} \
+	--argjson allow {{ .claude_baseline_allow | toJson | quote }} \
+	'{statusLine: {type: "command", command: $cmd},
+		enabledPlugins: ($plugins | map({(.): true}) | add // {}),
+		permissions: {allow: $allow}}' >"$baseline"
+for dir in {{ range $i, $p := .claude_profiles }}{{ if $i }} "$HOME/.claude-{{ $p }}"{{ else }}"$HOME/.claude"{{ end }}{{ end }}; do
+	"{{ .chezmoi.sourceDir }}/../scripts/claude-merge-settings.sh" "$dir/settings.json" "$baseline" || echo "claude settings: $dir failed" >&2
+done
