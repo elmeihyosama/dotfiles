@@ -31,6 +31,10 @@ assert_eq "true" "$(q '.mise.enabled')" "mise manager enabled"
 assert_eq '["/^mise\\.toml$/"]' "$(jq -c '.mise.managerFilePatterns' "$cfg")" "mise manager reads only the repo mise.toml"
 assert_eq "pins" "$(q '[.packageRules[] | select(.matchPackageNames == ["*"]) | .groupName] | first')" "one pins group for everything"
 assert_eq "true" "$(q '[.packageRules[] | select(.matchDatasources == ["docker"]) | .pinDigests] | first')" "docker images keep digest pins"
+# ignorePaths keeps config:recommended's defaults (:ignoreModulesAndTests,
+# which an explicit ignorePaths replaces) and adds the generated .mise/ locks.
+assert_eq '["**/node_modules/**","**/bower_components/**","**/vendor/**","**/examples/**","**/__tests__/**","**/test/**","**/tests/**","**/__fixtures__/**",".mise/**"]' \
+	"$(jq -c .ignorePaths "$cfg")" "ignorePaths: the recommended defaults plus .mise/**"
 # zjstatus_by_zellij_minor stays manual: no regex targets it, the config says so.
 assert_not_contains "$(q '[.customManagers[].matchStrings[]] | join(" ")')" "zjstatus" "no customManager bumps zjstatus_by_zellij_minor"
 assert_contains "$(q '.description | join(" ")')" "Manual, not managed here: zjstatus_by_zellij_minor" "renovate.json documents zjstatus as manual"
