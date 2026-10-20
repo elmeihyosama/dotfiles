@@ -37,6 +37,18 @@ repos:
         entry: .github/scripts/lint.sh test
         language: system
         pass_filenames: false
+      - id: lint-zizmor
+        name: zizmor (workflow security audit)
+        entry: .github/scripts/lint.sh zizmor
+        language: system
+        pass_filenames: false
+        files: '^\.github/'
+      - id: lint-actionlint
+        name: actionlint (workflow syntax)
+        entry: .github/scripts/lint.sh actionlint
+        language: system
+        pass_filenames: false
+        files: '^\.github/(workflows|actions)/'
       - id: secret-scan
         name: secrets (gitleaks git --staged)
         entry: gitleaks git --staged --redact --no-banner .

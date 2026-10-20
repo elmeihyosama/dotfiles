@@ -3,10 +3,18 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Weekly run catches upstream drift (new tool releases, base images) between PRs.
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
 
 # Read-only ephemeral token — lint jobs only read the repo (they never push).
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
@@ -16,61 +24,59 @@ jobs:
     # appends the full command string to the job name, so every command edit
     # silently renames the checks and breaks the ruleset.
     name: ${{ matrix.area }}
-    runs-on: ubuntu-latest
-    # ubi (chezmoi + the linter binaries) queries api.github.com for releases;
-    # give it the token so it uses the authenticated 5000/hr limit, not the
-    # anonymous 60/hr-per-IP one (which the matrix exhausts).
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Installs are guarded on the binary already existing so a lint-tools
-          # cache hit (see setup-lint) skips their api.github.com lookups too.
           - area: shell
-            install: |
-              command -v shellcheck >/dev/null || ubi --project koalaman/shellcheck --in "$HOME/.local/bin"
-              command -v shfmt >/dev/null || ubi --project mvdan/sh --in "$HOME/.local/bin" --exe shfmt
             run: ./.github/scripts/lint.sh shell
           - area: lua
-            install: |
-              sudo apt-get install -y -qq luajit
-              command -v stylua >/dev/null || ubi --project JohnnyMorganz/StyLua --in "$HOME/.local/bin" --exe stylua
+            # luajit parse-checks rendered *.lua.tmpl (the rest is mise-pinned).
+            install: sudo apt-get install -y -qq luajit
             run: ./.github/scripts/lint.sh lua
           - area: config
-            install: command -v yq >/dev/null || ubi --project mikefarah/yq --in "$HOME/.local/bin"
             run: ./.github/scripts/lint.sh config
           - area: ansible
-            install: |
-              python3 -m pip install --quiet --break-system-packages ansible-core ansible-lint
-              ansible-galaxy collection install -r ansible/requirements.yml
+            install: ansible-galaxy collection install -r ansible/requirements.yml
             run: ./.github/scripts/lint.sh ansible
           - area: editorconfig
-            # v4 renamed the binary in the archive; keep invoking it as `ec`.
-            install: command -v ec >/dev/null || ubi --project editorconfig-checker/editorconfig-checker --in "$HOME/.local/bin" --exe editorconfig-checker --rename-exe ec
             run: ./.github/scripts/lint.sh editorconfig
           - area: test
-            # Renders templates (chezmoi, from setup-lint) and runs zsh (also from setup-lint).
-            install: ':'
             run: ./.github/scripts/lint.sh test
+          - area: zizmor
+            # Online audits (e.g. impostor-commit, ref-confusion) need a token.
+            run: ZIZMOR_ONLINE=1 ./.github/scripts/lint.sh zizmor
+          - area: actionlint
+            run: ./.github/scripts/lint.sh actionlint
+          - area: lock
+            run: ./.github/scripts/lint.sh lock
           - area: secret-scan
-            install: command -v gitleaks >/dev/null || ubi --project gitleaks/gitleaks --in "$HOME/.local/bin"
             run: gitleaks git --no-banner --redact .
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Quote the operands: GH Actions `&&`/`||` return the operand and 0 is
           # FALSY, so `&& 0` would fall through to `|| 1` and secret-scan would get
           # a shallow clone (gitleaks needs full history). '0'/'1' are truthy.
           fetch-depth: ${{ matrix.area == 'secret-scan' && '0' || '1' }}
           persist-credentials: false
-      - uses: ./.github/actions/setup-lint
-        with:
-          cache-key: ${{ matrix.area }}
-      - name: Install ${{ matrix.area }} tools
+      # zizmor's self-repository rule wants `$/.github/...`, but actionlint
+      # 1.7.12 rejects that syntax as an invalid action reference. The checkout
+      # above is persist-credentials:false from this same repo, so the
+      # workspace-relative form carries no extra risk; revisit when actionlint
+      # learns `$/`.
+      - uses: ./.github/actions/setup-lint # zizmor: ignore[self-repository]
+      - name: Install ${{ matrix.area }} extras
+        if: matrix.install
         shell: bash
-        run: ${{ matrix.install }}
+        env:
+          INSTALL: ${{ matrix.install }}
+        run: eval "$INSTALL"
       - name: Run ${{ matrix.area }}
         shell: bash
-        run: ${{ matrix.run }}
+        env:
+          RUN: ${{ matrix.run }}
+          # Read-only token for zizmor's online audits; the zizmor area only.
+          GH_TOKEN: ${{ matrix.area == 'zizmor' && github.token || '' }}
+        run: eval "$RUN"

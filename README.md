@@ -102,7 +102,10 @@ WSL is supported and treated as Linux.
 - Command cheatsheets: run `navi` to browse the custom keybindings and workflow
   commands (theme, sessionizer, forgit, …).
 - Lint locally: `.github/scripts/lint.sh all`. `install.sh` also sets up a pre-commit hook
-  that runs these checks on each commit.
+  that runs these checks on each commit. The lint tools are pinned in the repo's
+  `mise.toml` (checksums in `mise.lock`): run `mise trust` once, then `mise install`
+  in the repo to get them. Entering the repo with mise activated prompts for that
+  trust until you grant it. Inside the repo directory the root `mise.toml`'s tools take precedence over any home installs (via mise activation/shims), and each new git worktree needs its own `mise trust`. `lua` linting also needs `luajit`, and `zsh` stays native.
 - Fresh machine, `chezmoi apply` before `./install.sh`: the zellij `glow`
   layout's status bar needs the zjstatus plugin that ansible installs, so it
   shows a plugin error until you run `./install.sh` — use `zellij -l split`

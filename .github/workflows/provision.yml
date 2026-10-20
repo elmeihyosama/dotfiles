@@ -5,6 +5,7 @@ on:
       - 'ansible/**'
       - '.github/scripts/provision-ci.sh'
       - '.github/scripts/assert-tools.sh'
+      - '.github/scripts/assert-idempotent.sh'
       - '.github/workflows/provision.yml'
   push:
     branches: [main]
@@ -12,7 +13,12 @@ on:
       - 'ansible/**'
       - '.github/scripts/provision-ci.sh'
       - '.github/scripts/assert-tools.sh'
+      - '.github/scripts/assert-idempotent.sh'
       - '.github/workflows/provision.yml'
+  # Weekly run catches upstream drift (new tool releases, base images) between PRs.
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
 
 # Read-only ephemeral token: GITHUB_TOKEN is passed into the container only to
 # raise ubi's GitHub API rate limit; contents:read keeps it minimal so exposure
@@ -20,12 +26,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   provision:
     # Short, stable check name ("debian (sudo)", "rocky10 (nosudo)", …) instead
     # of the full image URL; the image itself rides in matrix.image below.
     name: ${{ matrix.distro }} (${{ matrix.mode }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -36,21 +46,29 @@ jobs:
         # Hub's anonymous pull limit and the daemon times out. Same images;
         # provision-ci.sh detects the distro by package manager, not image name.
         # `include` attaches each distro's image to its two (sudo/nosudo) combos.
+        # Images are pinned to the multi-arch INDEX digest (tag kept for
+        # readers), so a re-pushed tag cannot change what CI runs. Dependabot's
+        # docker ecosystem does not read workflow matrices, so bump by hand:
+        #   docker buildx imagetools inspect <image:tag>   # "Digest:" line
+        # and update bootstrap.yml's copies of ubuntu/fedora in the same commit
+        # (tests/ci-pins.test.sh fails if they diverge). These digests, and the
+        # mise version+sha256 pins (here and in setup-lint), are manual bumps
+        # for now; plan 03 will automate them.
         include:
           - distro: debian
-            image: mirror.gcr.io/library/debian:bookworm-slim
+            image: mirror.gcr.io/library/debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587 # bookworm-slim
           - distro: ubuntu
-            image: mirror.gcr.io/library/ubuntu:24.04
+            image: mirror.gcr.io/library/ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac # 24.04
           - distro: arch
-            image: mirror.gcr.io/library/archlinux:latest
+            image: mirror.gcr.io/library/archlinux:base-20261004.0.606936@sha256:4e77cf2ea5f410e6f8be5abf93ccf17ce2436e87a138c167208356711a405dbd # base-20261004.0.606936
           - distro: fedora
-            image: mirror.gcr.io/library/fedora:latest
+            image: mirror.gcr.io/library/fedora:44@sha256:43b29f65a41eb9c35e1cd5323e3bdf3b655c2357a9f4f1ff2f9c2798e5045d80 # 44
           - distro: rocky9
-            image: quay.io/rockylinux/rockylinux:9
+            image: quay.io/rockylinux/rockylinux:9@sha256:8101994123cf3d0a8fee517bee7f39e555c7d92bd2d9eb3303cc988a0eeed00f # 9
           - distro: rocky10
-            image: quay.io/rockylinux/rockylinux:10
+            image: quay.io/rockylinux/rockylinux:10@sha256:827d37bc128288ccf160ee318bb3cb92d591164cb217e92f8bc61e3982ae1834 # 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Provision (${{ matrix.image }} / ${{ matrix.mode }})
@@ -81,3 +99,83 @@ jobs:
             [ "$attempt" -lt 3 ] && sleep 15
           done
           exit 1
+
+  macos:
+    # The real playbook on a real Mac (Apple Silicon): Homebrew, chezmoi apply
+    # into the runner's HOME, macOS defaults, then a convergent second run.
+    # macos-26 is a versioned runner label (no floating alias). Casks are
+    # skipped: GUI apps are slow, large and need no CI signal.
+    name: macos
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # ansible-core comes from the repo toolchain (mise.toml + mise.lock), the
+      # same pins the lint jobs use. Only the mise binary goes on PATH (no
+      # shims, no exported tool paths): the playbook installs chezmoi, yq, …
+      # itself, and mise copies must not mask a broken brew install from
+      # assert-tools.sh.
+      - name: Install mise
+        uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+        with:
+          version: 2026.10.11
+          # sha256 of mise-v2026.10.11-macos-arm64 (macos-26 is arm64;
+          # update together with `version` and setup-lint's linux-x64 sha).
+          sha256: 62e86e51f834899610e9bd0ee37580cfe01fac5fff03002318e714fbdb86faeb
+          install: false
+          cache: false
+          add_shims_to_path: false
+          export_path: false
+          env: false
+      - name: Install the locked toolchain; put ansible (only) on PATH
+        env:
+          # Raises mise's GitHub API limit for the aqua/github tool downloads.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mise install --locked
+          bin="$(dirname "$(mise which ansible-playbook)")"
+          echo "$bin" >>"$GITHUB_PATH"
+          "$bin/ansible-playbook" --version
+      - name: Install Ansible collections
+        run: ansible-galaxy collection install -r ansible/requirements.yml
+      - name: Write the CI machine vars (ansible/local.yml)
+        run: |
+          printf '%s\n' '---' 'git_name: CI' 'git_email: ci@example.com' 'allow_sudo: false' >ansible/local.yml
+      - name: Provision (first run)
+        working-directory: ansible
+        env:
+          # ubi (tools with no brew formula) reads it to raise its API limit.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ansible-playbook site.yml --skip-tags casks
+      - name: Assert tools
+        run: ./.github/scripts/assert-tools.sh ansible/group_vars/all.yml
+      - name: Provision (second run must be a no-op)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          (cd ansible && ansible-playbook site.yml --skip-tags casks) >"$RUNNER_TEMP/run2.log" 2>&1 || {
+            cat "$RUNNER_TEMP/run2.log"
+            exit 1
+          }
+          cat "$RUNNER_TEMP/run2.log"
+          ./.github/scripts/assert-idempotent.sh "$RUNNER_TEMP/run2.log"
+      - name: Doctor (health check)
+        run: |
+          # scripts/doctor.sh exits non-zero on any FAIL line. Run it, then fail
+          # on every FAIL line except those matching ALLOW (explicit allow-list;
+          # each entry needs a reason). Empty = no FAIL tolerated.
+          ALLOW='^NONE$'
+          set +e
+          sh scripts/doctor.sh | tee "$RUNNER_TEMP/doctor.log"
+          set -e
+          # The summary line proves doctor actually ran to the end.
+          grep -q '^doctor: ' "$RUNNER_TEMP/doctor.log" || {
+            echo "doctor did not run to completion" >&2
+            exit 1
+          }
+          if grep -E '^FAIL' "$RUNNER_TEMP/doctor.log" | grep -vE "$ALLOW"; then
+            echo "doctor reported unexpected FAIL lines (above)" >&2
+            exit 1
+          fi

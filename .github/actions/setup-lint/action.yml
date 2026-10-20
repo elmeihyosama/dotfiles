@@ -1,45 +1,33 @@
 name: setup-lint
-description: Bootstrap zsh + ubi + chezmoi for lint jobs (mirrors the repo's no-sudo install).
-inputs:
-  cache-key:
-    description: >-
-      Discriminator for the tool cache (the lint matrix area). Each area
-      installs its own extra binaries into ~/.local/bin and the post-job cache
-      save captures whatever the job ended up with, so areas must not share a key.
-    required: false
-    default: shared
+description: Install zsh plus the repo-pinned lint toolchain (mise.toml + mise.lock) for lint jobs.
 runs:
   using: composite
   steps:
     - name: Install zsh
       shell: bash
       run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh ca-certificates
-    - name: Compute cache month stamp
-      id: stamp
-      shell: bash
-      run: echo "month=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
-    # Cache the ubi-installed binaries so repeat runs skip the api.github.com
-    # release lookups entirely — bursts of PR CI were exhausting the shared
-    # GITHUB_TOKEN rate budget (403s in this very step). Exact monthly key:
-    # a hit means zero API calls and no re-save; a new month misses once,
-    # reinstalls fresh tools, and saves. Staleness is bounded at one month,
-    # which matches the unpinned-latest policy these installs already have.
-    - name: Cache lint tools
-      uses: actions/cache@v4
+    # Cache mise's data dir (installed tools + pipx venvs). The key hashes
+    # the lockfile plus this file (which pins the mise binary version, also
+    # stored in the cache): any tool/version/checksum change misses once and
+    # re-saves; an unchanged lock is a pure hit with zero GitHub API calls. All lint
+    # areas install the same tools, so they share one entry.
+    - name: Cache mise tools
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ~/.local/bin
-        key: lint-tools-${{ runner.os }}-${{ inputs.cache-key }}-${{ steps.stamp.outputs.month }}
-    - name: Bootstrap ubi + chezmoi (skipped when cached)
-      shell: bash
-      run: |
-        mkdir -p "$HOME/.local/bin"
-        if [ ! -x "$HOME/.local/bin/ubi" ]; then
-          curl -fsLS https://raw.githubusercontent.com/houseabsolute/ubi/v0.10.0/bootstrap/bootstrap-ubi.sh | TARGET="$HOME/.local/bin" sh
-        fi
-        if [ ! -x "$HOME/.local/bin/chezmoi" ]; then
-          "$HOME/.local/bin/ubi" --project twpayne/chezmoi --in "$HOME/.local/bin"
-        fi
-        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        path: ~/.local/share/mise
+        key: mise-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mise.lock', '.github/actions/setup-lint/action.yml') }}
+    # mise itself is pinned (version + sha256 of the linux-x64 binary), and
+    # tools install from mise.lock only (--locked), so CI runs exactly what the
+    # repo declares. The action's own cache is off: the step above owns it.
+    - name: Install mise and tools
+      uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+      with:
+        version: 2026.10.11
+        # sha256 of mise-v2026.10.11-linux-x64 (this action only runs on
+        # ubuntu-24.04 x64; update together with `version`).
+        sha256: f9612efcddda0ae55b62d3b6f82a6c860d5b54ebee0807d4f1a1d578055e1607
+        install_args: --locked
+        cache: false
     - name: Mark workspace safe for git
       shell: bash
       run: git config --global --add safe.directory "$GITHUB_WORKSPACE"

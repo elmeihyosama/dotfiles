@@ -6,6 +6,7 @@ on:
       - 'ansible/**'
       - '.github/scripts/bootstrap-smoke.sh'
       - '.github/scripts/assert-tools.sh'
+      - '.github/scripts/assert-idempotent.sh'
       - '.github/workflows/bootstrap.yml'
   push:
     branches: [main]
@@ -14,28 +15,46 @@ on:
       - 'ansible/**'
       - '.github/scripts/bootstrap-smoke.sh'
       - '.github/scripts/assert-tools.sh'
+      - '.github/scripts/assert-idempotent.sh'
       - '.github/workflows/bootstrap.yml'
+  # Weekly run catches upstream drift (new tool releases, base images) between PRs.
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
 
 # Read-only ephemeral token, passed into the container only to raise ubi's
 # GitHub API rate limit (same rationale as provision.yml).
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   bootstrap:
     # The provision matrix covers per-distro package installs; this job covers
-    # the entry point itself (install.sh end-to-end), so one distro suffices.
-    name: ubuntu (${{ matrix.mode }})
-    runs-on: ubuntu-latest
+    # the entry point itself (install.sh end-to-end): Ubuntu for its apt
+    # branch, Fedora for its dnf branch.
+    name: bootstrap ${{ matrix.distro }} (${{ matrix.mode }})
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
+        distro: [ubuntu, fedora]
         mode: [sudo, nosudo]
+        # Digest-pinned like provision.yml (bump both files together; see the
+        # note there; tests/ci-pins.test.sh fails if the copies diverge).
+        include:
+          - distro: ubuntu
+            image: mirror.gcr.io/library/ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac # 24.04
+          - distro: fedora
+            image: mirror.gcr.io/library/fedora:44@sha256:43b29f65a41eb9c35e1cd5323e3bdf3b655c2357a9f4f1ff2f9c2798e5045d80 # 44
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Bootstrap (${{ matrix.mode }})
+      - name: Bootstrap (${{ matrix.image }} / ${{ matrix.mode }})
         run: |
           # Same 3-retry pattern as provision.yml: absorb transient network
           # blips; install.sh and the playbook are idempotent, so a retry only
@@ -49,7 +68,7 @@ jobs:
               -e MODE='${{ matrix.mode }}' \
               -e GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
               -v "$PWD:/repo" -w /repo \
-              mirror.gcr.io/library/ubuntu:24.04 \
+              '${{ matrix.image }}' \
               sh .github/scripts/bootstrap-smoke.sh; then
               echo "::endgroup::"; exit 0
             fi

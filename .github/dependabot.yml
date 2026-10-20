@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    # The composite action (.github/actions/setup-lint) holds actions too.
+    directories: ["/", "/.github/actions/*"]
+    schedule:
+      interval: weekly
+      day: monday
+    # Let new releases age a week before proposing them (supply-chain hygiene).
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
