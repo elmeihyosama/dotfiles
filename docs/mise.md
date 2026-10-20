@@ -19,9 +19,9 @@ status.show_env = true
 
 `status.show_tools`/`status.show_env` print a one-line summary of the tools
 and env vars a directory's config loads whenever you `cd` into it — nice
-feedback, no side effects. (Verified against the installed mise version,
-`2026.7.14`, via `mise settings --all --toml`; these render into the
-`[status]` table with keys `show_tools`/`show_env`.) Nothing here changes
+feedback, no side effects. (These render into the `[status]` table with
+keys `show_tools`/`show_env`; check with `mise settings --all --toml`.)
+Nothing here changes
 mise's default trust behavior or idiomatic-version-file handling (e.g.
 `.nvmrc`, `.python-version`) — those stay stock.
 
@@ -87,6 +87,29 @@ Ansible environment). The playbook installs exactly those pins with
 Your own `mise use -g` (writes `~/.config/mise/config.toml`) and project
 `mise.toml` files outrank the dotfiles pins and keep working.
 
+Supported platforms are the three the lock covers: macos-arm64 (Apple
+Silicon), linux-x64 and linux-arm64. Intel Macs are not supported; the
+playbook stops at its first task there with a message saying so.
+
+### Upgrading an existing machine
+
+If `chezmoi apply` runs before the playbook, there is no `selected_tools`
+in the chezmoi config yet, so the fallback pins (every group) are deployed,
+and the playbook's first locked install installs the tools of deselected
+groups once. That is harmless: they are never uninstalled, and the next
+apply renders only the selection.
+
+### Known limitation: `shared_home` with mixed arches
+
+On a `shared_home` host with both linux-x64 and linux-arm64 machines,
+`~/.config/mise-dotfiles/config.toml` is one shared file, but it renders
+per arch: a tool `missing_on` one arch (git-absorb on linux-arm64) is
+pinned on the other only. Each arch's `chezmoi apply` rewrites the file for
+itself, so `chezmoi status` / doctor show drift on the other arch, and
+git-absorb drops out of the x64 pins after an arm64 apply until the next
+x64 apply. The installs themselves are per arch (`MISE_DATA_DIR` under
+`~/.local/share-<arch>`) and unaffected.
+
 PATH precedence: mise wins over `~/.local/bin` and Homebrew in every shell
 except the login, non-interactive case below.
 `.zshenv` moves the shims dir to the front (non-interactive shells), and
@@ -137,32 +160,58 @@ config masked, so neither a project `mise.toml` (the repo's lint toolchain
 included) nor `mise use -g` answers for a home tool. `command -v <bin>` must
 then point inside mise's data dir. A non-mise copy further back on PATH is a
 WARN with a removal hint (`brew uninstall X`, `sudo apt remove X`, ...); one
-ahead of mise's is a FAIL. doctor also FAILs when the `mise` binary is not
-the `mise_version` pinned in `ansible/group_vars/all.yml`.
+ahead of mise's is a FAIL. In an activated shell an install dir of another
+version ahead of the pinned one is a FAIL (a stale shell), unless your
+global config (`mise use -g`) selects exactly that version: then it is a
+WARN naming the config file and both versions. doctor also FAILs when the
+`mise` binary is not the `mise_version` pinned in
+`ansible/group_vars/all.yml`.
 
 ## Pins and Renovate
 
-Everything the dotfiles install is pinned to an exact version, and every
-download is checked against a checksum:
+Everything the dotfiles install is pinned to an exact version. Most
+downloads are also checked against a checksum; the table says which, and
+the exceptions follow it.
 
 | Pin | Lives in | Checksum |
 | --- | --- | --- |
-| Home CLI tools | `home/.chezmoidata/tools.yaml` | `home/dot_config/mise-dotfiles/mise.lock` |
-| Repo lint toolchain | `mise.toml` | `mise.lock`, plus `.mise/locks/pipx-*/<ver>/uv.lock` |
+| Home CLI tools | `home/.chezmoidata/tools.yaml` | `home/dot_config/mise-dotfiles/mise.lock`, except the entries in `.github/scripts/lock-exceptions-home.txt` |
+| Repo lint toolchain | `mise.toml` | `mise.lock`, plus `.mise/locks/pipx-*/<ver>/uv.lock` (hash-pinned, dependencies included) |
 | mise itself (bootstrap) | `mise_version` in `ansible/group_vars/all.yml` | `mise_sha256` beside it |
 | CI's mise binary | `version:` in `.github/actions/setup-lint/action.yml` and the macOS job in `.github/workflows/provision.yml` | the `sha256:` input below it |
-| uv, ansible-core, pre-commit (install.sh) | `ansible/group_vars/all.yml` | the repo `mise.lock` (same versions, `tests/python-pins.test.sh`) |
+| uv (install.sh) | `uv_version` in `ansible/group_vars/all.yml` | `uv_installer_sha256` beside it (the installer script; it checks the uv archive against the sha256 embedded in it) |
+| ansible-core, pre-commit (install.sh, `tasks/python.yml`) | `ansible_core_version`, `pre_commit_version` in `ansible/group_vars/all.yml` | none: version-equal to the repo `mise.toml` (`tests/python-pins.test.sh`), not hash-locked |
+| Python (uv-managed, under ansible-core and as the default `python3`) | `python_version` in `ansible/group_vars/all.yml` (equal to the repo `mise.toml` python) | the sha256 the pinned uv carries for that build |
 | JetBrainsMono Nerd Font | `nerd_font_version` in `ansible/group_vars/all.yml` | `checksum:` in `ansible/tasks/fonts.yml` |
 | zsh plugins | `rev = "<commit>"` / `tag = "X"` in `home/dot_config/sheldon/plugins.toml` | the commit itself |
 | CI container images | `image: <name>:<tag>@sha256:<digest>` in `.github/workflows/` | the digest |
 | zjstatus | `zjstatus_by_zellij_minor` in `ansible/group_vars/all.yml` | per-entry `sha256` |
 
+Not checksum-verified:
+
+- **Home tools whose upstream publishes no checksum**, listed with a reason
+  in `.github/scripts/lock-exceptions-home.txt`: jless on macOS and navi on
+  Linux. Their lock entries hold the release asset url and id only;
+  `mise install --locked` still installs exactly that asset.
+- **ansible-core and pre-commit as install.sh / the playbook install them**
+  (`uv tool install X==<ver>`): only the top-level version is pinned. Their
+  dependencies resolve at install time, and neither install reads the repo
+  `mise.lock`.
+- **Native packages** (brew / distro, `native_on` / `native_only` in
+  tools.yaml): whatever version and verification the package manager gives.
+
+`scripts/check-lock-sync.sh` also rejects a macos-arm64 lock url that names
+an x86_64 build (it needs Rosetta 2, which a fresh Apple Silicon Mac does not
+have) unless `.github/scripts/lock-arch-exceptions-home.txt` lists it; the
+usual fix is `native_on: [darwin]` (brew builds arm64), as for dust.
+
 `scripts/relock.sh` is the one command that refreshes every checksum from
 the versions above: `mise_sha256`, CI's mise `sha256:` inputs, both
 `mise.lock` files (dropping `.mise/locks` uv.lock dirs the repo lock no
-longer references), and the nerd font zip's sha256 (from the release's
-`SHA-256.txt`). It is idempotent and prints what changed. To bump by hand,
-edit the version, run it, commit.
+longer references), the nerd font zip's sha256 (from the release's
+`SHA-256.txt`) and `uv_installer_sha256`. It also sets tools.yaml's
+bootstrap `mise:` version to `mise_version`. It is idempotent and prints
+what changed. To bump by hand, edit the version, run it, commit.
 
 [Renovate](https://docs.renovatebot.com/) (`renovate.json`) proposes the
 version bumps, before 6am on Mondays, all in one "pins" PR so equal pins
@@ -192,14 +241,24 @@ silently stops matching fails CI. It also runs the official
 ### A bot PR failed `lock`
 
 Expected: Renovate edits versions but cannot compute checksums or locks, so
-a tool, mise or nerd-font bump fails the `lock` check (or the mise sha256 /
-playbook checks) until the checksums catch up. Check out the PR branch, then:
+a tool, mise, uv or nerd-font bump fails the `lock` check (or the mise
+sha256 / playbook checks) until the checksums catch up. Check out the PR
+branch, then:
 
 ```sh
 scripts/relock.sh
 git add -A && git commit -m "relock"   # -A: picks up new .mise/locks/pipx-*/<ver>/ dirs
 git push
 ```
+
+Two failures relock cannot fix:
+
+- **zellij moves to a new minor** (`tests/zjstatus-pin.test.sh` fails): add
+  a `zjstatus_by_zellij_minor` entry for it in `ansible/group_vars/all.yml`
+  (a zjstatus release built against that minor's `zellij-tile`, see the
+  comment there, with the wasm's sha256).
+- **The repo `mise.toml` python moves** (`tests/python-pins.test.sh`
+  fails): set `python_version` in group_vars to the same version.
 
 ### One-time setup
 
