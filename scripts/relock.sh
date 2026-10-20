@@ -11,12 +11,15 @@
 #      temp dir and locked there (never touches your own mise config)
 #   5. the nerd font zip's sha256 in ansible/tasks/fonts.yml, for the
 #      nerd_font / nerd_font_version in group_vars (release SHA-256.txt)
+#   6. uv_installer_sha256 in group_vars: the sha256 of uv_version's
+#      uv-installer.sh release asset (uv publishes none for it)
+#   7. the bootstrap `mise:` entry's version in tools.yaml, set to mise_version
 # One function per artifact (more can be added). Idempotent: a second run is a
 # no-op. Prints what changed. Respects the caller's MISE_* / GITHUB_TOKEN env.
 # Every rewrite is re-read and checked, so workflow/YAML drift fails loudly
 # instead of silently doing nothing. Needs: mise, chezmoi, yq, gh or curl.
-# Usage: scripts/relock.sh   (edit mise_version / nerd_font_version first to
-# bump, or run it on a Renovate PR branch that already did)
+# Usage: scripts/relock.sh   (edit mise_version / nerd_font_version /
+# uv_version first to bump, or run it on a Renovate PR branch that already did)
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -28,6 +31,7 @@ REPO_LOCK=mise.lock
 HOME_LOCK=home/dot_config/mise-dotfiles/mise.lock
 PINS_TMPL=home/dot_config/mise-dotfiles/config.toml.tmpl
 FONTS=ansible/tasks/fonts.yml
+TOOLS=home/.chezmoidata/tools.yaml
 PLATFORMS=macos-arm64,linux-x64,linux-arm64
 changed=0
 
@@ -77,6 +81,11 @@ fetch_release_asset() {
 fetch_shasums() {
 	SHASUMS="$tmp/SHASUMS256.txt"
 	fetch_release_asset jdx/mise "v$MISE_VERSION" SHASUMS256.txt "$SHASUMS"
+}
+
+# sha256 FILE -> its sha256 (sha256sum, else shasum)
+sha256() {
+	if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{print $1}'
 }
 
 # asset_sha ASSET -> sha256 of that raw release binary
@@ -168,8 +177,10 @@ prune_orphan_uvlocks() {
 
 # The dotfiles lock covers EVERY tool with a backend (the template's
 # mise_pins_all knob ignores selection and OS), so a machine's subset and any
-# OS find their entries. Locked in a throwaway MISE_SYSTEM_CONFIG_DIR with the
-# user's global config masked, exactly as documented in the layout spike.
+# OS find their entries. Locked the way the machines read it: the pins dir as
+# mise's system config (MISE_SYSTEM_CONFIG_DIR, a throwaway one here), the
+# user's global config masked, `-C /` so no project mise.toml joins in, and
+# `lock -g`, which writes mise.lock beside the system config.
 relock_home_lock() {
 	local d="$tmp/home-pins" cfg="$tmp/pins-render.toml"
 	mkdir -p "$d"
@@ -197,8 +208,37 @@ relock_nerd_font() {
 	replace_if_changed "$FONTS" "$out" "$FONTS nerd font sha256"
 }
 
+# uv publishes no checksum for uv-installer.sh, so record the sha256 of the
+# release asset (install.sh checks the download against it).
+relock_uv_installer() {
+	local ver inst="$tmp/uv-installer.sh" sha out="$tmp/all.uv.yml"
+	ver="$(sed -nE 's/^uv_version:[[:space:]]*"([^"]+)".*/\1/p' "$GV")"
+	[ -n "$ver" ] || die "uv_version not found in $GV"
+	fetch_release_asset astral-sh/uv "$ver" uv-installer.sh "$inst"
+	sha="$(sha256 "$inst")"
+	[[ "$sha" =~ ^[0-9a-f]{64}$ ]] || die "could not hash uv $ver uv-installer.sh"
+	sed -E "s/^(uv_installer_sha256:[[:space:]]*\")[0-9a-f]*\"/\1$sha\"/" "$GV" >"$out"
+	expect "$out" "^uv_installer_sha256:[[:space:]]*\"$sha\"" "$GV uv_installer_sha256"
+	replace_if_changed "$GV" "$out" "$GV uv_installer_sha256"
+}
+
+# tools.yaml's bootstrap `mise:` entry (what select-tools and doctor report)
+# carries mise_version too.
+relock_tools_mise() {
+	local out="$tmp/tools.yaml"
+	awk -v ver="$MISE_VERSION" '
+		/^  mise:$/ {f=1; print; next}
+		f && /^  [^[:space:]]/ {f=0}
+		f && /^    version:/ {sub(/"[^"]*"/, "\"" ver "\"")}
+		{print}' "$TOOLS" >"$out"
+	[ "$(yq '.tools.mise.version' "$out")" = "$MISE_VERSION" ] || die "$TOOLS: mise version did not land (layout changed?)"
+	replace_if_changed "$TOOLS" "$out" "$TOOLS mise version"
+}
+
 fetch_shasums
 relock_group_vars
+relock_uv_installer
+relock_tools_mise
 relock_ci
 relock_repo_lock
 relock_home_lock
