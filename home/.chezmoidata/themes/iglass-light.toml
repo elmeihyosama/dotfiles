@@ -1,14 +1,16 @@
 # iglass Frosted (light) from github.com/vukkt/iglass, tag v1.5.0, MIT license.
 # Mapped to base16 by hand; not in tinted-theming/schemes.
+# vendored: no upstream base16 scheme
+# base01/04/07 adapted for base16 light semantics.
 [themes.iglass-light]
 base00 = "#f5f5f7"
-base01 = "#1d1d1f"
+base01 = "#e5e5ea"
 base02 = "#bad7f9"
 base03 = "#605f64"
-base04 = "#c7c7cc"
+base04 = "#3a3a3c"
 base05 = "#1d1d1f"
-base06 = "#e5e5ea"
-base07 = "#e5e5ea"
+base06 = "#1d1d1f"
+base07 = "#000000"
 base08 = "#92000b"
 base09 = "#c30006"
 base0A = "#763200"

@@ -22,10 +22,28 @@ for slug in iglass-dark iglass-light; do
 	grep -q "^\[on_colors\.$slug\]\$" "$TESTS_REPO/home/.chezmoidata/on_colors.toml" || fail "$slug: no on_colors"
 done
 
-# The audit must not flag the vendored non-base16 themes.
-cache=$(mktemp -d)
-out=$(XDG_CACHE_HOME="$cache" sh "$TESTS_REPO/scripts/theme-audit.sh" 2>&1)
-rc=$?
-rm -rf "$cache"
-assert_eq 0 "$rc" "theme-audit exit"
-assert_not_contains "$out" "iglass" "theme-audit flags iglass"
+# iglass-light keeps base16 light semantics: base00-03 lighter than base05.
+lum() { # #rrggbb -> r+g+b
+	local h=${1#\#}
+	echo $((16#${h:0:2} + 16#${h:2:2} + 16#${h:4:2}))
+}
+light="$dir/iglass-light.toml"
+fg=$(lum "$(sed -n 's/^base05 = "\(.*\)"/\1/p' "$light")")
+for k in 00 01 02 03; do
+	v=$(lum "$(sed -n "s/^base$k = \"\(.*\)\"/\1/p" "$light")")
+	[ "$v" -gt "$fg" ] || fail "iglass-light: base$k not lighter than base05"
+done
+
+# The audit must not flag marked themes. Needs network: SKIP the audit when
+# schemes are unreachable (the file checks above still ran).
+export GIT_TERMINAL_PROMPT=0 GIT_HTTP_LOW_SPEED_LIMIT=1000 GIT_HTTP_LOW_SPEED_TIME=10
+if git ls-remote https://github.com/tinted-theming/schemes HEAD >/dev/null 2>&1; then
+	cache=$(mktemp -d)
+	out=$(XDG_CACHE_HOME="$cache" sh "$TESTS_REPO/scripts/theme-audit.sh" 2>&1)
+	rc=$?
+	rm -rf "$cache"
+	assert_eq 0 "$rc" "theme-audit exit"
+	assert_not_contains "$out" "iglass" "theme-audit flags iglass"
+else
+	echo "SKIP: theme-audit (no network)" >&2
+fi

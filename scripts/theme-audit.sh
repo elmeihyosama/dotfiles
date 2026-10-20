@@ -43,8 +43,8 @@ OUT_DIR="$tmp/out" "$REPO_ROOT/scripts/base16-to-theme.sh" -d "$SCHEMES_SRC" >/d
 for f in "$THEMES_DIR"/*.toml; do
 	b=$(basename "$f")
 	if [ ! -f "$tmp/out/$b" ]; then
-		# Hand-mapped vendored themes (e.g. iglass) have no upstream scheme.
-		head -1 "$f" | grep -q 'github.com/vukkt/iglass' && continue
+		# Hand-mapped vendored themes (iglass) carry a "# vendored" marker.
+		head -5 "$f" | grep -q "^# vendored: no upstream" && continue
 		printf 'DRIFT %s: missing upstream (renamed or removed?)\n' "$b"
 	elif ! cmp -s "$f" "$tmp/out/$b"; then
 		printf 'DRIFT %s: differs from regenerated upstream\n' "$b"
