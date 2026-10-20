@@ -8,6 +8,7 @@
     shared_home = false          # true only on shared-$HOME multi-arch hosts (per-arch PATH + mise dir)
     git_name = "Your Name"
     git_email = "you@example.com"
+    # signing_key = "~/.ssh/id_ed25519.pub"   # public key; enables SSH commit signing
     # theme = "rose-pine-moon"   # uncomment to override the repo default
     # selected_tools = ["fzf", "jq"]   # written by the playbook; omit it to pin
     #                                  # every tool with a backend (minus native ones)

@@ -1,0 +1,12 @@
+{{- /* SSH-signing config; empty when signing_key is unset. */ -}}
+{{- $k := includeTemplate "signing-key" . -}}
+{{- if $k }}
+[gpg]
+    format = ssh
+[user]
+    signingkey = {{ $k }}
+[commit]
+    gpgsign = true
+[tag]
+    gpgsign = true
+{{ end -}}

@@ -129,6 +129,11 @@ ensure_local_vars() {
 		_email="$(ask "Git email (required)" "")"
 	fi
 
+	_key_def=""
+	# shellcheck disable=SC2088  # literal ~, stored unexpanded
+	[ -f "$HOME/.ssh/id_ed25519.pub" ] && _key_def="~/.ssh/id_ed25519.pub"
+	_signing_key="$(ask "SSH public key for signing GitHub-identity commits (blank to skip)" "$_key_def")"
+
 	if sudo -n true >/dev/null 2>&1; then _sudo_default="yes"; else _sudo_default="no"; fi
 	_sudo_answer="$(ask "Allow sudo for native package installs? (yes/no)" "$_sudo_default")"
 	case "$_sudo_answer" in [Yy]*) _allow_sudo="true" ;; *) _allow_sudo="false" ;; esac
@@ -144,6 +149,9 @@ git_email: $(yaml_quote "$_email")
 allow_sudo: $_allow_sudo
 shared_home: $SHARED_HOME
 EOF
+	if [ -n "$_signing_key" ]; then
+		printf 'signing_key: %s\n' "$(yaml_quote "$_signing_key")" >>ansible/local.yml
+	fi
 	echo "Wrote ansible/local.yml."
 }
 

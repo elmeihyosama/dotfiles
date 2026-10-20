@@ -1,0 +1,5 @@
+{{- /* include takes absolute paths in chezmoi 2.x; stat guards a missing key (renders empty; doctor reports it). */ -}}
+{{- $k := includeTemplate "signing-key" . -}}
+{{- if and $k (stat $k) -}}
+{{ if hasKey . "personal_git_email" }}{{ .personal_git_email }}{{ else }}{{ .git_email }}{{ end }} {{ include $k | trim }}
+{{ end -}}

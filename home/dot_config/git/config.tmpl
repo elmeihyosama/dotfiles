@@ -25,6 +25,13 @@
     line-numbers-plus-style = "{{ $p.base0B }}"
     line-numbers-zero-style = "{{ $p.base03 }}"
 
+{{- if includeTemplate "signing-key" . }}
+[gpg "ssh"]
+    allowedSignersFile = ~/.config/git/allowed_signers
+{{- if not (hasKey . "personal_git_email") }}
+{{ template "signing-block" . }}
+{{- end }}
+{{ end }}
 [credential]
 {{- if eq .chezmoi.os "darwin" }}
     helper = osxkeychain

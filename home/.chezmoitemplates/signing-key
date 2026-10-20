@@ -1,0 +1,3 @@
+{{- /* Absolute signing_key path ("" when unset); git does not expand ~ here. */ -}}
+{{- $k := get . "signing_key" -}}
+{{- if hasPrefix "~/" $k }}{{ joinPath .chezmoi.homeDir (trimPrefix "~/" $k) }}{{ else }}{{ $k }}{{ end -}}
