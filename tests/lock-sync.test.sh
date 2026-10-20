@@ -31,6 +31,7 @@ plat() {
 } >"$d/home.lock"
 cp "$d/home.lock" "$d/home.lock.orig"
 : >"$d/exceptions.txt"
+: >"$d/arch-exceptions.txt"
 cat >"$d/mise.toml" <<'T'
 [tools]
 "aqua:mvdan/sh" = "3.14.1"
@@ -56,7 +57,8 @@ mkdir -p "$d/.mise/locks/pipx-pre-commit/4.7.0"
 
 run() {
 	out="$(bash "$script" --root "$d" --tools "$d/tools.yaml" --home-lock "$d/home.lock" \
-		--mise-toml "$d/mise.toml" --repo-lock "$d/repo.lock" --home-exceptions "$d/exceptions.txt" 2>&1)"
+		--mise-toml "$d/mise.toml" --repo-lock "$d/repo.lock" --home-exceptions "$d/exceptions.txt" \
+		--arch-exceptions "$d/arch-exceptions.txt" 2>&1)"
 	rc=$?
 }
 
@@ -106,6 +108,28 @@ sed 's|"https://example.invalid/x-darwin_arm64.tar.gz"|"https://example.invalid/
 run
 assert_eq 1 "$rc" "platform_url_wrong_os_fails: exit 1"
 assert_contains "$out" "the macos-arm64 url does not look like a macos asset" "platform_url_wrong_os_fails: says why"
+cp "$d/home.lock.orig" "$d/home.lock"
+
+# platform_url_wrong_arch_fails: the macos-arm64 url is an Intel build, which
+# needs Rosetta 2 (absent on a fresh Apple Silicon Mac)
+for a in x-x86_64-apple-darwin.tar.gz x_Darwin_amd64.tar.gz x-macos-intel.zip x-macos-x64.tar.gz; do
+	sed "s|\"https://example.invalid/x-darwin_arm64.tar.gz\"|\"https://example.invalid/$a\"|" "$d/home.lock.orig" >"$d/home.lock"
+	run
+	assert_eq 1 "$rc" "platform_url_wrong_arch_fails ($a): exit 1"
+	assert_contains "$out" "the macos-arm64 url is an x86_64 asset ($a)" "platform_url_wrong_arch_fails ($a): says why"
+done
+# ... unless the arch exceptions file lists the tool and platform (both fake
+# tools share the asset name, so list both)
+printf '%s macos-arm64  # x86_64 only upstream; Rosetta required\n' aqua:junegunn/fzf github:eza-community/eza >"$d/arch-exceptions.txt"
+run
+assert_eq 0 "$rc" "arch_exception_exempts_platform: exit 0 ($out)"
+: >"$d/arch-exceptions.txt"
+# universal and arch-less macOS assets are fine
+for a in x-universal-apple-darwin.tar.gz x-darwin-x86_64-arm64-universal.tar.gz x-apple-darwin.tar.gz x-macos.zip x-darwin-all.tar.gz; do
+	sed "s|\"https://example.invalid/x-darwin_arm64.tar.gz\"|\"https://example.invalid/$a\"|" "$d/home.lock.orig" >"$d/home.lock"
+	run
+	assert_eq 0 "$rc" "macos_universal_or_archless_ok ($a): exit 0 ($out)"
+done
 cp "$d/home.lock.orig" "$d/home.lock"
 
 # repo mise.toml tool missing from the repo lock
