@@ -87,8 +87,52 @@ Ansible environment). The playbook installs exactly those pins with
 Your own `mise use -g` (writes `~/.config/mise/config.toml`) and project
 `mise.toml` files outrank the dotfiles pins and keep working.
 
-PATH precedence: mise wins over `~/.local/bin` and Homebrew in every shell.
+PATH precedence: mise wins over `~/.local/bin` and Homebrew in every shell
+except the login, non-interactive case below.
 `.zshenv` moves the shims dir to the front (non-interactive shells), and
 `conf.d/00-env.zsh.tmpl` puts it back in front after prepending
 `~/.local/bin`; interactive shells then run `mise activate`, which puts the
-pinned install dirs first (`tests/path-precedence.test.sh`).
+pinned install dirs first (`tests/path-precedence.test.sh`). `mise activate`
+is cached in `$ZSH_CACHE_DIR/mise/activate.zsh` (about 12 ms saved per shell)
+without the PATH snapshot that its raw output embeds, so every shell keeps
+its own PATH entries (`tests/mise-activate-cache.test.sh`).
+
+### Known gap: `zsh -lc` (login, non-interactive)
+
+A login shell reads `~/.zprofile` after `.zshenv`, and nothing interactive
+runs afterwards to put the shims back in front. Two things reorder PATH
+there:
+
+- Homebrew's installer tells you to add `eval "$(/opt/homebrew/bin/brew shellenv)"`
+  to `~/.zprofile`. It prepends `/opt/homebrew/bin`, so a Homebrew copy of a
+  pinned tool (an old `brew install fzf`) wins over mise's.
+- On macOS, `/etc/zprofile` runs `path_helper`, which moves the system dirs
+  (`/usr/local/bin`, `/usr/bin`, ...) ahead of everything else, including
+  macOS's own `/usr/bin/jq`.
+
+This affects `zsh -lc '...'` (some IDE task runners and launchers, `ssh` to a
+host whose login shell is zsh with a command). Interactive shells, login or
+not, are fixed by 00-env and `mise activate`. The dotfiles do not manage
+`~/.zprofile` (it belongs to you and to installers that edit it). The fix is
+one line at the end of `~/.zprofile`, after the `brew shellenv` line:
+
+```zsh
+path=("${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims" ${path:#${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims})
+```
+
+Do not just delete the `brew shellenv` line: the dotfiles do not put
+Homebrew on PATH themselves, so `brew` and its formulae would disappear from
+every shell started from a login shell.
+
+## Checking a machine: `doctor` and assert-tools
+
+`doctor` (`scripts/doctor.sh`) runs `.github/scripts/assert-tools.sh`, the same
+check CI runs after provisioning. For each mise tool it requires
+`mise which --version <bin>` to equal the tools.yaml version, resolved with
+`mise -C /`, `MISE_SYSTEM_CONFIG_DIR=~/.config/mise-dotfiles` and the global
+config masked, so neither a project `mise.toml` (the repo's lint toolchain
+included) nor `mise use -g` answers for a home tool. `command -v <bin>` must
+then point inside mise's data dir. A non-mise copy further back on PATH is a
+WARN with a removal hint (`brew uninstall X`, `sudo apt remove X`, ...); one
+ahead of mise's is a FAIL. doctor also FAILs when the `mise` binary is not
+the `mise_version` pinned in `ansible/group_vars/all.yml`.
