@@ -47,6 +47,9 @@ if [ -f "$local_yml" ] && grep -Eq '^[[:space:]]*shared_home:[[:space:]]*true' "
 fi
 export MISE_SYSTEM_CONFIG_DIR="${MISE_SYSTEM_CONFIG_DIR:-$HOME/.config/mise-dotfiles}"
 export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share$sfx/mise}"
+# The user's own global config (what `mise use -g` writes), before masking it:
+# an override there is reported as such, not as a broken install.
+user_global="${MISE_GLOBAL_CONFIG_FILE:-${MISE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/mise}/config.toml}"
 export MISE_GLOBAL_CONFIG_FILE=/nonexistent/mise-user.toml
 # A shell that never read the dotfiles' .zshenv/.bashrc (a CI step, a fresh
 # container) lacks the shims: put them in front, as those files do. The local
@@ -133,10 +136,17 @@ while IFS='|' read -r tool bin source want managed; do
 			continue
 		fi
 		# An install dir on PATH (mise activate) must be the pinned one, not
-		# an old version left there by a stale shell.
+		# an old version left there by a stale shell. One that the user's
+		# global config selects (`mise use -g`) is their choice: WARN.
 		case "$where" in "$MISE_DATA_DIR"/installs/*)
 			pinned="$(mise -C / which "$bin" 2>/dev/null)" || pinned=""
 			if [ "$(resolve "$where")" != "$(resolve "$pinned")" ]; then
+				if [ -f "$user_global" ] &&
+					[ "$(resolve "$(MISE_GLOBAL_CONFIG_FILE="$user_global" mise -C / which "$bin" 2>/dev/null)")" = "$(resolve "$where")" ]; then
+					ver="$(MISE_GLOBAL_CONFIG_FILE="$user_global" mise -C / which --version "$bin" 2>/dev/null)" || ver="?"
+					echo "WARN: $tool -> '$bin' is $ver from your global mise config ($user_global), not the pinned $want; remove it there to use the pin"
+					continue
+				fi
 				echo "FAIL: $tool -> '$bin' resolves to $where, not the pinned $want install ($pinned): restart the shell, or run: mise -C / install --locked"
 				fail=1
 				continue
