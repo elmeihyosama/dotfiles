@@ -32,7 +32,7 @@ stub zsh 'printf "%s\n" "$@" >"$STUB_CALL"; printf "stdin=[%s]\n" "$(cat)" >>"$S
 stub uv 'printf "%s\n" "$@" >"$STUB_CALL"'
 
 cat >"$STUB_DATA" <<'J'
-{"theme": "zeta", "glass": "",
+{"theme": "zeta", "glass": "", "wallpaper_mode": "on",
 	"glass_levels": {"default": {}, "clear": {}, "solid": {}, "frosted": {}, "tinted": {}, "extra": {}},
 	"themes": {
 		"zeta": {"base00": "#000000", "base0F": "#ffffff", "name": "not a colour"},
@@ -48,7 +48,8 @@ run() { # run ARGS...: sets out, rc (stdin closed)
 # look_json: the contract the TUI parses
 run look --json
 assert_eq 0 "$rc" "look: exit 0 ($out)"
-assert_eq '["glass","levels","theme","themes"]' "$(jq -c 'keys' <<<"$out")" "look: keys"
+assert_eq '["glass","levels","theme","themes","wallpaper"]' "$(jq -c 'keys' <<<"$out")" "look: keys"
+assert_eq on "$(jq -r .wallpaper <<<"$out")" "look: wallpaper mode"
 assert_eq zeta "$(jq -r .theme <<<"$out")" "look: active theme"
 assert_eq null "$(jq -r .glass <<<"$out")" "look: empty glass is null"
 assert_eq "clear,frosted,tinted,solid,extra,default" "$(jq -r '.levels | join(",")' <<<"$out")" "look: levels lightest first, unknown before default, default last"
@@ -70,6 +71,8 @@ assert_contains "$call" "$TESTS_REPO/home/dot_config/zsh/conf.d/45-theme.zsh" "t
 assert_contains "$call" $'theme\nrose-pine\nstdin=[]' "theme: calls theme SLUG with nothing on stdin"
 out="$(printf 'y\n' | env -i HOME="$HOME" PATH="$HOME/bin:/usr/bin:/bin" STUB_CALL="$STUB_CALL" sh "$script" glass frosted 2>&1)"
 assert_contains "$(cat "$STUB_CALL")" $'glass\nfrosted\nstdin=[]' "glass: piped stdin never reaches zsh"
+run wallpaper toggle
+assert_contains "$(cat "$STUB_CALL")" $'wallpaper\ntoggle\nstdin=[]' "wallpaper: dispatched like theme"
 run theme
 assert_eq 2 "$rc" "theme: a slug is required"
 run glass a b
@@ -85,7 +88,8 @@ if [ -n "$zsh_bin" ]; then
 	: >"$src/.chezmoidata/themes/rose-pine.toml"
 	printf '[data]\n    theme = "old"\n' >"$HOME/chezmoi.toml"
 	ln -s "$zsh_bin" "$HOME/rbin/zsh"
-	printf '#!/bin/sh\ncase "$1" in source-path) echo "%s" ;; apply) echo apply >>"%s" ;; esac\n' "$src" "$STUB_CALL" >"$HOME/rbin/chezmoi"
+	# status: one file edited here (kept), one waiting (applied by path)
+	printf '#!/bin/sh\ncase "$1" in source-path) echo "%s" ;; status) printf "MM .config/edited.lua\\n M .config/ghostty/config\\n" ;; apply) echo "$*" >>"%s" ;; esac\n' "$src" "$STUB_CALL" >"$HOME/rbin/chezmoi"
 	for t in cmux zellij pgrep pkill nvim; do printf '#!/bin/sh\nexit 0\n' >"$HOME/rbin/$t"; done
 	chmod +x "$HOME/rbin/"*
 	rm -f "$STUB_CALL"
@@ -95,7 +99,8 @@ if [ -n "$zsh_bin" ]; then
 	assert_eq 0 "$rc" "real zsh: theme exits 0 ($out)"
 	assert_contains "$out" "theme → rose-pine" "real zsh: theme ran"
 	assert_contains "$(cat "$HOME/chezmoi.toml")" 'theme = "rose-pine"' "real zsh: theme key written"
-	assert_eq apply "$(cat "$STUB_CALL" 2>/dev/null)" "real zsh: chezmoi apply ran once"
+	assert_eq "apply $HOME/.config/ghostty/config" "$(cat "$STUB_CALL" 2>/dev/null)" "real zsh: apply only the waiting file, by path"
+	assert_contains "$out" "kept your edits, not applied: .config/edited.lua" "real zsh: names the edited file it left alone"
 	out="$(env -i HOME="$HOME" PATH="$HOME/rbin:/usr/bin:/bin" CHEZMOI_CONFIG="$HOME/chezmoi.toml" \
 		DOTFILES_TEST=1 sh "$script" theme no-such 2>&1 </dev/null)"
 	assert_eq 1 "$?" "real zsh: unknown theme exits 1"

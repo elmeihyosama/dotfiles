@@ -118,15 +118,24 @@ saying so.
   (no file changes) and reports incoming commits, chezmoi drift and missing
   tools.
 - `dotfiles doctor` — read-only health check (also `doctor`).
-- `dotfiles tui`, or bare `dotfiles` in a terminal — a full-screen view of the
-  above: **Tools** (space marks a tool to add or remove, `a` applies, `/`
-  filters), **Health** (`r` runs doctor), **Update** (`c` checks, `u` updates)
-  and **Look** (theme list with a palette preview, `g` for the glass level).
-  Keys: `1`–`4` switch tabs (opening a tab never runs anything), `q` quits. It runs with uv from a locked environment
-  (`scripts/tui/`), and its colours follow the active theme.
-- `dotfiles look --json`, `dotfiles theme SLUG`, `dotfiles glass LEVEL` — what
-  the Look tab uses: the theme and glass state as JSON, and `theme`/`glass`
-  without a terminal.
+- `dotfiles tui`, or bare `dotfiles` in a terminal — a full-screen view, five
+  tabs (`1`–`5`; opening a tab never runs anything, `q` quits):
+  - **Status**: health, incoming commits, local edits and tool problems at a
+    glance, then everything that needs attention; `r` checks (doctor + a
+    fetch), `u` updates, `enter` opens the file or tool.
+  - **Tools**: `space` marks a tool to add or remove, `a` applies, `/` filters.
+  - **Files**: managed files edited here or waiting to apply, with a diff;
+    `a` applies (asks before discarding your edits), `k` keeps yours
+    (`chezmoi re-add`), `A` applies everything waiting.
+  - **Look**: themes with a palette preview, `g` glass level, `w` wallpaper.
+  - **Machine**: the `install.sh` answers in `ansible/local.yml`; `enter`
+    edits one, `a` applies them without overwriting edited files.
+
+  It runs with uv from a locked environment (`scripts/tui/`); its colours
+  follow the active theme.
+- The commands behind it: `dotfiles look --json`, `theme SLUG`, `glass LEVEL`,
+  `wallpaper on|off|toggle`, `files --json | diff|apply|keep PATH...`,
+  `machine --json | set KEY VALUE [--no-apply] | apply`.
 
 On macOS, Raycast has *Dotfiles Update* and *Dotfiles Doctor* commands
 ([Raycast](docs/raycast.md)).

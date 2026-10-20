@@ -5,7 +5,7 @@ STUB_FAIL: a subcommand that exits 1 (after printing a FAIL line).
 STUB_LIST: replaces the `list --json` output verbatim.
 STUB_PROC: file that gets one JSON {argv, pid, leader, prompt} per call.
 STUB_SLOW: a full command line (e.g. "update") that sleeps 30s (quit/cancel tests).
-STUB_BIG: doctor prints 200 KB with no newline first.
+STUB_BIG: a subcommand that prints 200 KB with no newline first.
 STUB_THEME: the active theme slug in `look --json`.
 STUB_WORST: worst realistic data everywhere (the WORST_* fixtures), for the
   break-the-UI pass and its screenshots.
@@ -182,7 +182,59 @@ WORST_THEMES = [
     ]
 ]
 
-if args == ["list", "--json"]:
+FILES = [
+    {"path": ".config/ghostty/config", "local": True, "pending": True, "template": True},
+    {"path": ".gitconfig.local", "local": True, "pending": False, "template": False},
+    {"path": ".config/nvim/init.lua", "local": False, "pending": True, "template": False},
+]
+WORST_FILES = [
+    {"path": "Library/Application Support/Code/User/settings.json", "local": True, "pending": True, "template": False},
+    {"path": ".config/nvim/lua/config/keymaps.lua", "local": True, "pending": True, "template": False},
+    *[
+        {
+            "path": f".config/some/deeply/nested/app-{i:02d}/config.toml",
+            "local": False,
+            "pending": True,
+            "template": i % 3 == 0,
+        }
+        for i in range(1, 37)
+    ],
+]
+MACHINE = {
+    "path": "/Users/aleksandra.wisniewska-kowalczyk/workspace/dotfiles/ansible/local.yml",
+    "exists": True,
+    "values": {
+        "git_name": "Aleksandra Wiśniewska-Kowalczyk",
+        "git_email": "aleksandra.wisniewska-kowalczyk@northwind-industries-holdings.example.com",
+        "personal_git_name": None,
+        "personal_git_email": "12345678+awk@users.noreply.github.com",
+        "personal_git_dirs": ["~/workspace/dotfiles/", "~/personal/"],
+        "signing_key": "~/.ssh/id_ed25519.pub",
+        "allow_sudo": True,
+        "shared_home": None,
+        "tool_groups": ["git", "dev"],
+        "tools_add": ["lazydocker"],
+        "tools_remove": None,
+    },
+    "signing": {"key": "~/.ssh/id_ed25519.pub", "exists": False},
+}
+DIFF = [
+    "diff --git a/x b/x",
+    "@@ -1,3 +1,3 @@",
+    " font-size = 14",
+    "-background-opacity = 0.9",
+    "+background-opacity = 0.66",
+]
+
+if sub and sub == os.environ.get("STUB_BIG"):
+    print("x" * 200_000, end="\r")
+if args == ["files", "--json"]:
+    print(json.dumps(WORST_FILES if worst else FILES))
+elif args[:2] == ["files", "diff"]:
+    print("\n".join(DIFF))
+elif args == ["machine", "--json"]:
+    print(json.dumps(MACHINE))
+elif args == ["list", "--json"]:
     print(os.environ.get("STUB_LIST") or json.dumps(WORST_TOOLS if worst else TOOLS))
 elif args == ["look", "--json"]:
     current = os.environ.get("STUB_THEME", "penumbra-light-contrast-plus-plus" if worst else "dark-one")
@@ -195,8 +247,6 @@ elif args == ["look", "--json"]:
     }
     print(json.dumps(look))
 elif sub == "doctor":
-    if os.environ.get("STUB_BIG"):
-        print("x" * 200_000, end="\r")
     print("\n".join(WORST_DOCTOR if worst else DOCTOR))
     sys.exit(1)
 elif args == ["update", "--check"]:

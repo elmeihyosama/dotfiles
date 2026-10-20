@@ -7,9 +7,16 @@
 #                       mise tools and only prints how to remove native ones
 #   update [--check]    pull, playbook, chezmoi, sheldon, nvim, then doctor
 #   doctor [args]       scripts/doctor.sh
-#   look --json         active theme and glass, levels, every theme's palette
-#   theme SLUG | glass LEVEL
-#                       the zsh `theme`/`glass`, headless (for the TUI)
+#   look --json         active theme, glass, wallpaper, levels, every palette
+#   theme SLUG | glass LEVEL | wallpaper on|off|toggle
+#                       the zsh `theme`/`glass`/`wallpaper`, headless (TUI)
+#   files --json        managed files changed here or waiting to apply
+#   files diff|apply|keep PATH...
+#                       chezmoi diff; apply (overwrites local edits); re-add
+#   machine --json      this machine's local.yml answers
+#   machine set KEY VALUE [--no-apply] | machine apply
+#                       edit one answer, then rewrite chezmoi's config and
+#                       apply without --force
 #   tui                 the full-screen TUI (also bare `dotfiles` on a tty)
 #   help
 # Exit codes: 0 ok, 1 an operation failed, 2 usage or validation error
@@ -40,6 +47,14 @@
 #   theme   string|null, active slug      glass   string|null, unset = null
 #   levels  [string], glass levels, lightest first, "default" last
 #   themes  [{slug, colors: {base00..base0F: "#rrggbb"}}], sorted by slug
+#   wallpaper  "on"|"off"|null
+#
+# `files --json`: an array of {path (relative to ~), local (changed here since
+# chezmoi last wrote it), pending (the repo would change it), template}.
+#
+# `machine --json`: {path, exists, values: {KEY: value|null}, signing:
+# {key, exists}}, KEY in MACHINE_KEYS plus the read-only shared_home and tool
+# selection keys.
 set -eu
 
 repo_root="$(CDPATH='' cd "$(dirname "$0")/.." && pwd)"
@@ -47,7 +62,7 @@ repo_root="$(CDPATH='' cd "$(dirname "$0")/.." && pwd)"
 usage() { # usage [FD]: to stderr by default, stdout with 1
 	{
 		echo "usage: dotfiles <subcommand> [args]"
-		echo "subcommands: list [--json] | add TOOL|GROUP... | remove TOOL|GROUP... | update [--check] | doctor [args] | look --json | theme SLUG | glass LEVEL | tui | help"
+		echo "subcommands: list [--json] | add TOOL|GROUP... | remove TOOL|GROUP... | update [--check] | doctor [args] | look --json | theme SLUG | glass LEVEL | wallpaper on|off|toggle | files ... | machine ... | tui | help"
 	} >&"${1:-2}"
 }
 
@@ -686,7 +701,7 @@ cmd_look() {
 		def nz: if . == null or . == "" then null else . end;
 		["clear", "frosted", "tinted", "solid"] as $known
 		| (.glass_levels // {} | keys) as $have
-		| {theme: (.theme | nz), glass: (.glass | nz),
+		| {theme: (.theme | nz), glass: (.glass | nz), wallpaper: (.wallpaper_mode | nz),
 			levels: ([$known[] | select(IN($have[]))]
 				+ [$have[] | select(. != "default" and (IN($known[]) | not))]
 				+ [$have[] | select(. == "default")]),
@@ -695,11 +710,14 @@ cmd_look() {
 				| sort_by(.slug)}'
 }
 
-# cmd_zsh FUNC ARG: the zsh FUNC (theme or glass) from the repo's 45-theme.zsh,
+# cmd_zsh FUNC ARG: the zsh FUNC (theme, glass or wallpaper) from the repo's 45-theme.zsh,
 # without rc files and with stdin closed, so `theme` never execs a new shell.
+# Its `chezmoi apply` skips files edited here: without a tty chezmoi would
+# fail on them (after applying the rest), so they are left and named instead.
 cmd_zsh() {
 	[ $# -eq 2 ] || {
-		echo "usage: dotfiles $1 $([ "$1" = theme ] && echo SLUG || echo LEVEL)" >&2
+		case "$1" in theme) _a=SLUG ;; glass) _a=LEVEL ;; *) _a="on|off|toggle" ;; esac
+		echo "usage: dotfiles $1 $_a" >&2
 		exit 2
 	}
 	command -v zsh >/dev/null 2>&1 || {
@@ -707,8 +725,262 @@ cmd_zsh() {
 		exit 1
 	}
 	# shellcheck disable=SC2016 # expanded by zsh
-	exec zsh -fc 'compdef() { :; }; source "$1" || exit 1; shift; "$@"' zsh \
+	exec zsh -fc '
+		compdef() { :; }
+		chezmoi() {
+			[[ $1 == apply && $# == 1 ]] || { command chezmoi "$@"; return; }
+			local l; local -a ok kept
+			for l in ${(f)"$(command chezmoi status)"}; do
+				if [[ ${l[1]} == " " ]]; then ok+=("$HOME/${l[4,-1]}"); else kept+=("${l[4,-1]}"); fi
+			done
+			(( ${#kept} )) && print -r -- "kept your edits, not applied: ${(j:, :)kept}"
+			(( ${#ok} )) || return 0
+			command chezmoi apply "${ok[@]}"
+		}
+		source "$1" || exit 1; shift; "$@"' zsh \
 		"$repo_root/home/dot_config/zsh/conf.d/45-theme.zsh" "$@" </dev/null
+}
+
+# --- files: chezmoi drift --------------------------------------------------
+
+# cz ARGS...: chezmoi from / (no repo mise.toml), never paging or prompting
+cz() { (cd / && chezmoi --no-pager --no-tty "$@"); }
+
+cmd_files() {
+	command -v chezmoi >/dev/null 2>&1 || {
+		echo "dotfiles files: chezmoi not on PATH" >&2
+		exit 1
+	}
+	sub="${1:-}"
+	[ $# -gt 0 ] && shift
+	case "$sub" in
+	--json)
+		command -v jq >/dev/null 2>&1 || {
+			echo "dotfiles files: jq not on PATH" >&2
+			exit 1
+		}
+		st="$(cz status --exclude scripts)" || {
+			echo "dotfiles files: chezmoi status failed" >&2
+			exit 1
+		}
+		tmpl="$(cz managed --include templates)" || tmpl=""
+		# status columns: 1 = changed here since chezmoi wrote it, 2 = the repo
+		# would change it; the path starts at column 4
+		printf '%s\n' "$st" | jq -R -s --arg tmpl "$tmpl" '
+			($tmpl | split("\n") | map(select(length > 0))) as $t
+			| split("\n") | map(select(length > 3))
+			| map({path: .[3:], local: (.[0:1] != " "), pending: (.[1:2] != " ")}
+				| .template = (.path as $p | $t | index($p) != null))'
+		;;
+	diff | apply | keep)
+		[ $# -gt 0 ] || {
+			echo "usage: dotfiles files $sub PATH..." >&2
+			exit 2
+		}
+		# relative paths -> absolute, in place (paths may hold spaces)
+		_n=$#
+		while [ "$_n" -gt 0 ]; do
+			case "$1" in /* | ../* | */../* | ..)
+				echo "dotfiles files: give paths relative to ~ without ..: $1" >&2
+				exit 2
+				;;
+			esac
+			if [ "$sub" = keep ] && cz managed --include templates | grep -qxF "$1"; then
+				echo "dotfiles files: $1 comes from a template; edit $(cz source-path "$HOME/$1") instead" >&2
+				exit 2
+			fi
+			set -- "$@" "$HOME/$1"
+			shift
+			_n=$((_n - 1))
+		done
+		case "$sub" in
+		diff) cz diff "$@" ;;
+		# --force: the TUI confirms first that local edits are overwritten
+		apply) cz apply --force "$@" ;;
+		keep) cz re-add "$@" ;;
+		esac
+		;;
+	*)
+		echo "usage: dotfiles files --json | diff|apply|keep PATH..." >&2
+		exit 2
+		;;
+	esac
+}
+
+# --- machine: local.yml answers --------------------------------------------
+
+# Scalars `machine set` edits; personal_git_dirs is a list (comma-separated).
+MACHINE_KEYS="git_name git_email personal_git_name personal_git_email personal_git_dirs signing_key allow_sudo"
+
+# resolve_local_yml: set local_yml to the real file (a symlink's target)
+resolve_local_yml() {
+	local_yml="${DOTFILES_LOCAL_YML:-$repo_root/ansible/local.yml}"
+	_n=0
+	while [ -L "$local_yml" ]; do
+		_n=$((_n + 1))
+		_t="$(readlink "$local_yml")"
+		case "$_t" in /*) ;; *) _t="$(dirname "$local_yml")/$_t" ;; esac
+		if [ "$_n" -gt 40 ] || { [ ! -e "$_t" ] && [ ! -L "$_t" ]; }; then
+			echo "dotfiles: $local_yml is a dangling or looping symlink; fix the link first" >&2
+			exit 2
+		fi
+		local_yml="$_t"
+	done
+}
+
+# yaml_quote: single-quoted YAML, as install.sh writes it
+yaml_quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/''/g")"; }
+
+# set_scalar KEY LINE SRC DST: SRC with the column-0 `KEY:` line replaced by
+# LINE (empty LINE deletes it), or LINE appended when absent. Exit 3 when KEY
+# is not a one-line scalar (a block value follows it, or it is duplicated).
+set_scalar() {
+	KEY="$1" LINE="$2" awk '
+		BEGIN { key = ENVIRON["KEY"]; line = ENVIRON["LINE"] }
+		skip && /^[ \t]+[^ \t#]/ { rc = 3 }
+		{ skip = 0 }
+		$0 ~ ("^" key ":([ \t]|$)") {
+			if (found) rc = 3
+			found = 1
+			rest = $0; sub("^" key ":[ \t]*", "", rest)
+			if (rest == "" || rest ~ /^#/ || rest ~ /^[|>&*]/) { rc = 3; skip = 1 }
+			if (line != "") print line
+			next
+		}
+		{ print }
+		END { if (!found && line != "") print line; exit rc }' "$3" >"$4"
+}
+
+cmd_machine() {
+	for t in yq jq; do
+		command -v "$t" >/dev/null 2>&1 || {
+			echo "dotfiles machine: $t not on PATH" >&2
+			exit 1
+		}
+	done
+	resolve_local_yml
+	sub="${1:-}"
+	[ $# -gt 0 ] && shift
+	case "$sub" in
+	--json)
+		if [ -f "$local_yml" ]; then
+			vals="$(yq -o=json -I0 '. // {}' "$local_yml")" || {
+				echo "dotfiles machine: cannot read $local_yml" >&2
+				exit 1
+			}
+			exists=true
+		else
+			vals='{}' exists=false
+		fi
+		key="$(printf '%s' "$vals" | jq -r '.signing_key // ""')"
+		kexists=false
+		# shellcheck disable=SC2088 # a literal ~/ prefix, as stored in local.yml
+		case "$key" in "~/"*) kpath="$HOME/${key#\~/}" ;; *) kpath="$key" ;; esac
+		[ -n "$key" ] && [ -f "$kpath" ] && kexists=true
+		printf '%s' "$vals" | jq --arg path "$local_yml" --argjson exists "$exists" \
+			--arg keys "$MACHINE_KEYS shared_home tool_groups tools_add tools_remove" \
+			--argjson kexists "$kexists" '
+			. as $v
+			| {path: $path, exists: $exists,
+				values: ($keys | split(" ") | map({key: ., value: $v[.]}) | from_entries),
+				signing: {key: ($v.signing_key // null), exists: $kexists}}'
+		;;
+	set)
+		[ $# -ge 2 ] || {
+			echo "usage: dotfiles machine set KEY VALUE [--no-apply]" >&2
+			exit 2
+		}
+		key="$1" val="$2"
+		shift 2
+		apply=1
+		[ "${1:-}" = --no-apply ] && apply=0
+		case " $MACHINE_KEYS " in *" $key "*) ;; *)
+			echo "dotfiles machine: $key can't be set here (settable: $MACHINE_KEYS)" >&2
+			exit 2
+			;;
+		esac
+		[ -f "$local_yml" ] || {
+			echo "dotfiles: $local_yml not found; run install.sh first" >&2
+			exit 2
+		}
+		case "$key" in
+		git_name | git_email)
+			[ -n "$val" ] || {
+				echo "dotfiles machine: $key can't be empty" >&2
+				exit 2
+			}
+			;;
+		allow_sudo)
+			case "$val" in true | false) ;; *)
+				echo "dotfiles machine: allow_sudo is true or false" >&2
+				exit 2
+				;;
+			esac
+			;;
+		signing_key)
+			# a private key path would be read into allowed_signers
+			case "$val" in "" | *.pub) ;; *)
+				echo "dotfiles machine: signing_key must be a .pub (public key) path" >&2
+				exit 2
+				;;
+			esac
+			;;
+		esac
+		case "$key" in
+		allow_sudo) line="$key: $val" want="$val" ;;
+		personal_git_dirs)
+			want="$(printf '%s' "$val" | jq -R -c 'split(",") | map(gsub("^ +| +$"; "")) | map(select(length > 0))')"
+			line="$key: $want"
+			[ "$want" = "[]" ] && line="" want="null"
+			;;
+		*)
+			line="$key: $(yaml_quote "$val")" want="$(jq -n -c --arg v "$val" '$v')"
+			[ -z "$val" ] && line="" want="null"
+			;;
+		esac
+		tmp="$(mktemp "${local_yml}.XXXXXX")" || exit 1
+		tmpn="$tmp.new"
+		trap 'rm -f "$tmp" "$tmpn"' EXIT
+		cp -p "$local_yml" "$tmp" || exit 1
+		[ -z "$(tail -c1 "$tmp")" ] || printf '\n' >>"$tmp" || exit 1
+		if ! set_scalar "$key" "$line" "$tmp" "$tmpn"; then
+			echo "dotfiles: can't safely edit $key in $local_yml; edit it by hand" >&2
+			exit 2
+		fi
+		cat "$tmpn" >"$tmp" || exit 1
+		# verify: every other key is identical and KEY holds the new value
+		_o1="$(yq -o=json -I0 "(. // {}) | del(.$key)" "$local_yml" | jq -cS .)" || _o1=x1
+		_o2="$(yq -o=json -I0 "(. // {}) | del(.$key)" "$tmp" | jq -cS .)" || _o2=x2
+		_got="$(yq -o=json -I0 "(. // {}) | .$key" "$tmp" | jq -c .)" || _got=x
+		if [ "$_o1" != "$_o2" ] || [ "$_got" != "$want" ]; then
+			echo "dotfiles: internal check failed after editing; $local_yml left unchanged" >&2
+			exit 1
+		fi
+		mv -f "$tmp" "$local_yml" || exit 1
+		echo "dotfiles: $key updated in $local_yml"
+		[ "$apply" -eq 1 ] || return 0
+		cmd_machine apply
+		;;
+	apply)
+		command -v ansible-playbook >/dev/null 2>&1 || {
+			echo "dotfiles machine: ansible-playbook not on PATH" >&2
+			exit 1
+		}
+		echo "==> rewrite chezmoi's config from local.yml"
+		# chezmoi_apply is skipped: the playbook applies with --force, which
+		# would overwrite files changed here
+		(cd "$repo_root/ansible" && ansible-playbook site.yml --tags chezmoi --skip-tags packages,chezmoi_apply) || exit 1
+		echo "==> chezmoi apply"
+		cz apply || {
+			echo "dotfiles: chezmoi apply stopped; a file changed here needs a decision (dotfiles files, or the TUI's Files tab)" >&2
+			exit 1
+		}
+		;;
+	*)
+		echo "usage: dotfiles machine --json | set KEY VALUE [--no-apply] | apply" >&2
+		exit 2
+		;;
+	esac
 }
 
 # cmd_tui [args]: the Textual app, run by uv from its locked script env
@@ -738,7 +1010,9 @@ add | remove) cmd_edit "$sub" "$@" ;;
 update) cmd_update "$@" ;;
 doctor) exec sh "$repo_root/scripts/doctor.sh" "$@" ;;
 look) cmd_look "$@" ;;
-theme | glass) cmd_zsh "$sub" "$@" ;;
+theme | glass | wallpaper) cmd_zsh "$sub" "$@" ;;
+files) cmd_files "$@" ;;
+machine) cmd_machine "$@" ;;
 tui) cmd_tui "$@" ;;
 *)
 	echo "dotfiles: unknown subcommand: $sub" >&2

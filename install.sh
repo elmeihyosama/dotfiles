@@ -109,6 +109,98 @@ ask() {
 # Single-quoted YAML: only '' needs escaping, so any name round-trips.
 yaml_quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/''/g")"; }
 
+# catalog_groups / catalog_tools GROUP: from home/.chezmoidata/tools.yaml with
+# awk (yq isn't installed yet). Tools that ship inside another (provided_by)
+# follow it and aren't offered.
+catalog_groups() {
+	sed -nE 's/^tool_groups:[[:space:]]*\[(.*)\].*/\1/p' home/.chezmoidata/tools.yaml | tr -d ' ' | tr ',' ' '
+}
+catalog_tools() {
+	awk -v g="$1" '
+		/^  [A-Za-z0-9_-]+:[[:space:]]*$/ { if (name != "" && grp == g && !prov) print name; name = $1; sub(/:$/, "", name); grp = ""; prov = 0; next }
+		/^    group:/ { grp = $2 }
+		/^    provided_by:/ { prov = 1 }
+		END { if (name != "" && grp == g && !prov) print name }' home/.chezmoidata/tools.yaml | paste -sd' ' -
+}
+
+# say TEXT: a line for the person answering (the prompts' terminal)
+say() { printf '%s\n' "$*" >/dev/tty; }
+
+# choose_tools: ask which tools this machine gets; prints the local.yml lines
+# (nothing = every group, the default). Core is always installed.
+choose_tools() {
+	_groups="$(catalog_groups)"
+	say "Tools (core is always installed: $(catalog_tools core))"
+	for _g in $_groups; do
+		[ "$_g" = core ] && continue
+		say "$(printf '  %-11s %s' "$_g" "$(catalog_tools "$_g")")"
+	done
+	_mode="$(ask "Install [a]ll groups, [c]ore only, or [p]ick" "a")"
+	case "$_mode" in
+	[Cc]*)
+		echo "tool_groups: []"
+		return
+		;;
+	[Pp]*) ;;
+	*) return ;;
+	esac
+	_sel=""
+	for _g in $_groups; do
+		[ "$_g" = core ] && continue
+		case "$(ask "  $_g ($(catalog_tools "$_g"))? (yes/no)" "yes")" in
+		[Yy]*) _sel="$_sel $_g" ;;
+		esac
+	done
+	# Per-tool tweaks: a numbered list, toggled by number until enter.
+	_all="" _on=""
+	for _g in $_groups; do
+		[ "$_g" = core ] && continue
+		for _t in $(catalog_tools "$_g"); do
+			_all="$_all $_t"
+			case " $_sel " in *" $_g "*) _on="$_on $_t" ;; esac
+		done
+	done
+	case "$(ask "Adjust single tools? (yes/no)" "no")" in
+	[Yy]*)
+		while :; do
+			_i=0
+			for _t in $_all; do
+				_i=$((_i + 1))
+				case " $_on " in *" $_t "*) _m="x" ;; *) _m=" " ;; esac
+				say "$(printf '  %2d [%s] %s' "$_i" "$_m" "$_t")"
+			done
+			_nums="$(ask "Numbers to toggle (blank when done)" "")"
+			[ -n "$_nums" ] || break
+			for _n in $_nums; do
+				case "$_n" in *[!0-9]* | "") continue ;; esac
+				_t="$(printf '%s' "$_all" | tr ' ' '\n' | sed '/^$/d' | sed -n "${_n}p")"
+				[ -n "$_t" ] || continue
+				case " $_on " in
+				*" $_t "*) _on="$(printf '%s' "$_on" | tr ' ' '\n' | grep -vxF "$_t" | paste -sd' ' -)" ;;
+				*) _on="$_on $_t" ;;
+				esac
+			done
+		done
+		;;
+	esac
+	# groups chosen, then the per-tool differences against them
+	_add="" _rm=""
+	for _g in $_groups; do
+		[ "$_g" = core ] && continue
+		for _t in $(catalog_tools "$_g"); do
+			_in=0 _want=0
+			case " $_sel " in *" $_g "*) _in=1 ;; esac
+			case " $_on " in *" $_t "*) _want=1 ;; esac
+			[ "$_in" -eq 1 ] && [ "$_want" -eq 0 ] && _rm="$_rm $_t"
+			[ "$_in" -eq 0 ] && [ "$_want" -eq 1 ] && _add="$_add $_t"
+		done
+	done
+	_list() { printf '%s' "$1" | sed -E 's/^ +//; s/ +/, /g'; }
+	echo "tool_groups: [$(_list "$_sel")]"
+	[ -z "$_add" ] || echo "tools_add: [$(_list "$_add")]"
+	[ -z "$_rm" ] || echo "tools_remove: [$(_list "$_rm")]"
+}
+
 ensure_local_vars() {
 	if [ -f ansible/local.yml ] && [ "$reconfigure" -eq 0 ]; then
 		echo "Using existing ansible/local.yml (pass --reconfigure to change)."
@@ -149,6 +241,9 @@ ensure_local_vars() {
 	case "$_sudo_answer" in [Yy]*) _allow_sudo="true" ;; *) _allow_sudo="false" ;; esac
 
 	_shared_answer="$(ask "Is this \$HOME shared across CPU arches (arm+x86)? (yes/no)" "no")"
+	# Without a terminal every group is installed (no keys), as before.
+	_tools=""
+	have_tty && _tools="$(choose_tools)"
 	case "$_shared_answer" in [Yy]*) SHARED_HOME="true" ;; *) SHARED_HOME="false" ;; esac
 
 	cat >ansible/local.yml <<EOF
@@ -162,6 +257,7 @@ EOF
 	if [ -n "$_signing_key" ]; then
 		printf 'signing_key: %s\n' "$(yaml_quote "$_signing_key")" >>ansible/local.yml
 	fi
+	[ -z "$_tools" ] || printf '%s\n' "$_tools" >>ansible/local.yml
 	echo "Wrote ansible/local.yml."
 }
 
