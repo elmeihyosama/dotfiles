@@ -41,6 +41,8 @@ bad() {
 }
 
 arch="$(uname -m)"
+# Bounds the network check where timeout(1) exists (not stock macOS).
+gh_timeout="$(command -v timeout || command -v gtimeout || true)"
 
 # --- PATH ------------------------------------------------------------------
 # Accept the plain dir or the arch-suffixed variant used on shared homes.
@@ -137,6 +139,39 @@ if [ -f "$HOME/.config/chezmoi/chezmoi.toml" ] &&
 		bad "age encryption enabled but ~/.config/chezmoi/key.txt is missing (apply will fail on encrypted files)"
 	fi
 fi
+
+# --- Commit signing (checked only when signing_key is set) ----------------
+sk=""
+if command -v chezmoi >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+	sk="$(chezmoi data --format json 2>/dev/null | jq -r '.signing_key // empty' || true)"
+fi
+case "$sk" in
+"") ;;
+*.pub)
+	case "$sk" in \~/*) sk="$HOME/${sk#\~/}" ;; esac
+	if [ ! -f "$sk" ]; then
+		bad "signing key $sk is missing (generate it: ssh-keygen -t ed25519 -f ${sk%.pub})"
+	else
+		ok "signing key $sk present"
+		# Registration is best-effort: never a FAIL.
+		body="$(awk 'NR == 1 { print $2 }' "$sk")"
+		if ! command -v gh >/dev/null 2>&1; then
+			warn "signing key registration not checked (gh not installed)"
+		elif ! gh auth status >/dev/null 2>&1; then
+			warn "signing key registration not checked (gh not authenticated)"
+		elif ! keys="$(${gh_timeout:+$gh_timeout 15} gh api user/ssh_signing_keys --jq '.[].key' 2>/dev/null)"; then
+			warn "signing key registration not checked (offline)"
+		elif printf '%s\n' "$keys" | grep -qF -- "$body"; then
+			ok "signing key registered on GitHub"
+		else
+			warn "signing key not registered on GitHub; run: gh ssh-key add $sk --type signing --title \"\$(hostname -s)\""
+		fi
+	fi
+	;;
+*)
+	bad "signing_key $sk must be the public key (a .pub file), not the private key (set it in ansible/local.yml)"
+	;;
+esac
 
 # --- Login shell -----------------------------------------------------------
 case "${SHELL:-}" in
