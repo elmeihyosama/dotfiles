@@ -85,6 +85,18 @@ assert_eq 1 "$rc" "stale_install_dir_fails: exit 1 ($out)"
 assert_contains "$out" "FAIL: fzf -> 'fzf' resolves to $data/installs/aqua-junegunn-fzf/0.66.0/fzf" \
 	"stale_install_dir_fails: names the stale install"
 
+# global_override_warns: the user's own `mise use -g fzf@0.66.0` puts that
+# install dir first in an activated shell. Deliberate, so a WARN naming the
+# override, not a FAIL whose remedy (restart, reinstall) changes nothing.
+mkdir -p "$HOME/.config/mise"
+printf '[tools]\n"aqua:junegunn/fzf" = "0.66.0"\n' >"$HOME/.config/mise/config.toml"
+run "$HOME" "$HOME/tbin:$data/installs/aqua-junegunn-fzf/0.66.0:$data/shims:/usr/bin:/bin"
+assert_eq 0 "$rc" "global_override_warns: exit 0 ($out)"
+assert_contains "$out" "WARN: fzf -> 'fzf' is 0.66.0 from your global mise config ($HOME/.config/mise/config.toml), not the pinned 0.67.0" \
+	"global_override_warns: names the override and the pin"
+assert_not_contains "$out" "FAIL" "global_override_warns: not a FAIL"
+rm -rf "$HOME/.config/mise"
+
 # a mise warning on stderr does not break the version comparison
 mkdir -p "$HOME/noisy"
 printf '#!/bin/sh\necho "mise WARN  a newer mise is available" >&2\nexec "%s" "$@"\n' "$real_mise" >"$HOME/noisy/mise"
