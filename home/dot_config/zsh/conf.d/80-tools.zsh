@@ -23,7 +23,7 @@ _dotfiles() {
   local src
   local -a subs names
   if (( CURRENT == 2 )); then
-    subs=('list:tools and their install state' 'doctor:read-only health check' 'help:show usage')
+    subs=('list:tools and their install state' 'add:select tools or groups' 'remove:deselect tools or groups' 'doctor:read-only health check' 'help:show usage')
     _describe 'subcommand' subs
     return
   fi
@@ -33,6 +33,7 @@ _dotfiles() {
       (( $+commands[yq] )) || return
       names=(${(f)"$(yq '(.tools | keys | .[]), .tool_groups[]' "$src/.chezmoidata/tools.yaml" 2>/dev/null)"})
       _describe 'tool or group' names
+      compadd -- --no-apply
       ;;
     list) compadd -- --json ;;
   esac
