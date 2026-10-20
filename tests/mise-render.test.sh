@@ -65,6 +65,7 @@ assert_not_contains "$out" "denisidoro/navi" "navi (native on darwin) not pinned
 # an unknown selected_tools name fails the render with a clear message
 err="$(render 'selected_tools=["fzf","nosuchtool"]' 2>&1 >/dev/null)" && fail "unknown selected tool fails the render"
 assert_contains "$err" "unknown tool \"nosuchtool\"" "unknown selected tool: clear message"
+assert_contains "$err" "ansible-playbook site.yml --tags chezmoi" "unknown selected tool: names the remedy"
 
 # no blank line after [tools]
 out="$(TESTS_CHEZMOI_OS=linux render 'selected_tools=["fzf"]')"

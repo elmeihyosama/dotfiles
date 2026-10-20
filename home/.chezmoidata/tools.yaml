@@ -1,6 +1,4 @@
-# Tool catalog. It becomes the single source of truth once the legacy
-# group_vars keys are removed (later in this plan); until then both exist.
-# Consumed by
+# Tool catalog: the single source of truth for the CLI tools. Consumed by
 # scripts/select-tools.sh, the Ansible playbook (loaded as `tool_catalog`, see
 # ansible/site.yml), chezmoi templates (as .tools / .tool_groups), the doctor
 # and assert scripts, and the `dotfiles` CLI/TUI.
@@ -16,8 +14,9 @@
 #                 source "native" there (best effort, like native_only)
 #   native_only   never installed via mise (no usable release binary)
 #   native_pkg    per-manager package name when it differs from the tool name
-#   native_bin    per-manager binary name when the package ships a different
-#                 one (apt: batcat/fdfind); we symlink bin to it
+#   native_bin    informational: the binary name a distro package ships when it
+#                 differs (apt: batcat/fdfind). Nothing reads it; these tools
+#                 come from mise, which installs them under `bin`.
 #   smoke         command that must exit 0 and print nothing
 #   mise_options  extra options for the mise entry (e.g. rename_exe)
 #   provided_by   this bin ships in another tool's package (age-keygen in age):

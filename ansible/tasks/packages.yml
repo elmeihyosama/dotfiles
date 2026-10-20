@@ -125,6 +125,25 @@
   ansible.builtin.set_fact:
     _native_tools: "{{ _tool_selection.stdout | from_json | selectattr('source', 'equalto', 'native') | map(attribute='name') | list }}"
 
+# shell, not command: `command -v` is a shell builtin (see chezmoi.yml).
+- name: Check for Homebrew (macOS)  # noqa command-instead-of-shell
+  ansible.builtin.shell: command -v brew
+  register: _brew
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: ansible_facts.os_family == 'Darwin'
+
+- name: Warn that Homebrew is missing (macOS)
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: Homebrew not found; {{ _native_tools }} come from brew on macOS
+      and stay uninstalled. Install Homebrew (https://brew.sh) and re-run.
+  when:
+    - ansible_facts.os_family == 'Darwin'
+    - _brew.rc != 0
+    - _native_tools | length > 0
+
 # A missing package is a warning, not a failure: native tools are the
 # best-effort ones (source-only upstreams, no asset for this platform).
 - name: Install native tools via Homebrew (macOS)
@@ -134,7 +153,7 @@
   loop: "{{ _native_tools }}"
   register: _native_brew
   ignore_errors: true # noqa ignore-errors
-  when: ansible_facts.os_family == 'Darwin'
+  when: ansible_facts.os_family == 'Darwin' and _brew.rc == 0
 
 - name: Install native tools via the distro package manager (sudo Linux)
   become: true
