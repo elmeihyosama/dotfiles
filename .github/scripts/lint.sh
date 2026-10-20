@@ -219,10 +219,19 @@ lint_test() {
 	}
 }
 
-# mise.lock must carry a checksum for every tool on every locked platform.
+# mise.lock (repo toolchain and the shipped dotfiles lock) must carry a checksum
+# for every tool on every locked platform, and both locks must match their pins.
 lint_lock() {
 	.github/scripts/check-lock.sh mise.lock .github/scripts/lock-exceptions.txt || {
 		note lock "check-lock.sh mise.lock"
+		fail=1
+	}
+	.github/scripts/check-lock.sh home/dot_config/mise-dotfiles/mise.lock .github/scripts/lock-exceptions-home.txt || {
+		note lock "check-lock.sh home mise.lock"
+		fail=1
+	}
+	scripts/check-lock-sync.sh || {
+		note lock "check-lock-sync.sh (run scripts/relock.sh)"
 		fail=1
 	}
 }

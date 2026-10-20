@@ -1,0 +1,21 @@
+# Allowed gaps in the shipped dotfiles lock (home/dot_config/mise-dotfiles/mise.lock),
+# read by check-lock.sh. Same format as lock-exceptions.txt (see there). Separate
+# file because the repo lock's pipx exceptions would be stale here.
+#
+# Per platform on purpose: a `*` line could hide a platform with no release asset
+# at all. scripts/check-lock-sync.sh reads this file too: for each tool installed
+# via mise on a locked platform it requires an asset url (named for that OS) and
+# a checksum unless listed here, so a gap listed here is only ever a missing
+# checksum, never a missing asset (that goes in tools.yaml as native_on /
+# missing_on).
+#
+# mise records a checksum only when the release publishes one (a checksum file or
+# a GitHub asset digest); otherwise the lock keeps url/url_api, pinned to the
+# release asset id, and `mise install --locked` still works.
+aqua:PaulJuliusMartinez/jless macos-arm64  # release asset has no checksum file and no GitHub digest (jless 0.9.0 is old); lock holds url/url_api only
+aqua:PaulJuliusMartinez/jless linux-x64  # jless is native_on linux (the binary links libxcb), so the pins skip it; the entry also has no checksum upstream
+aqua:PaulJuliusMartinez/jless linux-arm64  # no linux-arm64 release asset; jless is native_on linux, so the pins skip it
+aqua:denisidoro/navi linux-x64  # navi 2.24.0 assets have no checksum file or GitHub digest; lock holds url/url_api only
+aqua:denisidoro/navi linux-arm64  # same: no checksum file or GitHub digest upstream; lock holds url/url_api only
+aqua:denisidoro/navi macos-arm64  # no macOS release asset at all; navi is native_on darwin (brew), so the pins skip it there
+aqua:aristocratos/btop macos-arm64  # no macOS release asset; btop is native_on darwin (brew), so the pins skip it there

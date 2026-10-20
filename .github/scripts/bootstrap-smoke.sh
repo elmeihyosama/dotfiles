@@ -2,16 +2,26 @@
 # Smoke-test the fresh-machine bootstrap: run install.sh end-to-end in a clean
 # Ubuntu or Fedora container — the surface the provision matrix does not cover. This
 # exercises the self-clone (curl | sh) path, promptless local.yml generation,
-# ensure_ansible (native apt under sudo, uv -> ansible-core without), the FULL
+# ensure_ansible (pinned uv -> pinned ansible-core, every mode), the FULL
 # playbook (every tag, not just packages), and second-run idempotence.
 # MODE=sudo|nosudo, same contract as provision-ci.sh.
 set -eu
 
 MODE="${MODE:?set MODE=sudo|nosudo}"
 
+# The first full apply must not hit a tool before it is installed (chezmoi's
+# run_onchange scripts need jq/bat; the playbook prints chezmoi's output).
+# bash/zsh say "command not found"; dash (#!/bin/sh) says "sh: 1: x: not found".
+assert_no_command_not_found() {
+	if grep -iE 'command not found|: [0-9]+: [^:]+: not found' "$1"; then
+		echo "FAIL: the first run logged 'command not found' (above)"
+		exit 1
+	fi
+}
+
 # Base deps a stock cloud image ships; deliberately NOT python or ansible —
-# install.sh must provide those itself. apt (Ubuntu) or dnf (Fedora), whichever
-# the image has; install.sh then takes the matching native-ansible branch.
+# install.sh must provide those itself (pinned uv -> ansible-core). apt
+# (Ubuntu) or dnf (Fedora), whichever the image has.
 if command -v apt-get >/dev/null 2>&1; then
 	export DEBIAN_FRONTEND=noninteractive
 	apt-get update -qq
@@ -23,7 +33,7 @@ else
 	exit 1
 fi
 
-# ubi reads GITHUB_TOKEN to raise its API rate limit; empty is fine.
+# mise reads GITHUB_TOKEN to raise its API rate limit; empty is fine.
 export GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
 # In CI the mounted checkout sits at a detached HEAD; cloning that yields no
@@ -45,10 +55,15 @@ fi
 cp /repo/install.sh /tmp/install.sh
 
 if [ "$MODE" = "sudo" ]; then
-	# Root with working sudo -> install.sh's apt path for ansible itself.
+	# Root with working sudo -> native essentials; ansible itself still via uv.
 	git config --global user.name ci-smoke
 	git config --global user.email ci-smoke@example.com
-	DOTFILES_REPO=/repo DOTFILES_DIR="$HOME/workspace/dotfiles" sh /tmp/install.sh
+	DOTFILES_REPO=/repo DOTFILES_DIR="$HOME/workspace/dotfiles" sh /tmp/install.sh >/tmp/run1.log 2>&1 || {
+		cat /tmp/run1.log
+		exit 1
+	}
+	cat /tmp/run1.log
+	assert_no_command_not_found /tmp/run1.log
 	export PATH="$HOME/.local/bin:$PATH"
 	# Distro btop packages may carry cap_perfmon, which a container's bounding
 	# set can't grant — exec fails with EPERM. Container-only artifact; strip it
@@ -56,7 +71,7 @@ if [ "$MODE" = "sudo" ]; then
 	if command -v setcap >/dev/null 2>&1 && command -v btop >/dev/null 2>&1; then
 		setcap -r "$(command -v btop)" 2>/dev/null || true
 	fi
-	(cd "$HOME/workspace/dotfiles" && ./.github/scripts/assert-tools.sh ansible/group_vars/all.yml)
+	(cd "$HOME/workspace/dotfiles" && ./.github/scripts/assert-tools.sh)
 	test -f "$HOME/.zshrc" || {
 		echo "FAIL: chezmoi did not apply (~/.zshrc missing)"
 		exit 1
@@ -80,8 +95,13 @@ else
 	su tester -c "git config --global --add safe.directory /repo/.git"
 	su tester -c "git config --global user.name ci-smoke"
 	su tester -c "git config --global user.email ci-smoke@example.com"
-	su tester -c "GITHUB_TOKEN='$GITHUB_TOKEN' DOTFILES_REPO=/repo DOTFILES_DIR=\$HOME/workspace/dotfiles sh /tmp/install.sh"
-	su tester -c "cd \$HOME/workspace/dotfiles && PATH=\$HOME/.local/bin:\$PATH ./.github/scripts/assert-tools.sh ansible/group_vars/all.yml"
+	su tester -c "GITHUB_TOKEN='$GITHUB_TOKEN' DOTFILES_REPO=/repo DOTFILES_DIR=\$HOME/workspace/dotfiles sh /tmp/install.sh" >/tmp/run1.log 2>&1 || {
+		cat /tmp/run1.log
+		exit 1
+	}
+	cat /tmp/run1.log
+	assert_no_command_not_found /tmp/run1.log
+	su tester -c "cd \$HOME/workspace/dotfiles && ./.github/scripts/assert-tools.sh"
 	su tester -c "test -f \$HOME/.zshrc" || {
 		echo "FAIL: chezmoi did not apply (~/.zshrc missing)"
 		exit 1

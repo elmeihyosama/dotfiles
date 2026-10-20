@@ -1,0 +1,150 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Weekly bumps for every pin, in one 'pins' PR (docs/mise.md, 'Renovate').",
+    "Bumps that also need a checksum (mise_version -> mise_sha256, CI mise version -> its sha256, nerd_font_version -> the zip sha256 in ansible/tasks/fonts.yml, uv_version -> uv_installer_sha256) and every tool bump (mise.lock) fail CI until someone runs scripts/relock.sh on the PR branch and pushes. That is intended.",
+    "Manual, not managed here: zjstatus_by_zellij_minor in ansible/group_vars/all.yml (must match the zellij minor's zellij-tile ABI; see the comment there; tests/zjstatus-pin.test.sh fails a zellij bump to an unmapped minor). python_version in group_vars follows the repo mise.toml python by hand (tests/python-pins.test.sh).",
+    "ignorePaths: config:recommended's defaults (:ignoreModulesAndTests; setting ignorePaths replaces them) plus .mise/**, the generated pipx uv.lock projects that pep621 would otherwise edit (relock.sh owns them)."
+  ],
+  "extends": ["config:recommended"],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    "**/vendor/**",
+    "**/examples/**",
+    "**/__tests__/**",
+    "**/test/**",
+    "**/tests/**",
+    "**/__fixtures__/**",
+    ".mise/**"
+  ],
+  "schedule": ["before 6am on monday"],
+  "github-actions": {
+    "description": "Dependabot owns GitHub Actions (.github/dependabot.yml).",
+    "enabled": false
+  },
+  "mise": {
+    "description": "The repo lint toolchain. home/dot_config/mise* are chezmoi templates, rendered from tools.yaml.",
+    "enabled": true,
+    "managerFilePatterns": ["/^mise\\.toml$/"]
+  },
+  "packageRules": [
+    {
+      "description": "One PR for everything (equal pins across files must move together).",
+      "matchPackageNames": ["*"],
+      "groupName": "pins"
+    },
+    {
+      "description": "CI container images stay pinned by tag@sha256 digest.",
+      "matchDatasources": ["docker"],
+      "pinDigests": true
+    }
+  ],
+  "customManagers": [
+    {
+      "description": "tools.yaml: `backend: aqua:OWNER/REPO` or `github:OWNER/REPO`, then (same entry, possibly after other fields) `version: \"X\"`.",
+      "customType": "regex",
+      "managerFilePatterns": ["/^home/\\.chezmoidata/tools\\.yaml$/"],
+      "matchStrings": [
+        "\\n    backend: (?:aqua|github):(?<depName>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)\\n(?:    [^\\n]*\\n)*?    version: \"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^\\D*(?<version>\\d.*)$"
+    },
+    {
+      "description": "tools.yaml: the bootstrap `mise:` entry (no backend), kept equal to mise_version.",
+      "customType": "regex",
+      "managerFilePatterns": ["/^home/\\.chezmoidata/tools\\.yaml$/"],
+      "matchStrings": [
+        "\\n  mise:\\n(?:    [^\\n]*\\n)*?    version: \"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "jdx/mise",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "description": "group_vars mise_version (mise_sha256 below it: scripts/relock.sh).",
+      "customType": "regex",
+      "managerFilePatterns": ["/^ansible/group_vars/all\\.yml$/"],
+      "matchStrings": ["\\nmise_version: \"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "jdx/mise",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "description": "group_vars uv_version (install.sh bootstrap; uv_installer_sha256 below it: scripts/relock.sh).",
+      "customType": "regex",
+      "managerFilePatterns": ["/^ansible/group_vars/all\\.yml$/"],
+      "matchStrings": ["\\nuv_version: \"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "astral-sh/uv",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "description": "group_vars ansible_core_version (install.sh bootstrap).",
+      "customType": "regex",
+      "managerFilePatterns": ["/^ansible/group_vars/all\\.yml$/"],
+      "matchStrings": ["\\nansible_core_version: \"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "ansible-core",
+      "datasourceTemplate": "pypi"
+    },
+    {
+      "description": "group_vars pre_commit_version.",
+      "customType": "regex",
+      "managerFilePatterns": ["/^ansible/group_vars/all\\.yml$/"],
+      "matchStrings": ["\\npre_commit_version: \"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "pre-commit",
+      "datasourceTemplate": "pypi"
+    },
+    {
+      "description": "group_vars nerd_font_version (the zip sha256 in ansible/tasks/fonts.yml: scripts/relock.sh).",
+      "customType": "regex",
+      "managerFilePatterns": ["/^ansible/group_vars/all\\.yml$/"],
+      "matchStrings": ["\\nnerd_font_version: \"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "ryanoasis/nerd-fonts",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "description": "CI mise binary: the jdx/mise-action `version:` input in setup-lint and the macOS job (its sha256: scripts/relock.sh).",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.github/actions/setup-lint/action\\.yml$/",
+        "/^\\.github/workflows/provision\\.yml$/"
+      ],
+      "matchStrings": [
+        "uses: jdx/mise-action@[0-9a-f]{40}[^\\n]*\\n\\s+with:\\n\\s+version: (?<currentValue>[0-9][^\\s]*)"
+      ],
+      "depNameTemplate": "jdx/mise",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "description": "CI container images: `image: <name>:<tag>@sha256:<digest>` (provision.yml and bootstrap.yml copies bump in the same PR; tests/ci-pins.test.sh asserts they agree).",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": [
+        "image: (?<depName>[a-z0-9./_-]+):(?<currentValue>[A-Za-z0-9._-]+)@(?<currentDigest>sha256:[0-9a-f]{64})"
+      ],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "description": "sheldon `rev = \"<sha>\"` pins: digest-only, tracking the plugin's default branch (git-refs HEAD).",
+      "customType": "regex",
+      "managerFilePatterns": ["/^home/dot_config/sheldon/plugins\\.toml$/"],
+      "matchStrings": [
+        "github = \"(?<depName>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)\"\\nrev = \"(?<currentDigest>[0-9a-f]{40})\""
+      ],
+      "packageNameTemplate": "https://github.com/{{{depName}}}",
+      "datasourceTemplate": "git-refs"
+    },
+    {
+      "description": "sheldon `tag = \"X\"` pins (forgit): release tags.",
+      "customType": "regex",
+      "managerFilePatterns": ["/^home/dot_config/sheldon/plugins\\.toml$/"],
+      "matchStrings": [
+        "github = \"(?<depName>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)\"\\ntag = \"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "loose"
+    }
+  ]
+}

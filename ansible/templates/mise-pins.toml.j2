@@ -1,0 +1,21 @@
+{#- Bootstrap copy of the dotfiles mise pins, written by tasks/packages.yml on
+a fresh machine before chezmoi (itself a mise tool) exists. Must render
+byte-identically to home/dot_config/mise-dotfiles/config.toml.tmpl for the
+same names (tests/mise-core-pins.test.sh). Inputs: tool_catalog (tools.yaml),
+mise_pin_names (list), mise_pin_os (darwin|linux), mise_pin_plat
+(<os>-<arch>, e.g. macos-arm64). Same skips as the chezmoi template:
+bootstrap, provided_by, native_on this OS, missing_on this platform. -#}
+[tools]
+{%- for name in mise_pin_names %}
+{%-   set t = tool_catalog.tools[name] %}
+{%-   if t.backend is defined and not (t.bootstrap | default(false)) and t.provided_by is not defined
+        and mise_pin_os not in (t.native_on | default([])) and mise_pin_plat not in (t.missing_on | default([])) %}
+{%-     if t.mise_options is defined %}
+
+"{{ t.backend }}" = { version = "{{ t.version }}"{% for k, v in t.mise_options | dictsort %}, {{ k }} = {{ v | to_json }}{% endfor %} }
+{%-     else %}
+
+"{{ t.backend }}" = "{{ t.version }}"
+{%-     endif %}
+{%-   endif %}
+{%- endfor %}

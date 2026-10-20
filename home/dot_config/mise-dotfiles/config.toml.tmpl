@@ -1,0 +1,45 @@
+{{- /* Dotfiles-managed mise pins. NOT ~/.config/mise/config.toml: that file is
+the user's (`mise use -g` writes there). mise reads this dir as its "system"
+config scope via MISE_SYSTEM_CONFIG_DIR=$HOME/.config/mise-dotfiles (set in
+.zshenv/.bashrc/.bash_profile, Raycast scripts and Ansible), and the lock lives
+next to it as mise.lock. Install with
+  MISE_GLOBAL_CONFIG_FILE=/nonexistent/mise-user.toml mise -C / install --locked
+Never set `locked = true` in [settings] here: it makes `mise use -g` fail.
+
+Tool set: `selected_tools` (written by ansible/tasks/chezmoi.yml from
+scripts/select-tools.sh) or, when absent, every tool with a backend. Either way
+tools native on this OS, missing_on this OS-arch, bootstrap tools (mise itself) and
+provided_by tools are skipped; an unknown selected_tools name fails the render. `mise_pins_all = true` (scripts/relock.sh) renders every backend
+tool regardless of OS so the shipped lock covers them all. */ -}}
+{{- $os := .chezmoi.os -}}
+{{- $arch := ternary "arm64" "x64" (eq .chezmoi.arch "arm64") -}}
+{{- $plat := printf "%s-%s" (ternary "macos" "linux" (eq $os "darwin")) $arch -}}
+{{- $all := (and (hasKey . "mise_pins_all") .mise_pins_all) -}}
+{{- $names := list -}}
+{{- if and (hasKey . "selected_tools") (not $all) -}}
+{{-   range $name := .selected_tools -}}
+{{-     if not (hasKey $.tools $name) -}}
+{{-       fail (printf "selected_tools: unknown tool %q (not in tools.yaml; stale since a tools.yaml change?). Refresh it: cd ansible && ansible-playbook site.yml --tags chezmoi" $name) -}}
+{{-     end -}}
+{{-     $names = append $names $name -}}
+{{-   end -}}
+{{- else -}}
+{{-   range $name, $t := .tools -}}
+{{-     $names = append $names $name -}}
+{{-   end -}}
+{{- end -}}
+[tools]
+{{- range $name := $names -}}
+{{-   $t := index $.tools $name -}}
+{{-   $backend := get $t "backend" -}}
+{{-   $native := get $t "native_on" | default list -}}
+{{-   $missing := get $t "missing_on" | default list -}}
+{{-   if and $backend (not (get $t "bootstrap")) (not (get $t "provided_by")) (or $all (and (not (has $os $native)) (not (has $plat $missing)))) -}}
+{{-     $opts := get $t "mise_options" -}}
+{{-     if $opts }}
+{{ $backend | quote }} = { version = {{ $t.version | quote }}{{ range $k, $v := $opts }}, {{ $k }} = {{ $v | toJson }}{{ end }} }
+{{-     else }}
+{{ $backend | quote }} = {{ $t.version | quote }}
+{{-     end }}
+{{-   end }}
+{{- end }}

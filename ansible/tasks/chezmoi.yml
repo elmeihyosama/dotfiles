@@ -10,7 +10,7 @@
 
 - name: Fail clearly if chezmoi is missing
   ansible.builtin.fail:
-    msg: "chezmoi not found — the packages task must run before chezmoi."
+    msg: "chezmoi not found (a core mise tool) — the packages task must run before chezmoi."
   when: _chezmoi.rc != 0
 
 - name: Ensure chezmoi config dir
@@ -52,6 +52,25 @@
       - personal_git_name
       - personal_git_email
       - personal_git_dirs
+      - selected_tools
+
+# Tools to pin via mise on this machine (OS-filtered, source == mise only), so
+# the pins template renders exactly what select-tools.sh would install. Needs
+# jq + yq on PATH. Without selected_tools in chezmoi.toml the template falls
+# back to every mise-capable tool.
+- name: Select tools for this machine
+  ansible.builtin.command:
+    argv:
+      - "{{ playbook_dir }}/../scripts/select-tools.sh"
+      - --os
+      - "{{ 'darwin' if ansible_facts['system'] == 'Darwin' else 'linux' }}"
+      - --arch
+      - "{{ 'x64' if ansible_facts['architecture'] in ['x86_64', 'amd64'] else 'arm64' }}"
+      - --local
+      - "{{ playbook_dir }}/local.yml"
+  register: _selected_tools_raw
+  changed_when: false
+  check_mode: false
 
 - name: Template chezmoi.toml from per-machine vars
   ansible.builtin.copy:
@@ -84,6 +103,7 @@
           shared_home = {{ shared_home | default(false) | lower }}
           git_name = "{{ git_name }}"
           git_email = "{{ git_email }}"
+          selected_tools = {{ _selected_tools_raw.stdout | from_json | selectattr('source', 'eq', 'mise') | map(attribute='name') | list | to_json }}
 
 - name: Check for pending chezmoi changes
   ansible.builtin.command: "{{ _chezmoi.stdout }} status"
@@ -94,5 +114,15 @@
 # Pre-existing files are backed up first by the run_once backup script.
 - name: Apply chezmoi (only when there are pending changes)
   ansible.builtin.command: "{{ _chezmoi.stdout }} apply --force"
+  register: _cz_apply
   when: _cz_status.stdout | length > 0
   changed_when: true
+
+# Surfaces run_onchange script noise (a "command not found" here means a
+# script ran before the tool it needs was installed; CI greps for it).
+- name: Show chezmoi apply output
+  ansible.builtin.debug:
+    msg: "{{ (_cz_apply.stdout_lines | default([])) + (_cz_apply.stderr_lines | default([])) }}"
+  when: >-
+    _cz_apply is changed
+    and ((_cz_apply.stdout | default('')) ~ (_cz_apply.stderr | default(''))) | length > 0

@@ -41,59 +41,64 @@ local_share_dir() {
 	fi
 }
 
-# Install Ansible: native where sudo is available, else user-local via uv.
+# gv_pin KEY FILE: the quoted value of a top-level `KEY: "X.Y.Z"` line in
+# group_vars (read with sed: this runs before Ansible exists).
+gv_pin() { sed -nE "s/^$1:[[:space:]]*\"([^\"]*)\".*/\\1/p" "$2"; }
+
+# sha256_of FILE: its sha256, hex (sha256sum on Linux, shasum on macOS).
+sha256_of() {
+	if have sha256sum; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{print $1}'
+}
+
+# Install Ansible, the same way on every OS: a pinned uv (the release's
+# installer, sha256-checked) into the local bin dir, then `uv tool install` of
+# the pinned ansible-core on the pinned uv-managed Python. Versions come from
+# ansible/group_vars/all.yml (uv_version, ansible_core_version,
+# python_version), which equal the repo mise.toml pins. Dirs match
+# ansible/tasks/python.yml.
 ensure_ansible() {
-	if have ansible-playbook; then return; fi
-	case "$(uname -s)" in
-	Darwin)
-		if ! have brew; then
-			echo "Homebrew required on macOS; install from https://brew.sh first." >&2
+	_gv=ansible/group_vars/all.yml
+	_uv_version="$(gv_pin uv_version "$_gv")"
+	_ansible_version="$(gv_pin ansible_core_version "$_gv")"
+	_python_version="$(gv_pin python_version "$_gv")"
+	if [ -z "$_uv_version" ] || [ -z "$_ansible_version" ] || [ -z "$_python_version" ]; then
+		echo "uv_version / ansible_core_version / python_version not found in $_gv" >&2
+		exit 1
+	fi
+	_lbin="$(local_bin_dir)"
+	_lshare="$(local_share_dir)"
+	if "$_lbin/ansible-playbook" --version 2>/dev/null | head -n1 | grep -qF "[core $_ansible_version]"; then
+		return
+	fi
+	# Under a shared $HOME a `uv` on PATH may be the other arch's binary (or
+	# another version), so use the arch-local pinned one.
+	_uv="$_lbin/uv"
+	if ! "$_uv" --version 2>/dev/null | grep -qF "uv $_uv_version"; then
+		have curl || {
+			echo "curl is required to install uv; install it and re-run." >&2
+			exit 1
+		}
+		# The release's installer, checked against uv_installer_sha256 (uv
+		# publishes no checksum for it; scripts/relock.sh records one). The
+		# installer checks the uv archive against its own embedded sha256.
+		_uv_sha="$(gv_pin uv_installer_sha256 "$_gv")"
+		_uv_inst="$(mktemp)"
+		curl -LsSf "https://github.com/astral-sh/uv/releases/download/$_uv_version/uv-installer.sh" -o "$_uv_inst"
+		if [ "$(sha256_of "$_uv_inst")" != "$_uv_sha" ]; then
+			rm -f "$_uv_inst"
+			echo "uv $_uv_version installer does not match uv_installer_sha256 in $_gv (run scripts/relock.sh after a uv bump)." >&2
 			exit 1
 		fi
-		brew install ansible
-		;;
-	Linux)
-		if sudo -n true >/dev/null 2>&1 && have apt-get; then
-			sudo apt-get update && sudo apt-get install -y ansible
-		elif sudo -n true >/dev/null 2>&1 && have pacman; then
-			sudo pacman -Sy --noconfirm ansible
-		elif sudo -n true >/dev/null 2>&1 && have dnf; then
-			# ansible-core is in Fedora and EL9+ AppStream; collections come from
-			# the ansible-galaxy step below.
-			sudo dnf install -y ansible-core
-		else
-			# no-sudo fallback: uv → ansible-core (uv also provides Python if missing),
-			# into the same (possibly arch-suffixed) dirs as ansible/tasks/python.yml.
-			_lbin="$(local_bin_dir)"
-			_lshare="$(local_share_dir)"
-			# Under a shared $HOME a `uv` on PATH may be the other arch's binary,
-			# so require the arch-local one.
-			if [ "$SHARED_HOME" = "true" ]; then
-				_uv="$_lbin/uv"
-				[ -x "$_uv" ] || _need_uv=1
-			else
-				_uv="uv"
-				have uv || _need_uv=1
-			fi
-			if [ "${_need_uv:-0}" = 1 ]; then
-				# UV_NO_MODIFY_PATH: chezmoi owns the shell rc files; uv's PATH edits
-				# would be drift that every apply reverts.
-				curl -LsSf https://astral.sh/uv/install.sh | XDG_BIN_HOME="$_lbin" UV_NO_MODIFY_PATH=1 sh
-				export PATH="$_lbin:$HOME/.local/bin:$PATH"
-				_uv="$_lbin/uv"
-			fi
-			XDG_BIN_HOME="$_lbin" \
-				UV_PYTHON_INSTALL_DIR="$_lshare/uv/python" \
-				UV_TOOL_DIR="$_lshare/uv/tools" \
-				"$_uv" tool install --python 3.13 ansible-core
-			export PATH="$_lbin:$HOME/.local/bin:$PATH"
-		fi
-		;;
-	*)
-		echo "Unsupported OS: $(uname -s)" >&2
-		exit 1
-		;;
-	esac
+		# UV_NO_MODIFY_PATH: chezmoi owns the shell rc files; uv's PATH edits
+		# would be drift that every apply reverts.
+		env XDG_BIN_HOME="$_lbin" UV_NO_MODIFY_PATH=1 sh "$_uv_inst"
+		rm -f "$_uv_inst"
+	fi
+	XDG_BIN_HOME="$_lbin" \
+		UV_PYTHON_INSTALL_DIR="$_lshare/uv/python" \
+		UV_TOOL_DIR="$_lshare/uv/tools" \
+		"$_uv" tool install --force --python "$_python_version" "ansible-core==$_ansible_version"
+	export PATH="$_lbin:$HOME/.local/bin:$PATH"
 }
 
 # True only when the terminal can actually be opened: `[ -r /dev/tty ]` passes in

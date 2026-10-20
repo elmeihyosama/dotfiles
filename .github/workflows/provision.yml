@@ -3,6 +3,11 @@ on:
   pull_request:
     paths:
       - 'ansible/**'
+      - 'home/**'
+      - 'scripts/select-tools.sh'
+      - 'scripts/cleanup-ubi.sh'
+      - 'scripts/remove-hint.sh' # sourced by assert-tools.sh / doctor.sh
+      - 'scripts/doctor.sh'
       - '.github/scripts/provision-ci.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'
@@ -11,6 +16,11 @@ on:
     branches: [main]
     paths:
       - 'ansible/**'
+      - 'home/**'
+      - 'scripts/select-tools.sh'
+      - 'scripts/cleanup-ubi.sh'
+      - 'scripts/remove-hint.sh' # sourced by assert-tools.sh / doctor.sh
+      - 'scripts/doctor.sh'
       - '.github/scripts/provision-ci.sh'
       - '.github/scripts/assert-tools.sh'
       - '.github/scripts/assert-idempotent.sh'
@@ -21,7 +31,7 @@ on:
   workflow_dispatch:
 
 # Read-only ephemeral token: GITHUB_TOKEN is passed into the container only to
-# raise ubi's GitHub API rate limit; contents:read keeps it minimal so exposure
+# raise mise's GitHub API rate limit; contents:read keeps it minimal so exposure
 # to the (same-repo) provisioning script carries negligible risk.
 permissions:
   contents: read
@@ -48,12 +58,13 @@ jobs:
         # `include` attaches each distro's image to its two (sudo/nosudo) combos.
         # Images are pinned to the multi-arch INDEX digest (tag kept for
         # readers), so a re-pushed tag cannot change what CI runs. Dependabot's
-        # docker ecosystem does not read workflow matrices, so bump by hand:
+        # docker ecosystem does not read workflow matrices; Renovate does
+        # (renovate.json, customManagers): it bumps these tags/digests and
+        # bootstrap.yml's ubuntu/fedora copies in the same "pins" PR
+        # (tests/ci-pins.test.sh fails if they diverge). To bump by hand:
         #   docker buildx imagetools inspect <image:tag>   # "Digest:" line
-        # and update bootstrap.yml's copies of ubuntu/fedora in the same commit
-        # (tests/ci-pins.test.sh fails if they diverge). These digests, and the
-        # mise version+sha256 pins (here and in setup-lint), are manual bumps
-        # for now; plan 03 will automate them.
+        # Renovate also bumps the mise `version:` pins (here and in
+        # setup-lint); their sha256s come from scripts/relock.sh on that PR.
         include:
           - distro: debian
             image: mirror.gcr.io/library/debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587 # bookworm-slim
@@ -74,9 +85,9 @@ jobs:
       - name: Provision (${{ matrix.image }} / ${{ matrix.mode }})
         run: |
           # Retry up to 3× (fresh container each) to absorb transient network
-          # blips — ubi GitHub-API/download hiccups and dnf makecache timeouts
+          # blips — mise GitHub-API/download hiccups and dnf makecache timeouts
           # across a 12-job network-heavy matrix. The provisioning is idempotent
-          # (ubi `creates:`, package managers skip installed), so a retry mostly
+          # (mise skips installed tools, package managers too), so a retry mostly
           # re-checks and only redoes what actually failed.
           for attempt in 1 2 3; do
             echo "::group::provision attempt $attempt"
@@ -113,10 +124,9 @@ jobs:
         with:
           persist-credentials: false
       # ansible-core comes from the repo toolchain (mise.toml + mise.lock), the
-      # same pins the lint jobs use. Only the mise binary goes on PATH (no
-      # shims, no exported tool paths): the playbook installs chezmoi, yq, …
-      # itself, and mise copies must not mask a broken brew install from
-      # assert-tools.sh.
+      # same pins the lint jobs use. Only the mise binary and ansible go on
+      # PATH: the playbook installs the home tools itself (its own pinned mise,
+      # the dotfiles pins); "Expose the dotfiles mise shims" adds them after.
       - name: Install mise
         uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
         with:
@@ -137,7 +147,12 @@ jobs:
           mise install --locked
           bin="$(dirname "$(mise which ansible-playbook)")"
           echo "$bin" >>"$GITHUB_PATH"
+          echo "ANSIBLE_BIN=$bin" >>"$GITHUB_ENV"
           "$bin/ansible-playbook" --version
+      # Review focus: a Homebrew copy of a pinned tool already on the machine
+      # must not win over the dotfiles' mise one (asserted after provisioning).
+      - name: Preinstall a Homebrew fzf
+        run: brew install fzf
       - name: Install Ansible collections
         run: ansible-galaxy collection install -r ansible/requirements.yml
       - name: Write the CI machine vars (ansible/local.yml)
@@ -146,11 +161,48 @@ jobs:
       - name: Provision (first run)
         working-directory: ansible
         env:
-          # ubi (tools with no brew formula) reads it to raise its API limit.
+          # mise reads it to raise its GitHub API limit.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ansible-playbook site.yml --skip-tags casks
+      - name: Expose the dotfiles mise shims
+        run: |
+          # Shims, then ansible again ahead of them (each GITHUB_PATH line is
+          # prepended), so later steps resolve the home tools through mise.
+          echo "$HOME/.local/share/mise/shims" >>"$GITHUB_PATH"
+          echo "$ANSIBLE_BIN" >>"$GITHUB_PATH"
+          echo "MISE_SYSTEM_CONFIG_DIR=$HOME/.config/mise-dotfiles" >>"$GITHUB_ENV"
       - name: Assert tools
-        run: ./.github/scripts/assert-tools.sh ansible/group_vars/all.yml
+        run: ./.github/scripts/assert-tools.sh
+      - name: Assert mise's fzf wins over Homebrew's
+        run: |
+          brew list fzf >/dev/null || {
+            echo "FAIL: the Homebrew fzf is not installed (test precondition)" >&2
+            exit 1
+          }
+          want="$(yq '.tools.fzf.version' home/.chezmoidata/tools.yaml)"
+          # A hostile inherited PATH, as a shell or IDE started from a
+          # brew-first environment passes down: Homebrew and ~/.local/bin
+          # ahead of the (already present) mise shims. The pre-fix .zshenv left
+          # the shims where they were, so zsh -c ran brew's fzf.
+          hostile="/opt/homebrew/bin:$HOME/.local/bin:$HOME/.local/share/mise/shims:/usr/bin:/bin"
+          for flags in -c -ic; do
+            # From / (no repo mise.toml), through the deployed ~/.zshenv
+            # (plus ~/.zshrc for -i).
+            path="$(cd / && env PATH="$hostile" zsh "$flags" 'command -v fzf' 2>/dev/null | tail -n1)"
+            ver="$(cd / && env PATH="$hostile" zsh "$flags" 'fzf --version' 2>/dev/null | tail -n1 | awk '{print $1}')"
+            echo "zsh $flags: fzf -> $path ($ver)"
+            case "$path" in
+            "$HOME/.local/share/mise/"*) ;;
+            *)
+              echo "FAIL: zsh $flags resolves fzf outside mise: $path" >&2
+              exit 1
+              ;;
+            esac
+            if [ "$ver" != "$want" ]; then
+              echo "FAIL: zsh $flags runs fzf $ver, tools.yaml pins $want" >&2
+              exit 1
+            fi
+          done
       - name: Provision (second run must be a no-op)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -179,3 +231,9 @@ jobs:
             echo "doctor reported unexpected FAIL lines (above)" >&2
             exit 1
           fi
+          # The Homebrew fzf preinstalled above sits behind mise's on PATH:
+          # doctor must name it as shadowed, with the brew removal hint.
+          grep -qF 'WARN  fzf also installed at /opt/homebrew/bin/fzf (shadowed); remove with: brew uninstall fzf' "$RUNNER_TEMP/doctor.log" || {
+            echo "doctor did not report the shadowed Homebrew fzf" >&2
+            exit 1
+          }

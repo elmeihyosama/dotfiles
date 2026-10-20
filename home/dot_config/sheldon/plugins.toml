@@ -2,22 +2,28 @@ shell = "zsh"
 
 [plugins.zsh-completions]
 github = "zsh-users/zsh-completions"
+rev = "4f5416f5fd9b42822de3ff0cebb831843f655d1d"
 
 [plugins.fzf-tab]
 github = "Aloxaf/fzf-tab"
+rev = "24105b15714bfec37989ed5c5b6e60f572253019"
 
 [plugins.zsh-autosuggestions]
 github = "zsh-users/zsh-autosuggestions"
+rev = "85919cd1ffa7d2d5412f6d3fe437ebdbeeec4fc5"
 
 [plugins.zsh-autopair]
 github = "hlissner/zsh-autopair"
+rev = "449a7c3d095bc8f3d78cf37b9549f8bb4c383f3d"
 
 [plugins.forgit]
 github = "wfxr/forgit"
+tag = "26.08.0"
 
 # MUST be last — wraps all widgets.
 [plugins.fast-syntax-highlighting]
 github = "zdharma-continuum/fast-syntax-highlighting"
+rev = "3d574ccf48804b10dca52625df13da5edae7f553"
 
 [templates]
 # Optional defer template — apply per-plugin with `apply = ["defer"]`. NOTE: it

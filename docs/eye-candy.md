@@ -37,7 +37,7 @@ on Linux. No extra driver installation needed.
 
 Provisioning: installed via Homebrew on macOS and the native package manager on
 sudo-capable Linux. Upstream ships source-only releases, so cava is **skipped on
-no-sudo Linux** (`ubi_unavailable`) — install it manually there if wanted.
+no-sudo Linux** (`native_only` in tools.yaml) — install it manually there if wanted.
 
 ### Visualizing system audio (optional, not automated)
 

@@ -15,6 +15,16 @@
       changed_when: true
 
   pre_tasks:
+    # Tool catalog (shared with chezmoi, doctor and the dotfiles CLI). Loaded
+    # under a name, not via vars_files, so its generic top-level keys (`tools`,
+    # `tool_groups`) cannot collide with other vars. Read it as
+    # tool_catalog.tools / tool_catalog.tool_groups.
+    - name: Load tool catalog
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../home/.chezmoidata/tools.yaml"
+        name: tool_catalog
+      tags: [always]
+
     - name: Detect passwordless sudo when allow_sudo is unset
       ansible.builtin.command: sudo -n true
       register: _sudo_probe
@@ -41,41 +51,64 @@
           shared_home={{ shared_home }}
           local_bin={{ local_bin }}
 
+  # Every task gets mise_env (group_vars): the shims on PATH, the dotfiles
+  # pins dir, the per-arch data dir. Order: pinned mise -> packages (core
+  # pins + locked install) -> chezmoi (deploys the full pins) -> locked
+  # install of the full selection -> everything that needs those tools.
   tasks:
+    - name: Pinned mise
+      ansible.builtin.import_tasks: tasks/mise.yml
+      environment: "{{ mise_env }}"
+      tags: [mise, packages]
+
     - name: Packages
       ansible.builtin.import_tasks: tasks/packages.yml
+      environment: "{{ mise_env }}"
       tags: [packages]
+
+    - name: Chezmoi apply
+      ansible.builtin.import_tasks: tasks/chezmoi.yml
+      environment: "{{ mise_env }}"
+      tags: [chezmoi]
+
+    - name: Pinned tools (full selection)
+      ansible.builtin.import_tasks: tasks/mise-install.yml
+      environment: "{{ mise_env }}"
+      tags: [packages, chezmoi]
 
     - name: GUI apps (macOS casks)
       ansible.builtin.import_tasks: tasks/casks.yml
+      environment: "{{ mise_env }}"
       tags: [casks]
       when: ansible_facts.os_family == 'Darwin'
 
     - name: MacOS defaults
       ansible.builtin.import_tasks: tasks/macos.yml
+      environment: "{{ mise_env }}"
       tags: [macos]
       when: ansible_facts.os_family == 'Darwin'
 
     - name: Zellij plugins
       ansible.builtin.import_tasks: tasks/zjstatus.yml
+      environment: "{{ mise_env }}"
       tags: [zjstatus]
 
     - name: Python (uv-managed default interpreter)
       ansible.builtin.import_tasks: tasks/python.yml
+      environment: "{{ mise_env }}"
       tags: [python]
 
     - name: Fonts
       ansible.builtin.import_tasks: tasks/fonts.yml
+      environment: "{{ mise_env }}"
       tags: [fonts]
-
-    - name: Chezmoi apply
-      ansible.builtin.import_tasks: tasks/chezmoi.yml
-      tags: [chezmoi]
 
     - name: Sheldon plugins
       ansible.builtin.import_tasks: tasks/sheldon.yml
+      environment: "{{ mise_env }}"
       tags: [sheldon]
 
     - name: Login shell
       ansible.builtin.import_tasks: tasks/shell.yml
+      environment: "{{ mise_env }}"
       tags: [shell]

@@ -2,42 +2,35 @@
 # Provide a default Python via uv. uv ships standalone interpreters, so
 # pip-backed tooling (Mason's ruff, formatters, language servers) builds the
 # same on every machine, independent of the OS package manager's Python.
-- name: Locate uv
-  ansible.builtin.command: command -v uv
-  register: _uv
-  changed_when: false
-  failed_when: false
-
+# uv itself is a core mise tool (on PATH via the shims, see mise_env).
+#
 # Redirect uv's outputs to the (possibly per-arch) dirs. Without these, uv writes
 # the `uv`/`python3` shims to $XDG_BIN_HOME (~/.local/bin) and the interpreter ELF
 # + tool venvs to ~/.local/share/uv — both shared paths that collide across arches
 # on a shared-$HOME host. See group_vars/all.yml for local_bin/local_share.
-- name: Install uv (user-local, no sudo) when missing
-  ansible.builtin.shell: set -o pipefail; curl -LsSf https://astral.sh/uv/install.sh | sh  # noqa: command-instead-of-module
-  args:
-    executable: /bin/bash
-    creates: "{{ local_bin }}/uv"
-  environment:
-    XDG_BIN_HOME: "{{ local_bin }}"
-  when: _uv.rc != 0
-
 - name: Install the default Python interpreter via uv — {{ python_version }}
   ansible.builtin.command: "uv python install {{ python_version }} --default"
   args:
     creates: "{{ local_bin }}/python3"
   environment:
-    PATH: "{{ local_bin }}:{{ ansible_facts['env']['PATH'] }}"
     XDG_BIN_HOME: "{{ local_bin }}"
     UV_PYTHON_INSTALL_DIR: "{{ local_share }}/uv/python"
     UV_TOOL_DIR: "{{ local_share }}/uv/tools"
 
-# pre-commit is a Python tool (no static binary for ubi) — install it via uv.
-- name: Install pre-commit as a uv tool
-  ansible.builtin.command: "uv tool install pre-commit"
-  args:
-    creates: "{{ local_bin }}/pre-commit"
+# pre-commit is a Python tool: a version-pinned uv tool (pre_commit_version,
+# equal to the repo mise.toml pin; tests/python-pins.test.sh).
+- name: Read the installed pre-commit version
+  ansible.builtin.command: "{{ local_bin }}/pre-commit --version"
+  register: _pre_commit_v
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Install pre-commit as a uv tool — {{ pre_commit_version }}
+  ansible.builtin.command: "uv tool install --force pre-commit=={{ pre_commit_version }}"
   environment:
-    PATH: "{{ local_bin }}:{{ ansible_facts['env']['PATH'] }}"
     XDG_BIN_HOME: "{{ local_bin }}"
     UV_PYTHON_INSTALL_DIR: "{{ local_share }}/uv/python"
     UV_TOOL_DIR: "{{ local_share }}/uv/tools"
+  changed_when: true
+  when: (_pre_commit_v.stdout | default('') | trim) != ('pre-commit ' ~ pre_commit_version)

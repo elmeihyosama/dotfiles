@@ -29,6 +29,17 @@ unset _arch
 {{- else -}}
 export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
 {{- end }}
+# mise shims back in front: the prepends above would otherwise put
+# ~/.local/bin ahead of the dotfiles' pinned tools (.zshenv put the shims
+# first). Interactive shells then get `mise activate` (49-mise), which puts
+# the pinned install dirs ahead of everything.
+{{ if .shared_home -}}
+_mise_shims="$HOME/.local/share-$(uname -m)/mise/shims"
+{{- else -}}
+_mise_shims="$XDG_DATA_HOME/mise/shims"
+{{- end }}
+[[ -d $_mise_shims ]] && path=("$_mise_shims" ${path:#$_mise_shims})
+unset _mise_shims
 
 # Toolchain bin dirs outside ~/.local. Here, not in 90-local: later modules
 # guard their init on `command -v` (35-atuin binds ^R only if atuin resolves).
