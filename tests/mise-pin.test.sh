@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pinned mise bootstrap: group_vars pins an exact mise version plus one sha256
-# per locked platform, and CI's two mise pins agree with it.
+# per locked platform, and CI's two mise pins and tools.yaml agree with it.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -21,6 +21,9 @@ while IFS= read -r line; do
 	[ -n "$line" ] || continue
 	printf '%s' "$line" | grep -Eq ':[[:space:]]*"[0-9a-f]{64}"' || fail "mise_sha256 entry is 64 hex: $line"
 done <<<"$block"
+
+# tools.yaml's bootstrap mise entry (select-tools / doctor report it) too.
+assert_eq "$ver" "$(yq '.tools.mise.version' home/.chezmoidata/tools.yaml)" "tools.yaml mise version equals group_vars mise_version"
 
 # CI pins must equal group_vars.
 mise_ver() { grep -E '^[[:space:]]*version:[[:space:]]*[0-9]' "$1" | head -1 | sed -E 's/.*version:[[:space:]]*//'; }

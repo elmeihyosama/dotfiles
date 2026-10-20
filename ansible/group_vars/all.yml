@@ -11,7 +11,7 @@ local_opt: "{{ ansible_facts['env']['HOME'] }}/.local/opt{{ ('-' + ansible_facts
 # pinned versions
 nerd_font: "JetBrainsMono"
 nerd_font_version: "v3.2.1"
-python_version: "3.13"         # uv-managed default python
+python_version: "3.13.16"      # uv-managed default python (= the repo mise.toml python; tests/python-pins.test.sh)
 # mise is bootstrapped from a pinned release binary (tasks/mise.yml). Linux uses
 # the musl asset (static, no glibc floor). Keep in step with CI's mise pin
 # (.github/actions/setup-lint/action.yml, the macos job in provision.yml): only
@@ -33,10 +33,14 @@ zjstatus_by_zellij_minor:
   "0.45": { version: "v0.25.0", sha256: "282ceab219e56e1908c9fac33907241fe6c3e1ef7d85faab3e5f438cef87b8fe" }
 
 # Python bootstrap toolchain. install.sh reads uv_version/ansible_core_version
-# with sed (it runs before Ansible exists): keep each on one line as
-# `key: "X.Y.Z"`. All three equal the repo mise.toml pins
-# (tests/python-pins.test.sh).
+# (and python_version, uv_installer_sha256) with sed (it runs before Ansible
+# exists): keep each on one line as `key: "X.Y.Z"`. All three equal the repo
+# mise.toml pins (tests/python-pins.test.sh). uv_installer_sha256 is the
+# sha256 of that release's uv-installer.sh, which uv publishes no checksum
+# for: scripts/relock.sh records it (the installer then checks the uv archive
+# against the sha256 embedded in it).
 uv_version: "0.13.1"
+uv_installer_sha256: "7c482d409673a53f4d9bd34ae95c9166be3b8d89ca82f27dd7bca3cab457afff"
 ansible_core_version: "2.21.5"
 pre_commit_version: "4.7.0"
 
