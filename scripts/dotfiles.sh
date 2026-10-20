@@ -14,7 +14,9 @@
 # Exit codes: 0 ok, 1 an operation failed, 2 usage or validation error.
 #
 # add/remove edit only tool_groups, tools_add and tools_remove in local.yml
-# (yq -i: comments and other keys stay; flow style `[a, b]` is kept). An add of
+# as a line edit of just those keys' own lines (yq only reads; every other byte,
+# comment and CRLF stays; an unsupported shape exits 2 with nothing written; the
+# result is verified, then moved into place atomically). An add of
 # a selected tool or a remove of an unselected one changes nothing, judged
 # against select-tools' computed selection. Every argument is validated before
 # anything is written. Apply = ansible-playbook site.yml --tags
@@ -183,25 +185,82 @@ suggest() {
 		| .[0:5][]'
 }
 
-# write_key KEY JSON_LIST FILE: set FILE's KEY to the list, flow style when the
-# key is new or already flow; an emptied tools_add/tools_remove is dropped
-write_key() {
-	_k="$1"
-	_f="$3"
-	if [ "$2" = '[]' ] && [ "$_k" != tool_groups ]; then
-		yq -i "del(.$_k)" "$_f"
-		return
-	fi
-	_flow=1
-	if [ "$(yq ".$_k | tag" "$_f")" = '!!seq' ] && [ "$(yq ".$_k | style" "$_f")" != flow ]; then _flow=0; fi
-	L="$2" yq -i ".$_k = (env(L) | .[] style=\"\" | . style=\"\")" "$_f"
-	[ "$_flow" -eq 0 ] || yq -i ".$_k style=\"flow\"" "$_f"
+# edit_key KEY JSON_LIST SRC DST REQUIRED: copy SRC to DST with only KEY's own
+# lines changed (awk, column-0 `KEY:` only; yq is never used to write):
+#   flow `KEY: [..]` on one line: just the bracket span, inline comment kept
+#   block `KEY:` + `- item` lines: only the item lines, first item's indent
+#   absent: `KEY: [a, b]` appended (REQUIRED=1 means it must exist: exit 4)
+# An emptied list is written as `KEY: []`. CR line endings are kept.
+# Exit 3: a shape we do not edit (scalar, anchor, multi-line flow, duplicate).
+edit_key() {
+	KEY="$1" REQUIRE="$5" EMPTY="$([ "$2" = '[]' ] && echo 1 || echo 0)" \
+	ITEMS="$(printf '%s' "$2" | jq -r 'map(if test("^[A-Za-z0-9][A-Za-z0-9._-]*$") then . else tojson end) | join("\n")')" \
+		awk '
+		function emit_items(   i, nl) {
+			nl = (hcr ? "\r" : "")
+			if (!seen) { rc = 3; print hdr nl; mode = 0; return }
+			if (n == 0) {
+				print key ": []" (hv ~ /^#/ ? " " hv : "") nl
+			} else {
+				print hdr nl
+				for (i = 1; i <= n; i++) print indent "- " it[i] (icr ? "\r" : "")
+			}
+			mode = 0
+		}
+		BEGIN {
+			key = ENVIRON["KEY"]
+			n = (ENVIRON["EMPTY"] == "1") ? 0 : split(ENVIRON["ITEMS"], it, "\n")
+			flow = ""
+			for (i = 1; i <= n; i++) flow = flow (i > 1 ? ", " : "") it[i]
+		}
+		{
+			line = $0; cr = 0
+			if (sub(/\r$/, "", line)) cr = 1
+			lastcr = cr
+			if (mode == 2) {
+				if (line ~ /^[ ]*-([ ]|$)/) {
+					if (!seen) { indent = line; sub(/-.*/, "", indent); icr = cr; seen = 1 }
+					next
+				}
+				emit_items()
+			}
+			if (line ~ ("^" key ":([ \t]|$)")) {
+				if (found) rc = 3
+				found = 1
+				rest = line; sub("^" key ":", "", rest)
+				ws = rest; sub(/[^ \t].*$/, "", ws)
+				v = substr(rest, length(ws) + 1)
+				if (v ~ /^\[/) {
+					p = index(v, "]")
+					after = substr(v, p + 1)
+					if (p > 0 && after ~ /^[ \t]*(#.*)?$/) {
+						print key ":" ws "[" flow "]" after (cr ? "\r" : "")
+						next
+					}
+					rc = 3
+				} else if (v == "" || v ~ /^#/) {
+					hdr = line; hv = v; hcr = cr; mode = 2; seen = 0
+					next
+				} else rc = 3
+			}
+			print $0
+		}
+		END {
+			if (mode == 2) emit_items()
+			if (!found) {
+				if (ENVIRON["REQUIRE"] == "1") exit 4
+				print key ": [" flow "]" (lastcr ? "\r" : "")
+			}
+			exit rc
+		}' "$3" >"$4"
 }
 
 # cmd_edit add|remove ARGS...
+# shellcheck disable=SC2016 # jq filters: $n is a jq variable, not shell
 cmd_edit() {
 	verb="$1"
 	shift
+	set -f # names are used unquoted below; never glob them
 	apply=1
 	names=""
 	for a in "$@"; do
@@ -260,93 +319,147 @@ cmd_edit() {
 		fi
 	done
 
-	# shellcheck disable=SC2086 # sel_args: no spaces in the values we pass
+	# Temp files: scratch holds select-tools probes (no user content); tmp/tmpn
+	# live next to local.yml so the final mv is atomic. All removed on any exit.
+	scratch="$(mktemp -d)" || exit 1
+	tmp="$(mktemp "$local_yml.XXXXXX")" || exit 1
+	tmpn="$tmp.n"
+	trap 'rm -rf "$scratch" "$tmp" "$tmpn"' EXIT
+	trap 'exit 130' INT
+	trap 'exit 143' TERM
+	trap 'exit 129' HUP
+
 	sel_args="--os $os --arch $arch --tools $tools_yaml"
-	# shellcheck disable=SC2086
-	if ! before="$("$repo_root/scripts/select-tools.sh" $sel_args --local "$local_yml")"; then
+	# sel_run FILE: select-tools JSON for that local file; invalid input exits 2
+	sel_run() {
+		# shellcheck disable=SC2086 # sel_args: no spaces in the values we pass
+		"$repo_root/scripts/select-tools.sh" $sel_args --local "$1" || return 2
+	}
+	# sel_has STATE_JSON NAME: is NAME in select-tools' selection for that state?
+	# (select-tools is the only place the selection rules live.)
+	sel_has() {
+		printf '%s' "$1" >"$scratch/s.json" || exit 1
+		_o="$(sel_run "$scratch/s.json")" || exit 2
+		printf '%s' "$_o" | jq -e --arg n "$2" 'any(.[]; .name == $n)' >/dev/null
+	}
+	# st_jq STATE FILTER: edit the state JSON; $n is the current name
+	st_jq() { printf '%s' "$1" | jq -c --arg n "$n" "$2" || exit 1; }
+
+	before="$(sel_run "$local_yml")" || {
 		echo "dotfiles: $local_yml has an invalid selection (above); fix it first" >&2
 		exit 2
-	fi
-
-	# The pure part: fold the arguments, in order, over the three selection keys.
-	if ! plan="$(jq -n --arg verb "$verb" --arg names "$names" --argjson c "$catalog" --argjson l "$local_json" '
-		def die($m): ($m + "\n") | halt_error(2);
-		def own($s; $t): $c.tools[$t].group == "core" or ($s.g | index($c.tools[$t].group)) != null
-			or ($s.a | index($t)) != null;
-		def base($s; $t): own($s; $t) and ($s.r | index($t)) == null;
-		def sel($s; $t): ($c.tools[$t].provided_by) as $p
-			| if $p != null then base($s; $p) and ($s.r | index($t)) == null else base($s; $t) end;
-		def drop($l; $x): $l - [$x];
-		def put($l; $x): if ($l | index($x)) != null then $l else $l + [$x] end;
-		{g: ($l.tool_groups // $c.tool_groups), a: ($l.tools_add // []), r: ($l.tools_remove // []), msgs: []}
-		| reduce ($names | split(" ") | map(select(. != ""))[]) as $n (.;
-			. as $s
-			| if ($c.tool_groups | index($n)) != null then
-				(if $n == "core" then
-					(if $verb == "remove" then die("dotfiles: core is in core and can'\''t be removed")
-					else .msgs += ["dotfiles: group core is already selected (always on)"] end)
-				elif $verb == "add" then
-					(if ($s.g | index($n)) != null then .msgs += ["dotfiles: group \($n) is already selected"]
-					else .g = put($s.g; $n) | .msgs += ["dotfiles: selected group \($n)"] end)
+	}
+	st="$(printf '%s' "$local_json" | jq -c --argjson c "$catalog" \
+		'{tool_groups: (.tool_groups // $c.tool_groups), tools_add: (.tools_add // []), tools_remove: (.tools_remove // [])}')" || exit 1
+	msgs=""
+	for n in $names; do
+		if printf '%s\n' "$catalog" | jq -e --arg n "$n" '.tool_groups | index($n) != null' >/dev/null; then
+			case "$verb:$n" in
+			remove:core)
+				echo "dotfiles: core is in core and can't be removed" >&2
+				exit 2
+				;;
+			add:core) msgs="$msgs
+dotfiles: group core is already selected (always on)" ;;
+			add:*)
+				if [ "$(st_jq "$st" '.tool_groups | index($n) != null')" = true ]; then
+					msgs="$msgs
+dotfiles: group $n is already selected"
 				else
-					(if ($s.g | index($n)) == null then .msgs += ["dotfiles: group \($n) is not selected"]
-					else .g = drop($s.g; $n) | .msgs += ["dotfiles: deselected group \($n)"] end)
-				end)
-			else
-				(if $verb == "remove" and $c.tools[$n].group == "core" then
-					die("dotfiles: \($n) is in core and can'\''t be removed")
-				elif $verb == "add" then
-					(if sel($s; $n) then .msgs += ["dotfiles: \($n) is already selected"]
-					elif $c.tools[$n].provided_by != null and (base($s; $c.tools[$n].provided_by) | not) then
-						die("dotfiles: \($n) comes with \($c.tools[$n].provided_by); add \($c.tools[$n].provided_by) instead")
-					else
-						.r = drop($s.r; $n)
-						| (if sel(.; $n) then . else .a = put(.a; $n) end)
-						| .msgs += ["dotfiles: selected \($n)"]
-					end)
+					st="$(st_jq "$st" '.tool_groups += [$n]')"
+					msgs="$msgs
+dotfiles: selected group $n"
+				fi
+				;;
+			remove:*)
+				if [ "$(st_jq "$st" '.tool_groups | index($n) != null')" = false ]; then
+					msgs="$msgs
+dotfiles: group $n is not selected"
 				else
-					(if (sel($s; $n) | not) then .msgs += ["dotfiles: \($n) is not selected"]
-					else
-						.a = drop($s.a; $n)
-						| (if sel(.; $n) then .r = put(.r; $n) else . end)
-						| .msgs += ["dotfiles: deselected \($n)"]
-					end)
-				end)
-			end)')"; then
-		exit 2
-	fi
-
-	tmp="$(mktemp)"
-	trap 'rm -f "$tmp" "$tmp.2"' EXIT
-	# yq (4.54) drops blank lines on rewrite; park them as marker comments
-	sed 's/^[[:space:]]*$/#__dotfiles_blank__/' "$local_yml" >"$tmp"
-	changed=0
-	# Each key is written only when it differs from what the file effectively
-	# says (an absent tool_groups means every group), so a no-op writes nothing.
-	for spec in tool_groups:g tools_add:a tools_remove:r; do
-		key="${spec%%:*}"
-		f="${spec#*:}"
-		new="$(printf '%s' "$plan" | jq -c ".$f")"
-		old="$(printf '%s' "$local_json" | jq -c --argjson c "$catalog" --arg k "$key" '.[$k] // (if $k == "tool_groups" then $c.tool_groups else [] end)')"
-		[ "$new" != "$old" ] || continue
-		write_key "$key" "$new" "$tmp"
-		changed=1
+					st="$(st_jq "$st" '.tool_groups -= [$n]')"
+					msgs="$msgs
+dotfiles: deselected group $n"
+				fi
+				;;
+			esac
+			continue
+		fi
+		if [ "$verb" = remove ] && [ "$(printf '%s\n' "$catalog" | jq -r --arg n "$n" '.tools[$n].group')" = core ]; then
+			echo "dotfiles: $n is in core and can't be removed" >&2
+			exit 2
+		fi
+		if [ "$verb" = add ]; then
+			if sel_has "$st" "$n"; then
+				msgs="$msgs
+dotfiles: $n is already selected"
+				continue
+			fi
+			cand="$(st_jq "$st" '.tools_remove -= [$n]')"
+			sel_has "$cand" "$n" || cand="$(st_jq "$cand" '.tools_add += [$n]')"
+			sel_has "$cand" "$n" >/dev/null || true # exits 2 with select-tools' message if invalid
+			st="$cand"
+			msgs="$msgs
+dotfiles: selected $n"
+		else
+			if ! sel_has "$st" "$n"; then
+				msgs="$msgs
+dotfiles: $n is not selected"
+				continue
+			fi
+			cand="$(st_jq "$st" '.tools_add -= [$n]')"
+			if sel_has "$cand" "$n"; then cand="$(st_jq "$cand" '.tools_remove += [$n]')"; fi
+			st="$cand"
+			msgs="$msgs
+dotfiles: deselected $n"
+		fi
 	done
-	sed 's/^#__dotfiles_blank__$//' "$tmp" >"$tmp.2" && mv "$tmp.2" "$tmp"
-	printf '%s' "$plan" | jq -r '.msgs[]'
-	[ "$changed" -eq 1 ] || return 0
+	printf '%s\n' "${msgs#
+}"
 
-	# shellcheck disable=SC2086
-	if ! after="$("$repo_root/scripts/select-tools.sh" $sel_args --local "$tmp")"; then
-		echo "dotfiles: that selection is invalid (above); $local_yml unchanged" >&2
-		exit 2
+	# Keys whose value differs from what the file effectively says (an absent
+	# tool_groups means every group); nothing differs -> nothing is written.
+	cp -p "$local_yml" "$tmp" || exit 1
+	[ -z "$(tail -c1 "$tmp")" ] || printf '\n' >>"$tmp" || exit 1
+	changed=""
+	for key in tool_groups tools_add tools_remove; do
+		new="$(printf '%s' "$st" | jq -c ".$key")" || exit 1
+		old="$(printf '%s' "$local_json" | jq -c --argjson c "$catalog" --arg k "$key" '.[$k] // (if $k == "tool_groups" then $c.tool_groups else [] end)')" || exit 1
+		[ "$new" != "$old" ] || continue
+		req=0
+		[ "$(printf '%s' "$local_json" | jq -r --arg k "$key" 'has($k)')" = true ] && req=1
+		rc=0
+		edit_key "$key" "$new" "$tmp" "$tmpn" "$req" || rc=$?
+		if [ "$rc" -ne 0 ]; then
+			echo "dotfiles: can't safely edit $key in $local_yml; edit it by hand" >&2
+			exit 2
+		fi
+		cat "$tmpn" >"$tmp" || exit 1
+		changed="$changed $key"
+	done
+	[ -n "$changed" ] || return 0
+
+	# Verify before committing the write: keys we did not touch are identical,
+	# the edited ones hold the plan, and select-tools accepts the file.
+	_other='del(.tool_groups, .tools_add, .tools_remove)'
+	_o1="$(yq -o=json -I0 "$_other" "$local_yml" | jq -cS .)" || _o1=x1
+	_o2="$(yq -o=json -I0 "$_other" "$tmp" | jq -cS .)" || _o2=x2
+	ok=1
+	[ "$_o1" = "$_o2" ] || ok=0
+	for key in $changed; do
+		_want="$(printf '%s' "$st" | jq -c ".$key")"
+		_got="$(yq -o=json -I0 ".$key" "$tmp" | jq -c . 2>/dev/null)" || _got=x
+		[ "$_want" = "$_got" ] || ok=0
+	done
+	if [ "$ok" -ne 1 ] || ! after="$(sel_run "$tmp")"; then
+		echo "dotfiles: internal check failed after editing; $local_yml left unchanged" >&2
+		exit 1
 	fi
-	cat "$tmp" >"$local_yml"
+	mv -f "$tmp" "$local_yml" || exit 1
 
 	# tools that stop being installed: native ones get a hint, mise ones are
 	# uninstalled after the apply
 	gone="$(jq -n --argjson b "$before" --argjson a "$after" \
-		'$b | map(select(.name as $n | ($a | map(.name) | index($n)) == null))')"
+		'$b | map(select(.name as $n | ($a | map(.name) | index($n)) == null))')" || exit 1
 	if [ "$verb" = remove ]; then
 		# shellcheck source=remove-hint.sh
 		. "$repo_root/scripts/remove-hint.sh"
@@ -385,8 +498,15 @@ cmd_edit() {
 native_hint() {
 	_bin="$(printf '%s\n' "$catalog" | jq -r --arg t "$1" '.tools[$t].bin // $t')"
 	_h=""
+	_on=1
 	if _p="$(command -v "$_bin" 2>/dev/null)" && [ "${_p#/}" != "$_p" ]; then
 		_h="$(remove_hint "$1" "$_p")"
+		if [ -z "$_h" ] && [ "$os" = darwin ]; then
+			echo "dotfiles: $1: provided by macOS; nothing to remove"
+			return 0
+		fi
+	else
+		_on=0
 	fi
 	if [ -z "$_h" ]; then
 		if [ "$os" = darwin ]; then
@@ -401,7 +521,11 @@ native_hint() {
 			_h="brew uninstall $(pkg_name "$1" brew)"
 		fi
 	fi
-	echo "dotfiles: $1: installed natively; remove with: $_h"
+	if [ "$_on" -eq 1 ]; then
+		echo "dotfiles: $1: installed natively; remove with: $_h"
+	else
+		echo "dotfiles: $1: if installed natively, remove with: $_h"
+	fi
 }
 
 [ $# -gt 0 ] || {

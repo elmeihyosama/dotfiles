@@ -64,7 +64,7 @@ git_email: \"a@b.c\"}" >"$LOCAL"
 run() { # run ARGS...: sets out, rc
 	out="$(env -i HOME="$HOME" PATH="$HOME/bin:$HOME/nbin:/usr/bin:/bin" STUB_CALLS="$STUB_CALLS" \
 		${STUB_ANSIBLE_RC:+STUB_ANSIBLE_RC="$STUB_ANSIBLE_RC"} ${STUB_MISE_RC:+STUB_MISE_RC="$STUB_MISE_RC"} \
-		DOTFILES_LOCAL_YML="$LOCAL" DOTFILES_TOOLS_YAML="$HOME/tools.yaml" sh "$script" "$@" 2>&1)"
+		DOTFILES_LOCAL_YML="$LOCAL" DOTFILES_TOOLS_YAML="${TOOLS:-$HOME/tools.yaml}" sh "$script" "$@" 2>&1)"
 	rc=$?
 }
 val() { yq -o=json -I0 ".$1" "$LOCAL"; } # val KEY
@@ -91,13 +91,13 @@ run add gitx --no-apply
 assert_eq '["gity"]' "$(val tools_remove)" "add_tool_unremove: dropped from tools_remove"
 assert_eq "null" "$(val tools_add)" "add_tool_unremove: not also added"
 run add gity --no-apply
-assert_eq "null" "$(val tools_remove)" "add_tool_unremove: emptied key removed"
+assert_eq "[]" "$(val tools_remove)" "add_tool_unremove: emptied key becomes []"
 # a tool whose group is off AND which is removed needs both
 fresh 'tool_groups: [core]
 tools_remove: [fzf]'
 run add fzf --no-apply
 assert_eq '["fzf"]' "$(val tools_add)" "add_tool_group_off: added"
-assert_eq "null" "$(val tools_remove)" "add_tool_group_off: unremoved"
+assert_eq "[]" "$(val tools_remove)" "add_tool_group_off: unremoved"
 
 # remove_tool: via group -> tools_remove; via tools_add -> dropped from it
 fresh
@@ -229,7 +229,7 @@ run remove nat --no-apply
 assert_eq 0 "$rc" "native_remove: exit 0"
 assert_contains "$out" "installed natively; remove with: rm $HOME/nbin/natbin" "native_remove: path-based hint"
 run remove nat2 --no-apply
-assert_contains "$out" "installed natively; remove with:" "native_remove_unresolved: hint"
+assert_contains "$out" "remove with:" "native_remove_unresolved: hint"
 case "$(uname -s)" in
 Darwin) assert_contains "$out" "brew uninstall nat2-brew" "native_remove_unresolved: brew form" ;;
 *) assert_contains "$out" "nat2-" "native_remove_unresolved: package name" ;;
@@ -270,7 +270,7 @@ STUB_ANSIBLE_RC=4 run remove fzf
 assert_eq 1 "$rc" "apply_fails: exit 1"
 assert_contains "$out" "apply failed" "apply_fails: message"
 assert_contains "$out" "Re-running is safe" "apply_fails: says re-run is safe"
-assert_eq "null" "$(val tools_add)" "apply_fails: local.yml stays edited"
+assert_eq "[]" "$(val tools_add)" "apply_fails: local.yml stays edited"
 assert_not_contains "$(cat "$STUB_CALLS")" "mise|" "apply_fails: no uninstall"
 
 # uninstall failure: warning only
@@ -279,3 +279,79 @@ tools_add: [fzf]'
 STUB_MISE_RC=1 run remove fzf
 assert_eq 0 "$rc" "uninstall_fails: exit 0"
 assert_contains "$out" "warning: could not uninstall fzf" "uninstall_fails: warning"
+
+# ---- line-edit guarantees (review repros) ----
+# the example file with tool_groups/tools_add uncommented: only their lines change
+cp "$TESTS_REPO/ansible/local.yml.example" "$LOCAL"
+sed -i.bak -e 's/^# tool_groups: /tool_groups: /' -e 's/^# tools_add: /tools_add: /' "$LOCAL"
+rm -f "$LOCAL.bak"
+cp "$LOCAL" "$HOME/ex.yml"
+: >"$STUB_CALLS"
+TOOLS=$TESTS_REPO/home/.chezmoidata/tools.yaml run remove lazydocker --no-apply
+assert_eq 0 "$rc" "example_remove: exit 0 ($out)"
+got="$(diff "$HOME/ex.yml" "$LOCAL")"
+case "$got" in
+*"tools_add: []"*"extra tools on top of the groups"*) ;;
+*) fail "example_remove: tools_add emptied in place, comment kept ($got)" ;;
+esac
+assert_eq "2" "$(diff "$HOME/ex.yml" "$LOCAL" | grep -c '^[<>]')" "example_remove: exactly one line changed"
+assert_contains "$(cat "$LOCAL")" "#   containers, system, media, dev)" "example_remove: continuation comment kept"
+assert_contains "$(cat "$LOCAL")" "# tools_remove: [gh-dash]" "example_remove: commented example kept"
+# untouched keys keep spacing and indentation byte-for-byte
+printf '%s\n' 'git_name:   "A"   # who' 'personal_git_dirs:' '    - "~/a/"' '    - "~/b/"' '' 'tool_groups:' '- core' '- git' >"$LOCAL"
+cp "$LOCAL" "$HOME/before.yml"
+run add dev --no-apply
+assert_eq 0 "$rc" "untouched_bytes: exit 0 ($out)"
+assert_eq "" "$(diff <(head -n 6 "$HOME/before.yml") <(head -n 6 "$LOCAL"))" "untouched_bytes: lines before the edit identical"
+assert_eq '["core","git","dev"]' "$(val tool_groups)" "untouched_bytes: block list updated"
+assert_contains "$(cat "$LOCAL")" "- dev" "untouched_bytes: item at the list's own indent"
+# CRLF stays CRLF (edited lines and appended key)
+printf 'git_name: "A"\r\ntool_groups: [core, git]  # c\r\n' >"$LOCAL"
+run add dev fzf --no-apply
+assert_eq 0 "$rc" "crlf: exit 0 ($out)"
+assert_eq "0" "$(tr -d '\r' <"$LOCAL" | grep -c '^$')" "crlf: no stray blank lines"
+assert_eq "$(wc -l <"$LOCAL" | tr -d ' ')" "$(grep -c $'\r$' "$LOCAL")" "crlf: every line ends CRLF"
+assert_contains "$(cat "$LOCAL")" "[core, git, dev]  # c" "crlf: comment kept"
+# no trailing newline: appended key starts on its own line
+printf 'git_name: "A"' >"$LOCAL"
+run remove fzf --no-apply
+assert_eq 0 "$rc" "no_eol: exit 0 ($out)"
+assert_eq '"A"' "$(val git_name)" "no_eol: git_name intact"
+assert_eq '["fzf"]' "$(val tools_remove)" "no_eol: key appended"
+# a block scalar with a blank line stays valid and untouched
+printf '%s\n' 'msg: |' '  one' '' '  two' 'tool_groups: [core]' >"$LOCAL"
+run add git --no-apply
+assert_eq 0 "$rc" "block_scalar: exit 0 ($out)"
+assert_eq "$(printf 'one\n\ntwo')" "$(yq -r .msg "$LOCAL")" "block_scalar: value intact"
+assert_eq '["core","git"]' "$(val tool_groups)" "block_scalar: edit applied"
+# unsupported shapes: exit 2, byte-identical
+for body in 'tool_groups: &g [core, git]' $'tool_groups: [core,\n  git]' 'tool_groups:' '"tool_groups": [core, git]'; do
+	printf '%s\n' "$body" >"$LOCAL"
+	cp "$LOCAL" "$HOME/before.yml"
+	run remove git --no-apply
+	assert_eq 2 "$rc" "unsupported($body): exit 2 ($out)"
+	assert_contains "$out" "can't safely edit tool_groups in $LOCAL; edit it by hand" "unsupported($body): message"
+	cmp -s "$LOCAL" "$HOME/before.yml" || fail "unsupported($body): file byte-identical"
+done
+# mode preserved, no temp files left behind
+nfiles() {
+	set -- "$HOME"/local.yml*
+	echo $#
+}
+printf 'git_name: "A"\n' >"$LOCAL"
+chmod 640 "$LOCAL"
+run remove fzf --no-apply
+assert_eq "640" "$(stat -f %Lp "$LOCAL" 2>/dev/null || stat -c %a "$LOCAL")" "mode_kept"
+assert_eq 1 "$(nfiles)" "no_temp_left"
+# a failing verify step leaves the original intact (exit 1)
+mv "$HOME/bin/yq" "$HOME/bin/yq.real"
+# shellcheck disable=SC2016 # the stub's $* and $$ expand when it runs
+printf '#!/bin/sh\ncase "$*" in *"del("*) echo "{\\"x\\": $$}" ;; *) exec "$(dirname "$0")/yq.real" "$@" ;; esac\n' >"$HOME/bin/yq"
+chmod +x "$HOME/bin/yq"
+printf 'git_name: "A"\n' >"$LOCAL"
+cp "$LOCAL" "$HOME/before.yml"
+run remove fzf --no-apply
+assert_eq 1 "$rc" "verify_fails: exit 1"
+cmp -s "$LOCAL" "$HOME/before.yml" || fail "verify_fails: original intact"
+assert_eq 1 "$(nfiles)" "verify_fails: no temp left"
+mv "$HOME/bin/yq.real" "$HOME/bin/yq"
