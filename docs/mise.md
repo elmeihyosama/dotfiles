@@ -197,7 +197,7 @@ playbook checks) until the checksums catch up. Check out the PR branch, then:
 
 ```sh
 scripts/relock.sh
-git commit -am "relock"
+git add -A && git commit -m "relock"   # -A: picks up new .mise/locks/pipx-*/<ver>/ dirs
 git push
 ```
 
