@@ -2,117 +2,186 @@
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>dotfiles</title>
+<meta name="description" content="A cross-platform terminal environment: one command installs it, every tool pinned, 300+ themes switch live.">
 <style>
   @font-face{font-family:"JBNF";src:url("fonts/jbnf-subset.woff2") format("woff2");font-weight:400 700;font-display:swap}
+  /* base16 slots; the theme buttons swap them (rose-pine-moon by default) */
   :root{
-    --base:#232136; --surface:#2a273f; --overlay:#393552; --hl:#44415a;
-    --muted:#6e6a86; --subtle:#908caa; --text:#e0def4;
-    --love:#eb6f92; --gold:#f6c177; --rose:#ea9a97; --pine:#3e8fb0;
-    --foam:#9ccfd8; --iris:#c4a7e7; --blue:#7e9cd8; --green:#a3be8c;
+    --b00:#232136;--b01:#2a273f;--b02:#393552;--b03:#6e6a86;--b04:#908caa;--b05:#e0def4;
+    --b08:#eb6f92;--b09:#f6c177;--b0A:#ea9a97;--b0B:#3e8fb0;--b0C:#9ccfd8;--b0D:#c4a7e7;--b0E:#f6c177;
+    --glass:.80;--blur:8px;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:radial-gradient(1200px 600px at 50% -10%,#2a273f 0%,var(--base) 55%);
-    color:var(--text);font-family:"JBNF",ui-monospace,Menlo,monospace;
-    min-height:100vh;padding:60px 22px 80px}
-  .wrap{max-width:780px;margin:0 auto}
-  .hero{text-align:center;margin-bottom:34px}
+  html{background:var(--b00)}
+  body{margin:0;color:var(--b05);font-family:"JBNF",ui-monospace,Menlo,monospace;min-height:100vh;
+    padding:56px 18px 80px;position:relative;overflow-x:hidden;transition:background .25s,color .25s;
+    background:radial-gradient(1100px 560px at 50% -10%,var(--b01) 0%,var(--b00) 60%)}
+  /* a "desktop" behind the glass terminal */
+  .blob{position:absolute;border-radius:50%;filter:blur(60px);opacity:.55;z-index:0;pointer-events:none;transition:background .25s}
+  .blob.a{width:340px;height:340px;left:calc(50% - 420px);top:330px;background:var(--b0D)}
+  .blob.b{width:300px;height:300px;left:calc(50% + 120px);top:520px;background:var(--b0C)}
+  .wrap{max-width:820px;margin:0 auto;position:relative;z-index:1}
+  .hero{text-align:center;margin-bottom:26px}
   .title{font-size:62px;font-weight:800;margin:0;letter-spacing:-1px;
-    background:linear-gradient(95deg,var(--iris),var(--foam));-webkit-background-clip:text;background-clip:text;color:transparent}
-  .tag{color:var(--subtle);font-size:15px;margin:6px 0 22px}
-  .install{display:inline-flex;align-items:center;gap:12px;background:#1b1a2b;
-    border:1px solid var(--overlay);border-radius:10px;padding:13px 16px;font-size:14px}
-  .install .pn{color:var(--pine)}
-  .install .cp{color:var(--muted);background:none;border:0;border-left:1px solid var(--overlay);margin-left:4px;padding:0 0 0 12px;font:inherit;cursor:pointer;transition:color .15s}
-  .install .cp:hover{color:var(--foam)} .install .cp.ok{color:var(--green)}
+    background:linear-gradient(95deg,var(--b0D),var(--b0C));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .tag{color:var(--b04);font-size:15px;margin:8px auto 22px;max-width:560px;line-height:1.6}
+  .install{display:inline-flex;align-items:center;gap:12px;background:var(--b01);
+    border:1px solid var(--b02);border-radius:10px;padding:13px 16px;font-size:14px;max-width:100%;overflow-x:auto}
+  #cmd{white-space:nowrap}
+  @media(max-width:480px){.install{font-size:12px}}
+  .install .pn{color:var(--b0B)} .install .su{color:var(--b04)}
+  .install .cp{color:var(--b03);background:none;border:0;border-left:1px solid var(--b02);margin-left:4px;padding:0 0 0 12px;font:inherit;cursor:pointer}
+  .install .cp:hover{color:var(--b0C)} .install .cp.ok{color:var(--b0B)}
   .badges{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-top:18px}
-  .badge{font-size:11px;padding:4px 10px;border-radius:6px;background:var(--surface);border:1px solid var(--overlay);color:var(--subtle)}
-  .term{background:#1b1a2b;border:1px solid var(--overlay);border-radius:11px;overflow:hidden;
-    font-size:13px;line-height:1.65;box-shadow:0 20px 50px -20px #00000080;margin:30px 0 16px}
-  .bar{display:flex;gap:6px;align-items:center;padding:9px 12px;background:var(--overlay)}
+  .badge{font-size:11px;padding:4px 10px;border-radius:6px;background:var(--b01);border:1px solid var(--b02);color:var(--b04)}
+  .picker{display:flex;flex-wrap:wrap;gap:8px 14px;justify-content:center;align-items:center;margin:30px 0 4px;font-size:12px}
+  .picker .lbl{color:var(--b04);text-transform:uppercase;letter-spacing:.08em;font-size:11px}
+  .opt{font:inherit;font-size:12px;color:var(--b04);background:var(--b01);border:1px solid var(--b02);border-radius:7px;
+    padding:5px 9px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .opt:hover{color:var(--b05)} .opt.on{color:var(--b05);border-color:var(--b0D)}
+  .sw{width:11px;height:11px;border-radius:3px;border:2px solid}
+  .term{border:1px solid var(--b02);border-radius:12px;overflow:hidden;font-size:13px;line-height:1.7;
+    box-shadow:0 24px 60px -24px #00000090;margin:14px 0 10px;
+    background:color-mix(in srgb,var(--b00) calc(var(--glass) * 100%),transparent);
+    -webkit-backdrop-filter:blur(var(--blur));backdrop-filter:blur(var(--blur));transition:background .25s}
+  .bar{display:flex;gap:6px;align-items:center;padding:9px 12px;background:color-mix(in srgb,var(--b02) 85%,transparent)}
   .dot{width:11px;height:11px;border-radius:50%}
-  .term .body{padding:14px 16px}
-  .gd{color:var(--gold)} .lv{color:var(--love)} .fm{color:var(--foam)}
-  .mu{color:var(--muted)} .gn{color:var(--green)} .cmd{color:var(--text)}
-  .su{color:var(--subtle)} .blue{color:var(--blue)} .ir{color:var(--iris)}
-  .dir{color:var(--foam);font-weight:700} .git{color:var(--iris)} .dirty{color:var(--love)}
-  .arr{color:var(--pine);font-weight:700} .row{white-space:pre}
-  .p2{display:flex;align-items:center;margin:1px 0}
-  .brk{flex:0 0 11px;height:1.65em;border:1.5px solid var(--subtle);border-right:0;border-radius:7px 0 0 7px;margin-right:8px}
-  .pl{flex:1;min-width:0}
-  .pl .l{display:flex;align-items:center;gap:7px}
-  .pl .l .sp{flex:1}
-  h2{font-size:14px;color:var(--subtle);text-transform:uppercase;letter-spacing:.08em;text-align:center;margin:46px 0 18px;font-weight:600}
-  .tools{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
-  @media(max-width:720px){.tools{grid-template-columns:1fr 1fr}.title{font-size:48px}}
-  .tcard{background:var(--surface);border:1px solid var(--overlay);border-radius:10px;overflow:hidden}
-  .tcard .h{display:flex;justify-content:space-between;align-items:center;padding:8px 11px;border-bottom:1px solid var(--overlay);font-size:11px}
-  .tcard .h .nm{color:var(--text);font-weight:600} .tcard .h .role{color:var(--muted)}
-  .tcard .b{padding:10px 11px;font-size:11px;line-height:1.6;min-height:64px}
-  .foot{text-align:center;color:var(--muted);font-size:12px;margin-top:46px;line-height:1.8}
-  .foot a{color:var(--foam);text-decoration:none}
+  .term .body{padding:14px 16px;overflow-x:auto}
+  .r{color:var(--b08)} .o{color:var(--b09)} .y{color:var(--b0A)} .g{color:var(--b0B)}
+  .c{color:var(--b0C)} .bl{color:var(--b0D)} .m{color:var(--b0E)} .mu{color:var(--b03)} .su{color:var(--b04)}
+  .b{font-weight:700} .line{white-space:pre}
+  .tui{border:1px solid var(--b02);border-radius:8px;margin:8px 0 6px;max-width:560px}
+  .tui .tabs{display:flex;gap:14px;padding:5px 10px;border-bottom:1px solid var(--b02);font-size:12px;color:var(--b03)}
+  .tui .tabs .on{color:var(--b05);border-bottom:2px solid var(--b0D)}
+  .tui .box{margin:8px 10px 10px;border:1px solid var(--b0C);border-radius:8px;padding:6px 12px 8px;position:relative}
+  .tui .box .t{position:absolute;top:-10px;left:10px;padding:0 4px;color:var(--b0C);font-size:12px;font-weight:700;
+    background:color-mix(in srgb,var(--b00) calc(var(--glass) * 100%),var(--b00))}
+  .tui .it{display:flex;gap:10px;font-size:12px} .tui .it .k{margin-left:auto;color:var(--b03)}
+  .tui .sel{background:color-mix(in srgb,var(--b0C) 22%,transparent);border-radius:4px}
+  h2{font-size:13px;color:var(--b04);text-transform:uppercase;letter-spacing:.1em;text-align:center;margin:52px 0 18px;font-weight:600}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+  @media(max-width:760px){.cards{grid-template-columns:1fr 1fr}.title{font-size:48px}}
+  @media(max-width:480px){.cards{grid-template-columns:1fr}}
+  .card{background:var(--b01);border:1px solid var(--b02);border-radius:10px;padding:12px 13px}
+  .card .h{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;margin-bottom:7px}
+  .card .h .nm{font-weight:700} .card .h .role{color:var(--b03);font-size:11px}
+  .card p{margin:0;font-size:12px;line-height:1.6;color:var(--b04)}
+  .card code{color:var(--b0C)}
+  .grp{display:flex;gap:12px;align-items:baseline;padding:7px 0;border-top:1px solid var(--b02)}
+  .grp:first-child{border-top:0}
+  .gname{flex:0 0 92px;color:var(--b03);font-size:12px;text-align:right}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-size:12px;padding:2px 8px;border-radius:5px;background:var(--b01);border:1px solid var(--b02);cursor:help}
+  .chip:hover{border-color:var(--b0D)}
+  .note{text-align:center;color:var(--b03);font-size:12px;margin-top:12px}
+  .foot{text-align:center;color:var(--b03);font-size:12px;margin-top:52px;line-height:1.8}
+  .foot a{color:var(--b0C);text-decoration:none}
 </style></head><body>
+<div class="blob a"></div><div class="blob b"></div>
 <div class="wrap">
 
   <div class="hero">
     <h1 class="title">dotfiles</h1>
-    <div class="tag">A cross-platform terminal environment — one command, fully themed with Rosé&nbsp;Pine&nbsp;Moon.</div>
+    <div class="tag">A cross-platform terminal environment. One command installs it, every tool is pinned to an exact version, and <span data-count="themes">328</span> themes switch live.</div>
     <div class="install"><span id="cmd"><span class="su">curl -fsSL</span> https://elmeihyosama.github.io/dotfiles/install.sh <span class="pn">| sh</span></span><button class="cp" onclick="copyCmd(this)">copy</button></div>
-    <div class="badges"><span class="badge">macOS</span><span class="badge">Debian</span><span class="badge">Ubuntu</span><span class="badge">Arch</span><span class="badge">Fedora</span><span class="badge">Rocky</span><span class="badge">Alma</span><span class="badge">no&nbsp;sudo&nbsp;✓</span></div>
+    <div class="badges"><span class="badge">macOS</span><span class="badge">Debian</span><span class="badge">Ubuntu</span><span class="badge">Arch</span><span class="badge">Fedora</span><span class="badge">Rocky</span><span class="badge">Alma</span><span class="badge">WSL</span><span class="badge">no&nbsp;sudo&nbsp;✓</span></div>
+  </div>
+
+  <div class="picker">
+    <span class="lbl">theme</span><button class="opt on" data-theme="rose-pine-moon"><span class="sw" style="background:#232136;border-color:#c4a7e7"></span>rose-pine-moon</button><button class="opt" data-theme="catppuccin-mocha"><span class="sw" style="background:#1e1e2e;border-color:#89b4fa"></span>catppuccin-mocha</button><button class="opt" data-theme="nord"><span class="sw" style="background:#2e3440;border-color:#81a1c1"></span>nord</button><button class="opt" data-theme="gruvbox-dark-hard"><span class="sw" style="background:#1d2021;border-color:#83a598"></span>gruvbox-dark-hard</button><button class="opt" data-theme="tokyo-night-dark"><span class="sw" style="background:#1a1b26;border-color:#2ac3de"></span>tokyo-night-dark</button><button class="opt" data-theme="iglass-light"><span class="sw" style="background:#f5f5f7;border-color:#0035bb"></span>iglass-light</button>
+  </div>
+  <div class="picker">
+    <span class="lbl">glass</span><button class="opt" data-glass=".5,22px">clear</button><button class="opt on" data-glass=".8,8px">frosted</button><button class="opt" data-glass=".9,10px">tinted</button><button class="opt" data-glass="1,0px">solid</button>
   </div>
 
   <div class="term">
-    <div class="bar"><span class="dot" style="background:var(--love)"></span><span class="dot" style="background:var(--gold)"></span><span class="dot" style="background:var(--foam)"></span><span class="mu" style="margin-left:8px;font-size:11px">dotfiles — zsh</span></div>
+    <div class="bar"><span class="dot" style="background:var(--b08)"></span><span class="dot" style="background:var(--b0A)"></span><span class="dot" style="background:var(--b0B)"></span><span class="mu" style="margin-left:8px;font-size:11px">zsh</span></div>
     <div class="body">
-      <div class="p2"><div class="brk"></div><div class="pl">
-        <div class="l"><span class="dir">dotfiles</span><span class="git"> main</span><span class="dirty">?</span><span class="sp"></span><span class="mu">01:56</span></div>
-        <div class="l"><span class="arr">❯</span><span class="cmd">curl -fsSL …/install.sh | sh</span></div></div></div>
-      <div class="mu" style="padding-left:19px">✔ chezmoi · ansible · 24 tools provisioned</div>
-      <div class="p2"><div class="brk"></div><div class="pl">
-        <div class="l"><span class="dir">dotfiles</span><span class="git"> main</span><span class="dirty">?</span><span class="sp"></span><span class="mu">01:57</span></div>
-        <div class="l"><span class="arr">❯</span><span class="cmd"><span class="gd">eza</span> --icons --group-directories-first</span></div></div></div>
-      <div class="row" style="padding-left:19px"><span class="blue"> ansible</span>  <span class="blue"> docs</span>  <span class="cmd"> chezmoi.toml.example</span></div>
-      <div class="row" style="padding-left:19px"><span class="blue"> ci</span>      <span class="blue">󱂵 home</span>  <span class="gn"> install.sh</span>  <span class="cmd">󰂺 README.md</span></div>
-      <div class="p2"><div class="brk"></div><div class="pl">
-        <div class="l"><span class="dir">dotfiles</span><span class="git"> main</span><span class="dirty">?</span><span class="sp"></span><span class="mu">01:57</span></div>
-        <div class="l"><span class="arr">❯</span><span class="cmd"> </span></div></div></div>
+      <div class="line"><span class="c b">~</span> <span class="g b">❯</span> curl -fsSL …/install.sh | sh</div>
+      <div class="line"><span class="su">Install [a]ll groups, [c]ore only, or [p]ick</span> <span class="mu">[a]</span>: <span class="y">p</span></div>
+      <div class="line"><span class="su">  git (git-delta lazygit gh gh-dash git-absorb gitleaks)? (yes/no)</span> <span class="mu">[yes]</span>:</div>
+      <div class="line"><span class="g">✓</span> <span class="su">tools installed at their pins · chezmoi applied · doctor: healthy</span></div>
+      <div class="line"><span class="c b">~</span> <span class="g b">❯</span> dotfiles</div>
+      <div class="tui">
+        <div class="tabs"><span class="on">Status</span><span>Tools</span><span>Files</span><span>Look</span><span>Machine</span></div>
+        <div class="box"><span class="t">Status</span>
+          <div class="line g b">✓  All good</div>
+          <div class="line mu">health and updates checked 2 h ago · r checks again</div>
+          <div class="it sel"><span class="bl">↓</span><span>3 updates waiting</span><span class="k">u update</span></div>
+          <div class="it"><span class="mu">◌</span><span>2 files waiting to apply</span><span class="k">→ Files</span></div>
+        </div>
+      </div>
+      <div class="line"><span class="c b">~</span> <span class="g b">❯</span> theme <span class="m">catppuccin-mocha</span> <span class="mu"># nvim, ghostty and friends repaint live</span></div>
     </div>
   </div>
+  <div class="note">pick a theme or a glass level above: the page repaints the way your terminal does</div>
 
   <h2>what you get</h2>
-  <div class="tools">
-
-    <div class="tcard"><div class="h"><span class="nm">starship</span><span class="role">prompt</span></div>
-      <div class="b"><div class="p2"><div class="brk" style="height:1.6em"></div><div class="pl"><div class="l"><span class="dir">~</span><span class="git"> main</span><span class="dirty">?</span></div><div class="l"><span class="arr">❯</span></div></div></div></div></div>
-
-    <div class="tcard"><div class="h"><span class="nm">eza</span><span class="role">ls, with icons</span></div>
-      <div class="b"><span class="blue"> ci</span> <span class="blue">󱂵 home</span><br><span class="gn"> install.sh</span><br><span class="cmd">󰂺 README.md</span></div></div>
-
-    <div class="tcard"><div class="h"><span class="nm">bat</span><span class="role">cat + syntax</span></div>
-      <div class="b"><span class="mu">1 </span><span class="blue"># Dotfiles</span><br><span class="mu">3 </span><span class="cmd">works without </span><span class="gn">sudo</span><br><span class="mu">23 </span><span class="gd">**bootstrap**</span></div></div>
-
-    <div class="tcard"><div class="h"><span class="nm">lazygit</span><span class="role">git TUI</span></div>
-      <div class="b"><span class="git"> main</span><br><span class="gn">+ 3 staged</span><br><span class="lv">~ 1 modified</span></div></div>
-
-    <div class="tcard"><div class="h"><span class="nm">nvim</span><span class="role">editor</span></div>
-      <div class="b"><span class="ir">LazyVim</span><br><span class="mu">~/.config/nvim</span><br><span class="cmd">lua, themed</span></div></div>
-
-    <div class="tcard"><div class="h"><span class="nm">zellij</span><span class="role">multiplexer</span></div>
-      <div class="b"><span class="cmd"> code </span><span class="mu">·</span><span class="cmd"> logs </span><span class="mu">·</span><span class="cmd"> shell</span><br><span class="mu">tabs · panes · layouts</span></div></div>
-
+  <div class="cards">
+    <div class="card"><div class="h"><span class="nm">dotfiles</span><span class="role">one command</span></div>
+      <p>Status, Tools, Files, Look and Machine in one terminal UI. Every action is a plain <code>dotfiles</code> subcommand too.</p></div>
+    <div class="card"><div class="h"><span class="nm">pinned</span><span class="role">mise</span></div>
+      <p><span data-count="tools">37</span> tools at exact versions with locked checksums, the same on every machine. Renovate keeps them current.</p></div>
+    <div class="card"><div class="h"><span class="nm">themed</span><span class="role">base16</span></div>
+      <p><span data-count="themes">328</span> palettes across the terminal, Neovim, bat, lazygit, btop and more. <code>theme</code>, <code>glass</code> and <code>wallpaper</code> switch live.</p></div>
+    <div class="card"><div class="h"><span class="nm">your pick</span><span class="role">install</span></div>
+      <p>The installer asks: everything, core only, or groups and single tools. Change your mind later in the Tools tab.</p></div>
+    <div class="card"><div class="h"><span class="nm">healthy</span><span class="role">doctor · update</span></div>
+      <p><code>dotfiles update</code> pulls, provisions and verifies. <code>doctor</code> explains anything off and how to fix it.</p></div>
+    <div class="card"><div class="h"><span class="nm">yours</span><span class="role">no sudo needed</span></div>
+      <p>Installs into your home without root. Signed GitHub commits and age-encrypted secrets are built in.</p></div>
   </div>
 
+  <h2>the tools</h2>
+  <div class="tools">
+    <div class="grp"><div class="gname">core</div><div class="chips"><span class="chip" title="Manages these dotfiles: renders templates into your home directory">chezmoi</span><span class="chip" title="Installs and pins every CLI tool (and runtimes) to exact versions">mise</span><span class="chip" title="Fast zsh plugin manager, pinned per plugin">sheldon</span><span class="chip" title="The shell prompt: directory, git state, languages">starship</span><span class="chip" title="Fuzzy finder for files, history and anything piped in">fzf</span><span class="chip" title="Query and reshape JSON on the command line">jq</span><span class="chip" title="jq for YAML, TOML and XML">yq</span><span class="chip" title="Smarter cd: jump to frequent directories with z">zoxide</span><span class="chip" title="Searchable shell history with context (ctrl-r)">atuin</span><span class="chip" title="cat with syntax highlighting and git marks">bat</span><span class="chip" title="Modern ls with icons, git status and tree view">eza</span><span class="chip" title="Very fast recursive search (rg)">ripgrep</span><span class="chip" title="Simple, fast find replacement">fd</span><span class="chip" title="Generates LS_COLORS from the active theme">vivid</span><span class="chip" title="Fast Python installer and runner (also runs this TUI)">uv</span></div></div>
+    <div class="grp"><div class="gname">git</div><div class="chips"><span class="chip" title="Readable, syntax-highlighted git diffs">git-delta</span><span class="chip" title="Terminal UI for git: stage, commit, rebase">lazygit</span><span class="chip" title="GitHub from the terminal: PRs, issues, actions">gh</span><span class="chip" title="Dashboard of your GitHub PRs and issues">gh-dash</span><span class="chip" title="Folds staged fixes into the right earlier commits">git-absorb</span><span class="chip" title="Scans git history for leaked secrets">gitleaks</span></div></div>
+    <div class="grp"><div class="gname">files</div><div class="chips"><span class="chip" title="Fast terminal file manager with previews">yazi</span><span class="chip" title="Shows what&#x27;s using disk space, as a tree">dust</span><span class="chip" title="Friendly disk usage and free space overview">duf</span><span class="chip" title="Simple file encryption (chezmoi secrets)">age</span></div></div>
+    <div class="grp"><div class="gname">containers</div><div class="chips"><span class="chip" title="Terminal UI for Docker containers and logs">lazydocker</span></div></div>
+    <div class="grp"><div class="gname">system</div><div class="chips"><span class="chip" title="Resource monitor: CPU, memory, disks, processes">btop</span><span class="chip" title="System info splash shown when a shell opens">fastfetch</span><span class="chip" title="Terminal workspace: panes, tabs and sessions">zellij</span><span class="chip" title="Interactive cheatsheets for shell commands">navi</span></div></div>
+    <div class="grp"><div class="gname">media</div><div class="chips"><span class="chip" title="Audio visualizer in the terminal">cava</span></div></div>
+    <div class="grp"><div class="gname">dev</div><div class="chips"><span class="chip" title="The editor">neovim</span><span class="chip" title="Checks files follow .editorconfig rules (ec)">editorconfig-checker</span><span class="chip" title="Command-line benchmarking">hyperfine</span><span class="chip" title="Friendly HTTP client, like HTTPie">xh</span><span class="chip" title="Viewer for exploring JSON and YAML">jless</span><span class="chip" title="Re-runs a command when files change">watchexec</span></div></div>
+  </div>
+  <div class="note">hover a tool for what it does · core is always installed, the rest you choose</div>
+
   <div class="foot">
-    Declarative everywhere — Ansible provisions, chezmoi configures, one palette themes the whole stack.<br>
-    <a href="https://github.com/elmeihyosama/dotfiles">github.com/elmeihyosama/dotfiles</a> · MIT · Rosé Pine Moon
+    Ansible provisions, chezmoi configures, mise pins, one palette themes the whole stack.<br>
+    <a href="https://github.com/elmeihyosama/dotfiles">github.com/elmeihyosama/dotfiles</a> · MIT
   </div>
 
 </div>
 <script>
+var PALETTES = {"rose-pine-moon": ["#232136", "#2a273f", "#393552", "#6e6a86", "#908caa", "#e0def4", "#e0def4", "#56526e", "#eb6f92", "#f6c177", "#ea9a97", "#3e8fb0", "#9ccfd8", "#c4a7e7", "#f6c177", "#56526e"], "catppuccin-mocha": ["#1e1e2e", "#181825", "#313244", "#45475a", "#585b70", "#cdd6f4", "#f5e0dc", "#b4befe", "#f38ba8", "#fab387", "#f9e2af", "#a6e3a1", "#94e2d5", "#89b4fa", "#cba6f7", "#f2cdcd"], "nord": ["#2e3440", "#3b4252", "#434c5e", "#4c566a", "#d8dee9", "#e5e9f0", "#eceff4", "#8fbcbb", "#bf616a", "#d08770", "#ebcb8b", "#a3be8c", "#88c0d0", "#81a1c1", "#b48ead", "#5e81ac"], "gruvbox-dark-hard": ["#1d2021", "#3c3836", "#504945", "#665c54", "#bdae93", "#d5c4a1", "#ebdbb2", "#fbf1c7", "#fb4934", "#fe8019", "#fabd2f", "#b8bb26", "#8ec07c", "#83a598", "#d3869b", "#d65d0e"], "tokyo-night-dark": ["#1a1b26", "#16161e", "#2f3549", "#444b6a", "#787c99", "#a9b1d6", "#cbccd1", "#d5d6db", "#c0caf5", "#a9b1d6", "#0db9d7", "#9ece6a", "#b4f9f8", "#2ac3de", "#bb9af7", "#f7768e"], "iglass-light": ["#f5f5f7", "#e5e5ea", "#bad7f9", "#605f64", "#3a3a3c", "#1d1d1f", "#1d1d1f", "#000000", "#92000b", "#c30006", "#763200", "#00521b", "#004a6e", "#0035bb", "#6a238a", "#902fbd"]};
+var SLOTS = ["00","01","02","03","04","05","06","07","08","09","0A","0B","0C","0D","0E","0F"];
+function pick(attr, btn){
+  document.querySelectorAll("[data-" + attr + "]").forEach(function(b){ b.classList.toggle("on", b === btn); });
+}
+document.querySelectorAll("[data-theme]").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    var p = PALETTES[btn.dataset.theme], s = document.documentElement.style;
+    SLOTS.forEach(function(k, i){ s.setProperty("--b" + k, p[i]); });
+    pick("theme", btn);
+  });
+});
+document.querySelectorAll("[data-glass]").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    var v = btn.dataset.glass.split(","), s = document.documentElement.style;
+    s.setProperty("--glass", v[0]); s.setProperty("--blur", v[1]);
+    pick("glass", btn);
+  });
+});
+// #theme=nord&glass=clear picks them on load (shareable)
+(function(){
+  var q = new URLSearchParams(location.hash.slice(1));
+  var t = document.querySelector('[data-theme="' + q.get("theme") + '"]');
+  if (t) t.click();
+  document.querySelectorAll("[data-glass]").forEach(function(b){ if (b.textContent === q.get("glass")) b.click(); });
+})();
 function copyCmd(btn){
-  var text = document.getElementById('cmd').textContent;
+  var text = document.getElementById("cmd").textContent;
   navigator.clipboard.writeText(text).then(function(){
-    btn.textContent = 'copied!'; btn.classList.add('ok');
-    setTimeout(function(){ btn.textContent = 'copy'; btn.classList.remove('ok'); }, 1500);
+    btn.textContent = "copied!"; btn.classList.add("ok");
+    setTimeout(function(){ btn.textContent = "copy"; btn.classList.remove("ok"); }, 1500);
   });
 }
 </script>
