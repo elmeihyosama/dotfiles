@@ -118,13 +118,24 @@ assert_contains "$(get "$scratch/arrow.toml" format)" '$kubernetes[](fg:surfa
 # text, then band B on raised (base02); no divider where band B opens
 render bar-theme prompt_style=bar
 loads bar-theme
-assert_contains "$(get "$scratch/bar-theme.toml" format)" '[](fg:accent2)$hostname$directory$git_branch$git_status[](fg:accent2 bg:raised)$jobs' "theme bar: two bands"
+assert_contains "$(get "$scratch/bar-theme.toml" format)" '[](fg:accent2)$hostname$directory($git_branch$git_status[](fg:link bg:raised))$jobs' "theme bar: git its own band, closed only when it shows"
+assert_eq '"[ 󰉋 $path$read_only ]($style)[](fg:accent2 bg:raised)"' "$(get "$scratch/bar-theme.toml" directory.format)" "theme bar: outside a repo the directory ends into band B"
+assert_contains "$(get "$scratch/bar-theme.toml" directory.repo_root_format)" '[](fg:accent2 bg:link)' "theme bar: in a repo it ends into git"
+assert_eq '"bold fg:bg bg:link"' "$(get "$scratch/bar-theme.toml" git_branch.style)" "theme bar: git on the branch colour"
 assert_contains "$(get "$scratch/bar-theme.toml" format)" '$kubernetes[](fg:raised) ' "theme bar: band B closes it"
 assert_eq '"bold fg:bg bg:accent2"' "$(get "$scratch/bar-theme.toml" directory.style)" "theme bar: dark text on band A"
-assert_eq '"[](fg:bg bg:accent2)[ $symbol$branch ]($style)"' "$(get "$scratch/bar-theme.toml" git_branch.format)" "theme bar: a dark divider in band A"
+assert_eq '"[ $symbol$branch ]($style)"' "$(get "$scratch/bar-theme.toml" git_branch.format)" "theme bar: no divider opening the git band"
 assert_eq '"fg:green bg:raised"' "$(get "$scratch/bar-theme.toml" nodejs.style)" "theme bar: band B keeps segment colours"
 assert_eq '"[ $symbol($version) ]($style)"' "$(get "$scratch/bar-theme.toml" nodejs.format)" "theme bar: no divider opening band B"
 assert_eq '"bold fg:bg bg:magenta"' "$(render_tmpl "$starship_tmpl" prompt_style=bar prompt_dir_color=magenta >"$scratch/bt2.toml" && get "$scratch/bt2.toml" directory.style)" "theme bar: band A follows the directory colour"
+# right ends: the right side's own shape, bar and rainbow
+render right-round prompt_style=bar prompt_separator=angled prompt_right_ends=round
+assert_contains "$(get "$scratch/right-round.toml" format)" '[](fg:raised)$cmd_duration$time[](fg:raised)' "right ends: the right bar's own shape"
+assert_contains "$(get "$scratch/right-round.toml" format)" '$kubernetes[](fg:raised)' "right ends: the left keeps Ends"
+assert_contains "$(get "$scratch/right-round.toml" cmd_duration.format)" '[](' "right ends: the right divider matches"
+render right-rb prompt_style=rainbow prompt_right_ends=angled
+assert_contains "$(get "$scratch/right-rb.toml" time.format)" '[](fg:muted)' "right ends: rainbow clock block"
+assert_contains "$(get "$scratch/right-rb.toml" directory.format)" '[](fg:accent2)' "right ends: rainbow left blocks keep Ends"
 render arrow-rb prompt_style=rainbow prompt_separator=angled prompt_start=flat
 assert_contains "$(get "$scratch/arrow-rb.toml" directory.format)" '[](fg:accent2)[ ' "left end: rainbow blocks too"
 render bar-blue prompt_style=bar prompt_bar_color=blue
