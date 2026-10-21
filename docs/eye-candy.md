@@ -47,6 +47,46 @@ plain blur (`20`).
 read. A wallpaper (`wallpaper on`) shows through the same translucency, so
 prefer `tinted` or `solid` with one.
 
+## Prompt (Starship) and cursor
+
+The prompt's layout and colours are options, listed with their choices in
+`home/.chezmoidata/prompt.toml`. The defaults are the prompt as it always was:
+lean (coloured text), two lines joined by a `╭─`/`╰─` frame, duration and time
+on the right, `❯`.
+
+| Option | Choices (default first) |
+|---|---|
+| `style` | `lean` (coloured text), `rainbow` (coloured blocks) |
+| `separator` | `round`, `angled`, `slanted`, `flat` — the blocks' ends (rainbow) |
+| `lines` | `two`, `one` |
+| `frame` | `on`, `off` (two lines) |
+| `layout` | `split` (duration and time on the right), `left` |
+| `fill` | `space`, `dots`, `line`, `dashed` — the gap before the right side (two lines, split) |
+| `char` | `chevron` ❯, `arrow` ➜, `lambda` λ, `dollar` $, `triangle` ▶ |
+| `time` | `24h`, `12h`, `off` |
+| `icons` | `nerd`, `plain` (text labels, for fonts without Nerd Font glyphs) |
+| `langs` | `on`, `off` — Node, Python, Rust and Go versions |
+| `spacing` | `sparse` (a blank line before each prompt), `compact` |
+| `dir_color`, `git_color`, `char_color`, `frame_color` | a theme colour: `accent`, `accent2`, `link`, `ok`, `warn`, `err`, `rail`, `muted`, `text`, `red` … `magenta` |
+| `cursor` | `bar`, `block`, `underline` — Ghostty's cursor shape |
+| `blink` | `on`, `off` |
+
+The TUI's **Prompt** tab shows the real prompt (Starship's own output) for
+the highlighted choice before anything changes; `enter` applies. From a shell:
+
+```sh
+dotfiles prompt lines=one char=lambda   # several at once; each is checked first
+dotfiles prompt reset                    # every option back to its default
+```
+
+Choices are stored per machine as `prompt_<option>` in
+`~/.config/chezmoi/chezmoi.toml [data]` (no git diff); an unknown value reads
+as the default. Applying touches only `starship.toml` and the Ghostty config.
+Starship reads its config at every prompt, so open shells change on their next
+one. The colours follow the theme. A cursor other than `bar` turns off Ghostty
+shell integration's own prompt cursor, which would otherwise make it a bar at
+the prompt.
+
 ## cava — audio visualizer
 
 `cava` renders an audio spectrum whose gradient bars are drawn from the active

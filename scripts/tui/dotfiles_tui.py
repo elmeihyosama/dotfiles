@@ -1775,6 +1775,285 @@ class LookPane(Pane):
         self.load_fetch()  # the splash is re-rendered with the new theme's colours
         if isinstance(self.app, DotfilesApp):
             self.app.query_one(FilesPane).action_refresh()
+            self.app.query_one(PromptPane).action_refresh()  # its swatches and background
+
+
+class PromptPreview(Widget):
+    """The real prompt (`dotfiles prompt --preview`: starship with the chosen
+    options) on the active theme's background: after a command that worked,
+    then after a slow one that failed, with the cursor in the chosen shape."""
+
+    OUTPUT = "README.md  ansible  home  scripts  site  tests"
+
+    def __init__(self, **kw: Any) -> None:
+        super().__init__(**kw)
+        self.data: dict[str, Any] | None = None
+        self.bg = self.fg = ""  # the active theme's base00 / base05, once known
+        self.cursor = "bar"
+        self.message = "rendering…"
+        self.footer = Text()
+
+    @staticmethod
+    def prompt(part: Any, width: int, typed: Text) -> list[Text]:
+        """PART's left prompt lines, TYPED after the symbol, and its right
+        prompt on the last line's right edge, as zsh draws RPROMPT."""
+        left = part.get("left") if isinstance(part, dict) else None
+        right = part.get("right") if isinstance(part, dict) else None
+        lines = Text.from_ansi(left if isinstance(left, str) else "").split("\n", allow_blank=True)
+        if not lines:
+            lines = [Text("")]
+        last = lines[-1] + typed
+        if isinstance(right, str) and right.strip():
+            r = Text.from_ansi(right)
+            if (gap := width - last.cell_len - r.cell_len) >= 1:
+                last = last + Text(" " * gap) + r
+        lines[-1] = last
+        return lines
+
+    def caret(self) -> Text:
+        fg = self.fg or "white"
+        if self.cursor == "block":
+            return Text(" ", style=Style(bgcolor=fg))
+        return Text("▁" if self.cursor == "underline" else "▏", style=fg)
+
+    def render(self) -> Text:
+        w, h = self.size.width, self.size.height
+        if w <= 0 or h <= 0:
+            return Text("")
+        rows: list[Text] = []
+        if self.data:
+            rows += self.prompt(self.data.get("ok"), w - 2, Text("ls", style=self.fg))
+            rows.append(Text(self.OUTPUT, style=self.fg))
+            rows += self.prompt(self.data.get("err"), w - 2, self.caret())
+        else:
+            rows.append(Text(self.message, style="dim"))
+        body = [Text(" ") + r for r in rows]
+        foot = Text(" ") + self.footer
+        lines = body[: max(0, h - 2)] + [Text("")] * max(0, h - 2 - len(body)) + [Text(""), foot]
+        out = Text()
+        for y, row in enumerate(lines[:h]):
+            row.truncate(w, overflow="crop")
+            row.pad_right(w - row.cell_len)
+            if self.bg:
+                # under the prompt's own colours: rainbow blocks keep theirs
+                row.stylize_before(Style(bgcolor=self.bg), 0, len(row))
+            out.append(row)
+            if y < h - 1:
+                out.append("\n")
+        return out
+
+
+class PromptPane(Pane):
+    """The prompt (starship) and the cursor: every option, changed with ←/→
+    and previewed with the real prompt before enter applies them."""
+
+    BINDINGS = [
+        Binding("left,h", "cycle(-1)", "change", show=False),
+        Binding("right,l,space", "cycle(1)", "change", key_display="←→"),
+        Binding("escape", "revert", "revert"),
+        Binding("d", "defaults", "defaults"),
+        Binding("r", "refresh", "refresh"),
+    ]
+    main = "#prompt-list"
+
+    def __init__(self) -> None:
+        super().__init__("Prompt", id="prompt")
+        self.options: list[dict[str, Any]] = []
+        self.values: dict[str, str] = {}  # this machine's
+        self.pending: dict[str, str] = {}  # changed here, not applied yet
+        self.swatches: dict[str, str] = {}  # colour name -> #rrggbb
+
+    def compose(self) -> ComposeResult:
+        with Horizontal():
+            with Vertical(id="prompt-left", classes="box"):
+                yield OptionList(id="prompt-list")
+                yield Static("", id="prompt-about")
+            with Vertical(id="prompt-preview-box", classes="box side"):
+                yield PromptPreview(id="prompt-preview")
+
+    def on_mount(self) -> None:
+        self.query_one("#prompt-left").border_title = "Prompt"
+        self.query_one("#prompt-preview-box").border_title = "Preview"
+        self.action_refresh()
+
+    def on_resize(self) -> None:
+        # also when the tab first shows: the preview is drawn for its width
+        if self.options:
+            self.load_preview()
+
+    @staticmethod
+    def valid(o: Any) -> bool:
+        if not isinstance(o, dict) or not all(isinstance(o.get(k), str) for k in ("key", "label", "default")):
+            return False
+        choices = o.get("choices")
+        return isinstance(choices, list) and all(isinstance(c, str) for c in choices) and o["default"] in choices
+
+    @work(exclusive=True, group="prompt")
+    async def action_refresh(self) -> None:
+        rc, out, err = await capture("prompt", "--json")
+        try:
+            if rc:
+                raise ValueError(err.strip() or f"exit {rc}")
+            data = json.loads(out)
+            if not isinstance(data, dict):
+                raise ValueError("not an object")
+        except (ValueError, json.JSONDecodeError) as e:
+            self.notify(f"dotfiles prompt failed: {e}", severity="error")
+            preview = self.query_one(PromptPreview)
+            preview.message = f"no prompt options: {e}"
+            preview.refresh()
+            return
+        self.options = [o for o in data.get("options") or [] if self.valid(o)]
+        values = data.get("values") if isinstance(data.get("values"), dict) else {}
+        self.values = {
+            o["key"]: v if (v := values.get(o["key"])) in o["choices"] else o["default"] for o in self.options
+        }
+        palette = data.get("palette") if isinstance(data.get("palette"), dict) else {}
+        self.swatches = {k: v for k, v in palette.items() if isinstance(v, str) and HEX.fullmatch(v)}
+        self.pending = {k: v for k, v in self.pending.items() if k in self.values and v != self.values[k]}
+        self.render_list()
+        self.load_preview()
+
+    def effective(self) -> dict[str, str]:
+        return {**self.values, **self.pending}
+
+    @staticmethod
+    def not_applicable(key: str, eff: dict[str, str]) -> str:
+        """Why KEY does nothing with EFF's other choices, else ""."""
+        if key == "separator" and eff.get("style") != "rainbow":
+            return "rainbow only"
+        if key == "frame" and eff.get("lines") != "two":
+            return "two lines only"
+        if key == "fill" and (eff.get("lines") != "two" or eff.get("layout") != "split"):
+            return "two-line split only"
+        return ""
+
+    def option(self, key: str | None) -> dict[str, Any] | None:
+        return next((o for o in self.options if o["key"] == key), None)
+
+    def highlighted(self) -> dict[str, Any] | None:
+        ol = self.query_one("#prompt-list", OptionList)
+        if ol.highlighted is None or not ol.option_count:
+            return None
+        return self.option(ol.get_option_at_index(ol.highlighted).id)
+
+    def render_list(self) -> None:
+        ol = self.query_one("#prompt-list", OptionList)
+        keep = ol.highlighted
+        eff = self.effective()
+        ol.clear_options()
+        for o in self.options:
+            key, value = o["key"], eff[o["key"]]
+            na = self.not_applicable(key, eff)
+            row = Text()
+            row.append(f"{o['label']:<17}", style="dim" if na else "")
+            if key.endswith("_color") and (hexv := self.swatches.get(value)):
+                row.append("██ ", style=hexv)
+            if key in self.pending:
+                row.append(value, style=tone(self.app, "bold $accent"))
+                row.append(" •", style=tone(self.app, "$warning"))
+            else:
+                row.append(value, style="dim" if na else "bold")
+            if na:
+                row.append(f"  {na}", style="dim italic")
+            ol.add_option(Option(row, id=key))
+        if ol.option_count:
+            ol.highlighted = min(keep or 0, ol.option_count - 1)
+        self.render_about()
+
+    def render_about(self) -> None:
+        o = self.highlighted()
+        about = Text()
+        if o:
+            value = self.effective()[o["key"]]
+            for i, choice in enumerate(o["choices"]):
+                if i:
+                    about.append(" · ", style="dim")
+                about.append(choice, style=tone(self.app, "bold $accent") if choice == value else "dim")
+            about.append("\n")
+            about.append(str(o.get("about") or ""), style="dim")
+        self.query_one("#prompt-about", Static).update(about)
+
+    @on(OptionList.OptionHighlighted, "#prompt-list")
+    def moved(self) -> None:
+        self.render_about()
+
+    def changed(self) -> None:
+        self.render_list()
+        self.load_preview()
+
+    def action_cycle(self, step: int) -> None:
+        if not (o := self.highlighted()):
+            return
+        key, choices = o["key"], o["choices"]
+        new = choices[(choices.index(self.effective()[key]) + step) % len(choices)]
+        if new == self.values[key]:
+            self.pending.pop(key, None)
+        else:
+            self.pending[key] = new
+        self.changed()
+
+    def action_revert(self) -> None:
+        if self.pending:
+            self.pending.clear()
+            self.changed()
+
+    def action_defaults(self) -> None:
+        self.pending = {o["key"]: o["default"] for o in self.options if o["default"] != self.values[o["key"]]}
+        self.changed()
+
+    @on(OptionList.OptionSelected, "#prompt-list")
+    def apply(self) -> None:
+        if not self.pending:
+            self.notify("nothing to apply: ←/→ change the highlighted option")
+            return
+        pairs = [f"{k}={v}" for k, v in self.pending.items()]
+        self.app.push_screen(Run("prompt " + " ".join(pairs), [["prompt", *pairs]]), self.applied)
+
+    def applied(self, rc: int | None) -> None:
+        if rc == 0:
+            self.pending.clear()
+        self.action_refresh()
+        if isinstance(self.app, DotfilesApp):
+            self.app.query_one(FilesPane).action_refresh()
+
+    def footer(self) -> Text:
+        f = Text()
+        if self.pending:
+            n = len(self.pending)
+            f.append(f"{n} change{'s' if n > 1 else ''}", style=tone(self.app, "bold $warning"))
+            f.append("  enter applies  esc reverts", style="dim")
+        else:
+            f.append("as on this machine", style="dim")
+            f.append("  ←/→ change the highlighted option  d defaults", style="dim")
+        eff = self.effective()
+        if eff.get("blink") == "on":
+            f.append("  ·  the cursor blinks", style="dim")
+        return f
+
+    @work(exclusive=True, group="prompt-preview")
+    async def load_preview(self) -> None:
+        await asyncio.sleep(0.15)  # a burst of ←/→ renders once
+        preview = self.query_one(PromptPreview)
+        eff = self.effective()
+        width = max(20, (preview.size.width or 80) - 2)
+        pairs = [f"{k}={v}" for k, v in eff.items()]
+        rc, out, err = await capture("prompt", "--preview", "--width", str(width), *pairs)
+        try:
+            if rc:
+                raise ValueError(err.strip() or f"exit {rc}")
+            data = json.loads(out)
+            if not isinstance(data, dict):
+                raise ValueError("not an object")
+        except (ValueError, json.JSONDecodeError) as e:
+            preview.data = None
+            preview.message = f"preview failed: {e}"
+        else:
+            preview.data = data
+        preview.bg, preview.fg = self.swatches.get("bg", ""), self.swatches.get("text", "")
+        preview.cursor = eff.get("cursor", "bar")
+        preview.footer = self.footer()
+        preview.refresh()
 
 
 class DotfilesApp(App[None]):
@@ -1828,6 +2107,12 @@ class DotfilesApp(App[None]):
     #preview-box { width: 1fr; padding: 0; }
     #preview { width: 1fr; height: 1fr; }
 
+    #prompt-left { width: 54; }
+    #prompt-list { height: 1fr; }
+    #prompt-about { height: auto; padding: 1 1 0 1; }
+    #prompt-preview-box { width: 1fr; padding: 0; }
+    #prompt-preview { width: 1fr; height: 1fr; }
+
     #machine-box { height: 1fr; }
     .field { height: 2; }
     .flabel { width: 18; text-style: bold; color: $text-muted; }
@@ -1858,7 +2143,8 @@ class DotfilesApp(App[None]):
         Binding("2", "tab('tools')", "tools", show=False),
         Binding("3", "tab('files')", "files", show=False),
         Binding("4", "tab('look')", "look", show=False),
-        Binding("5", "tab('machine')", "machine", show=False),
+        Binding("5", "tab('prompt')", "prompt", show=False),
+        Binding("6", "tab('machine')", "machine", show=False),
     ]
 
     quit_armed = False
@@ -1887,6 +2173,7 @@ class DotfilesApp(App[None]):
             yield ToolsPane()
             yield FilesPane()
             yield LookPane()
+            yield PromptPane()
             yield MachinePane()
         yield Footer()
 
@@ -1920,6 +2207,7 @@ class DotfilesApp(App[None]):
         self.query_one(ToolsPane).action_refresh()
         self.query_one(FilesPane).action_refresh()
         self.query_one(LookPane).action_refresh()
+        self.query_one(PromptPane).action_refresh()
         self.query_one(MachinePane).action_refresh()
 
     def render_bar(self) -> None:
@@ -1943,7 +2231,7 @@ class DotfilesApp(App[None]):
         if self.tools_data is not None and self.files_data is not None and not (missing or local):
             right.append("✓ in sync  ", style=tone(self, "$success"))
         if wide:
-            right.append("1-5 tabs", style="dim")
+            right.append("1-6 tabs", style="dim")
         self.query_one("#bar-left", Label).update(left)
         self.query_one("#bar-right", Label).update(right)
 
@@ -1990,7 +2278,7 @@ class DotfilesApp(App[None]):
 
 def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
-        print("usage: dotfiles tui  (keys: 1-5 tabs, q quit; each tab lists its own)")
+        print("usage: dotfiles tui  (keys: 1-6 tabs, q quit; each tab lists its own)")
         return 0
     DotfilesApp().run()
     return 0

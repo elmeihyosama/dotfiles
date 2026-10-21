@@ -21,6 +21,16 @@ background-image-opacity = {{ $.wallpaper.opacity }}
 background-image-fit = {{ $.wallpaper.fit }}
 background-image-position = {{ $.wallpaper.position }}
 {{- end }}
+{{- /* Cursor from the prompt options (prompt.toml). Shell integration turns
+  the cursor into a bar at the prompt; another shape needs that off. */ -}}
+{{- $o := includeTemplate "prompt-settings" . | fromJson -}}
+{{- if ne $o.cursor "bar" }}
+cursor-style = {{ $o.cursor }}
+shell-integration-features = no-cursor
+{{- end }}
+{{- if eq $o.blink "off" }}
+cursor-style-blink = false
+{{- end }}
 
 # Colors from the active base16 palette ({{ .theme }})
 background = {{ $p.base00 }}

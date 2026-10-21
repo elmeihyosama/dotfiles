@@ -298,7 +298,7 @@ async def test_files_apply_all_skips_local_edits(calls):
 
 async def machine(pilot) -> None:
     await settle(pilot)
-    await pilot.press("5")
+    await pilot.press("6")
     await settle(pilot)
 
 
@@ -332,7 +332,7 @@ async def test_machine_shows_refusals_inline(calls, monkeypatch):
     monkeypatch.setenv("STUB_FAIL", "machine")
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
-        await pilot.press("5")
+        await pilot.press("6")
         await settle(pilot)
         # machine --json failed too (STUB_FAIL covers the subcommand): no crash, an error line
         assert "dotfiles machine failed" in text(pilot.app.query_one("#machine-summary"))
@@ -428,6 +428,99 @@ async def test_look_glass_applies(calls):
         await pilot.press("enter")
         await settle(pilot)
         assert ["glass", "frosted"] in calls()
+
+
+async def prompt_tab(pilot) -> tuple[OptionList, tui.PromptPreview]:
+    """Open the Prompt tab with its preview drawn; return the list and preview."""
+    await settle(pilot)
+    await pilot.press("5")
+    await pilot.pause(0.3)
+    await settle(pilot)
+    return pilot.app.query_one("#prompt-list", OptionList), pilot.app.query_one(tui.PromptPreview)
+
+
+def prompt_rows(ol: OptionList) -> dict[str, str]:
+    return {str(o.id): o.prompt.plain for o in ol.options}
+
+
+async def test_prompt_lists_every_option_with_this_machines_values(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        ol, preview = await prompt_tab(pilot)
+        assert pilot.app.focused is ol
+        rows = prompt_rows(ol)
+        assert list(rows) == ["style", "separator", "lines", "frame", "dir_color", "cursor", "blink"], "bad one dropped"
+        assert "one" in rows["lines"], "the machine's value"
+        assert "accent2" in rows["dir_color"], "a value that is not a choice reads as the default"
+        assert "rainbow only" in rows["separator"] and "two lines only" in rows["frame"], "what does nothing says why"
+        assert "lean · rainbow" in text(pilot.app.query_one("#prompt-about"))
+        shown = preview.render().plain
+        assert "style=lean" in shown and "lines=one" in shown, "the real prompt, for this machine's values"
+        assert "12:00" in shown, "one line: the right prompt on the right"
+        assert not [c for c in calls() if c[0] == "prompt" and c[1:2] != ["--json"] and c[1:2] != ["--preview"]]
+
+
+async def test_prompt_arrows_preview_before_enter_applies(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        ol, preview = await prompt_tab(pilot)
+        ol.highlighted = list(prompt_rows(ol)).index("lines")
+        await pilot.press("right")
+        await pilot.pause(0.3)
+        await settle(pilot)
+        rows = prompt_rows(ol)
+        assert "two •" in rows["lines"], "a change is marked"
+        assert "two lines only" not in rows["frame"], "the frame applies again"
+        assert "╭─" in preview.render().plain and "lines=two" in preview.render().plain, "previewed"
+        assert "1 change" in preview.render().plain
+        assert not [c for c in calls() if c[0] == "prompt" and "=" in "".join(c[1:2])], "previewing applies nothing"
+        await pilot.press("space")  # wraps around: back to this machine's value, nothing pending
+        await pilot.pause(0.3)
+        await settle(pilot)
+        assert "•" not in prompt_rows(ol)["lines"]
+        await pilot.press("left", "down", "right")  # lines=two, then the frame off
+        await pilot.pause(0.3)
+        await pilot.press("enter")
+        await settle(pilot)
+        assert ["prompt", "lines=two", "frame=off"] in calls(), "enter applies every change at once"
+
+
+async def test_prompt_escape_reverts_and_d_picks_the_defaults(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        ol, _ = await prompt_tab(pilot)
+        await pilot.press("right")  # style -> rainbow
+        await pilot.pause()
+        assert "rainbow •" in prompt_rows(ol)["style"]
+        await pilot.press("escape")
+        await pilot.pause()
+        assert "•" not in "".join(prompt_rows(ol).values()), "esc drops every change"
+        await pilot.press("enter")
+        await settle(pilot)
+        assert not [c for c in calls() if c[0] == "prompt" and c[1:2] not in (["--json"], ["--preview"])]
+        await pilot.press("d")
+        await pilot.pause()
+        assert "two •" in prompt_rows(ol)["lines"], "d: the defaults, as changes to apply"
+        await pilot.press("enter")
+        await settle(pilot)
+        assert ["prompt", "lines=two"] in calls()
+
+
+async def test_prompt_cursor_shape_and_colour_swatch(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        ol, preview = await prompt_tab(pilot)
+        swatches = {sp.style for sp in ol.options[list(prompt_rows(ol)).index("dir_color")].prompt.spans}
+        assert stub.PAL["base0C"] in {str(s) for s in swatches}, "the colour is shown"
+        assert "▏" in preview.render().plain, "bar cursor"
+        ol.highlighted = list(prompt_rows(ol)).index("cursor")
+        await pilot.press("right")
+        await pilot.pause(0.3)
+        await settle(pilot)
+        assert preview.cursor == "block" and "▏" not in preview.render().plain
+
+
+async def test_prompt_failed_preview_says_so(calls, monkeypatch):
+    monkeypatch.setenv("STUB_PROMPT_FAIL", "1")
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        _, preview = await prompt_tab(pilot)
+        assert "preview failed: starship exploded" in preview.render().plain
 
 
 async def test_status_check_persists_across_launches(calls):
@@ -581,17 +674,23 @@ READS = {
     ("machine", "--json"),
     ("look", "--fetch"),
     ("look", "--fetch", "--no-logo"),
+    ("prompt", "--json"),
 }
+
+
+def reads(call: list[str]) -> bool:
+    """CALL only reads (prompt previews render to a temp file)."""
+    return tuple(call) in READS or call[:2] == ["prompt", "--preview"]
 
 
 async def test_opening_tabs_runs_nothing(calls):
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
-        await pilot.press("2", "3", "4", "5", "1", "3")
+        await pilot.press("2", "3", "4", "5", "6", "1", "3")
         await pilot.pause(0.3)
         await settle(pilot)
-        ran = {tuple(c) for c in calls()}
-        assert ran - READS <= {("files", "diff", ".config/ghostty/config")}, f"only reads: {ran - READS}"
+        ran = {tuple(c) for c in calls() if not reads(c)}
+        assert ran <= {("files", "diff", ".config/ghostty/config")}, f"only reads: {ran}"
 
 
 async def test_escape_leaves_the_filter_so_tab_keys_work(calls):
@@ -623,7 +722,7 @@ async def test_tab_bar_arrows_keep_focus_on_the_tab_bar(calls):
         await pilot.press("down")
         await pilot.pause()
         assert pilot.app.focused is pilot.app.query_one("#file-list", OptionList)
-        await pilot.press("5")
+        await pilot.press("6")
         await pilot.pause()
         assert pilot.app.focused is pilot.app.query_one("#m-git_name", Input), "number keys go into the tab"
 

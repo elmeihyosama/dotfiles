@@ -8,6 +8,7 @@ STUB_SLOW: a full command line (e.g. "update") that sleeps 30s (quit/cancel test
 STUB_BIG: a subcommand that prints 200 KB with no newline first.
 STUB_THEME: the active theme slug in `look --json`.
 STUB_WALL: an image path offered as dark-one's wallpaper.
+STUB_PROMPT_FAIL: `prompt --preview` exits 1.
 STUB_WORST: worst realistic data everywhere (the WORST_* fixtures), for the
   break-the-UI pass and its screenshots.
 """
@@ -189,6 +190,57 @@ if args[:2] == ["look", "--fetch"]:
     logo = "" if args[2:] == ["--no-logo"] else f"\x1b[1m\x1b[38;2;{r};{g};{b}m  ,xNMM.  \x1b[m"
     print(f"{logo}\x1b[1m\x1b[32maleksandra\x1b[m@host")
     print(f"{logo}\x1b[38;2;{r};{g};{b}m theme\x1b[m  {os.environ.get('STUB_THEME', 'dark-one')}")
+    sys.exit(0)
+PROMPT_OPTIONS = [
+    {"key": "style", "label": "Style", "about": "lean or rainbow", "default": "lean", "choices": ["lean", "rainbow"]},
+    {"key": "separator", "label": "Block ends", "about": "ends", "default": "round", "choices": ["round", "flat"]},
+    {"key": "lines", "label": "Lines", "about": "one or two", "default": "two", "choices": ["two", "one"]},
+    {"key": "frame", "label": "Frame", "about": "the rail", "default": "on", "choices": ["on", "off"]},
+    {
+        "key": "dir_color",
+        "label": "Directory colour",
+        "about": "colour",
+        "default": "accent2",
+        "choices": ["accent", "accent2", "red"],
+    },
+    {"key": "cursor", "label": "Cursor", "about": "shape", "default": "bar", "choices": ["bar", "block", "underline"]},
+    {"key": "blink", "label": "Cursor blink", "about": "blinks", "default": "on", "choices": ["on", "off"]},
+    {"bad": "option"},
+]
+if args == ["prompt", "--json"]:
+    print(
+        json.dumps(
+            {
+                "options": PROMPT_OPTIONS,
+                "values": {"style": "lean", "separator": "round", "lines": "one", "frame": "on", "dir_color": "neon"},
+                "palette": {
+                    "bg": PAL["base00"],
+                    "text": PAL["base05"],
+                    "accent": PAL["base0B"],
+                    "accent2": PAL["base0C"],
+                    "red": PAL["base08"],
+                    "bogus": "nope",
+                },
+            }
+        )
+    )
+    sys.exit(0)
+if args[:2] == ["prompt", "--preview"]:
+    if os.environ.get("STUB_PROMPT_FAIL"):
+        print("starship exploded", file=sys.stderr)
+        sys.exit(1)
+    # two of the options as the prompt text, so tests see what was asked for
+    opts = " ".join(a for a in args[4:] if a.split("=")[0] in ("style", "lines"))
+    two = "lines=two" in args
+    left = f"\x1b[1;32m╭─ {opts}\n╰─❯\x1b[0m " if two else f"\x1b[1;32m{opts} ❯\x1b[0m "
+    print(
+        json.dumps(
+            {
+                "ok": {"left": "\n" + left, "right": "" if two else "\x1b[2m12:00\x1b[0m"},
+                "err": {"left": "\n" + left.replace("32m", "31m"), "right": "" if two else "3s 12:00"},
+            }
+        )
+    )
     sys.exit(0)
 if args == ["files", "--json"]:
     print(json.dumps(WORST_FILES if worst else FILES))
