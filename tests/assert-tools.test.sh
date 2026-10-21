@@ -111,6 +111,16 @@ assert_contains "$out" "WARN: fzf also installed at $HOME/brew/bin/fzf (shadowed
 assert_contains "$out" "WARN: fzf also installed at $HOME/other/fzf (shadowed); remove with: rm $HOME/other/fzf" \
 	"shadowed_copy_warns: other copy"
 
+# shadowed_dependency_ok: a Homebrew fzf another formula needs (navi) can't go
+# shellcheck disable=SC2016 # the stub expands these when it runs
+printf '#!/bin/sh\n[ "$1 $2 $3" = "uses --installed fzf" ] && echo navi\nexit 0\n' >"$HOME/brew/bin/brew"
+chmod +x "$HOME/brew/bin/brew"
+run "$HOME" "$HOME/tbin:$data/shims:$HOME/brew/bin:/usr/bin:/bin"
+assert_contains "$out" "OK: fzf also installed at $HOME/brew/bin/fzf (kept: Homebrew's navi needs it)" \
+	"shadowed_dependency_ok: kept, not a warning"
+assert_not_contains "$out" "WARN: fzf also installed at $HOME/brew/bin/fzf" "shadowed_dependency_ok: no warning"
+rm "$HOME/brew/bin/brew"
+
 # shadowing_copy_fails: the Homebrew fzf comes first, so mise's never runs
 run "$HOME" "$HOME/tbin:$HOME/brew/bin:$data/shims:/usr/bin:/bin"
 assert_eq 1 "$rc" "shadowing_copy_fails: exit 1"

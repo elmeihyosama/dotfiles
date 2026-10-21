@@ -1,3 +1,9 @@
+{{- /* Colima adds this line itself when missing; rendering it keeps the
+file from drifting. Only when Colima is set up. */ -}}
+{{- $colima := joinPath .chezmoi.homeDir ".config/colima/ssh_config" -}}
+{{- if stat $colima }}Include {{ $colima }}
+
+{{ end -}}
 # Generic client defaults only; private hosts go in ~/.ssh/config.local. The
 # Include comes first so local blocks win (ssh takes the FIRST value it sees).
 Include config.local

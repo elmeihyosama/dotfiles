@@ -9,10 +9,18 @@
 #   bundled    as its provider (age-keygen in age).
 #   bootstrap  (mise itself) must resolve and run.
 #   native     required on macOS (brew), best effort (SKIP) on Linux.
-# Output lines: OK: / WARN: / SKIP: / FAIL:.
+# Output lines: OK: / WARN: / SKIP: / FAIL:. A shadowed Homebrew copy that
+# another installed formula depends on is OK (it can't be removed).
 #
 # mise runs as `mise -C /` with the global config masked (as the playbook
 # does), so neither the repo's mise.toml nor `mise use -g` answers.
+
+# brew_users FORMULA: installed formulae that depend on FORMULA (space-separated)
+brew_users() {
+	_b="$(command -v brew 2>/dev/null || echo "${HOMEBREW_PREFIX:-/opt/homebrew}/bin/brew")"
+	[ -x "$_b" ] || return 0
+	"$_b" uses --installed "$1" 2>/dev/null | paste -sd' ' -
+}
 set -eu
 
 repo="$(CDPATH='' cd "$(dirname "$0")/../.." && pwd)"
@@ -143,6 +151,15 @@ while IFS='|' read -r tool bin source want managed; do
 			[ "$c" = "$HOME/.local/bin$sfx/uv" ] && continue
 			hint="$(remove_hint "$tool" "$c")"
 			[ -n "$hint" ] || continue
+			# a formula another installed formula needs can't be removed: not a warning
+			case "$hint" in "brew uninstall "*)
+				users="$(brew_users "${hint#brew uninstall }")"
+				if [ -n "$users" ]; then
+					echo "OK: $bin also installed at $c (kept: Homebrew's $users needs it)"
+					continue
+				fi
+				;;
+			esac
 			echo "WARN: $bin also installed at $c (shadowed); remove with: $hint"
 		done <<C
 $(copies "$bin")
