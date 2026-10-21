@@ -8,6 +8,8 @@
 #   update [--check]    pull, playbook, chezmoi, sheldon, nvim, then doctor
 #   doctor [args]       scripts/doctor.sh
 #   look --json         active theme, glass, wallpaper, levels, every palette
+#   look --fetch [--no-logo]
+#                       the fastfetch start screen, coloured (for the preview)
 #   theme SLUG | glass LEVEL | wallpaper on|off|toggle
 #                       the zsh `theme`/`glass`/`wallpaper`, headless (TUI)
 #   files --json        managed files changed here or waiting to apply
@@ -48,6 +50,7 @@
 #   levels  [string], glass levels, lightest first, "default" last
 #   themes  [{slug, colors: {base00..base0F: "#rrggbb"}}], sorted by slug
 #   wallpaper  "on"|"off"|null
+#   wallpapers {slug: image path}, wallpaper_opacity number|null
 #
 # `files --json`: an array of {path (relative to ~), local (changed here since
 # chezmoi last wrote it), pending (the repo would change it), template}.
@@ -683,8 +686,24 @@ native_hint() {
 
 # cmd_look --json
 cmd_look() {
+	if [ "${1:-}" = --fetch ]; then
+		# the shell's splash (50-aliases.zsh), forced to colour; nothing if absent
+		command -v fastfetch >/dev/null 2>&1 || return 0
+		cfg="$HOME/.config/fastfetch/config.jsonc"
+		[ -f "$cfg" ] || return 0
+		logo=""
+		[ "${2:-}" = --no-logo ] && logo="--logo none"
+		# under zsh (the trailing : keeps it from exec'ing), so the shell
+		# module reports zsh, as at a real prompt
+		if command -v zsh >/dev/null 2>&1; then
+			# shellcheck disable=SC2016 # expanded by zsh
+			exec zsh -fc 'fastfetch --config "$1" --pipe false ${=2}; :' zsh "$cfg" "$logo"
+		fi
+		# shellcheck disable=SC2086 # logo: an option pair, split on purpose
+		exec fastfetch --config "$cfg" --pipe false $logo
+	fi
 	[ "${1:-}" = --json ] && [ $# -eq 1 ] || {
-		echo "usage: dotfiles look --json" >&2
+		echo "usage: dotfiles look --json | --fetch [--no-logo]" >&2
 		exit 2
 	}
 	for t in chezmoi jq; do
@@ -697,11 +716,13 @@ cmd_look() {
 		echo "dotfiles look: chezmoi data failed" >&2
 		exit 1
 	}
-	printf '%s\n' "$data" | jq '
+	printf '%s\n' "$data" | jq --arg wdir "$repo_root/home/dot_config/wallpapers" '
 		def nz: if . == null or . == "" then null else . end;
 		["clear", "frosted", "tinted", "solid"] as $known
 		| (.glass_levels // {} | keys) as $have
 		| {theme: (.theme | nz), glass: (.glass | nz), wallpaper: (.wallpaper_mode | nz),
+			wallpapers: (.wallpaper.map // {} | map_values($wdir + "/" + .)),
+			wallpaper_opacity: (.wallpaper.opacity // null),
 			levels: ([$known[] | select(IN($have[]))]
 				+ [$have[] | select(. != "default" and (IN($known[]) | not))]
 				+ [$have[] | select(. == "default")]),

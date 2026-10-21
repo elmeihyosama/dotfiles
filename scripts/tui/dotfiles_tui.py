@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --quiet --locked --script
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["textual==8.2.8"]
+# dependencies = ["textual==8.2.8", "pillow==12.3.0"]
 # ///
 """dotfiles TUI: tools, health, update and look, on top of scripts/dotfiles.sh.
 
@@ -19,18 +19,22 @@ import re
 import shlex
 import signal
 import sys
+import time
 from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
+from rich.color import Color, ColorType
+from rich.style import Style
 from rich.text import Text
 from textual import events, on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.theme import Theme
+from textual.widget import Widget
 from textual.widgets import (
     Button,
     DataTable,
@@ -174,39 +178,6 @@ def base16_theme(colors: dict[str, str]) -> Theme:
 def clip(text: str, width: int) -> str:
     """TEXT cut to WIDTH cells with an ellipsis."""
     return text if len(text) <= width else text[: width - 1] + "…"
-
-
-def swatch(slug: str, colors: dict[str, str], active: bool) -> Text:
-    """A card painted in the palette itself: name, the 16 colours (base00 as a
-    pattern, being the card's own background) and a code sample."""
-    width = 34
-    bg, fg, dim = colors["base00"], colors["base05"], colors["base03"]
-    t = Text()
-
-    def line(parts: list[tuple[str, str]]) -> None:
-        used = 0
-        for text, style in parts:
-            t.append(text, style=f"{style} on {bg}")
-            used += len(text)
-        t.append(" " * max(0, width - used) + "\n", style=f"on {bg}")
-
-    line([])
-    line([(" " + clip(slug, width - 2), f"bold {fg}")])
-    line([(" ● active" if active else " enter applies it", dim)])
-    line([])
-    for row in (BASES[:8], BASES[8:]):
-        cells: list[tuple[str, str]] = [(" ", fg)]
-        for k in row:
-            cells += [("░░░" if k == "base00" else "███", dim if k == "base00" else colors[k]), (" ", fg)]
-        line(cells)
-        line([(" ", fg)] + [(f"{k[4:]:<4}", dim) for k in row])
-    line([])
-    line([(" # switch the look", dim)])
-    line([(" def ", colors["base0E"]), ("apply", colors["base0D"]), ("(theme):", fg)])
-    line([("     run(", fg), ('"chezmoi"', colors["base0B"]), (", ", fg), ("3", colors["base09"]), (")", fg)])
-    line([("     ", fg), ("raise ", colors["base08"]), ("Done", colors["base0C"])])
-    line([])
-    return t
 
 
 def empty(title: str, hint: str) -> Text:
@@ -576,6 +547,7 @@ class StatusPane(Pane):
         self.check: dict[str, list[str]] | None = None
         self.check_rc = 0
         self.checking = False
+        self.checked_at = 0.0
         self.doctor_error = ""
         self.details: dict[str, Text] = {}
 
@@ -583,14 +555,60 @@ class StatusPane(Pane):
         with Horizontal(id="cards"):
             for card in ("health", "updates", "files", "tools"):
                 yield Static("", id=f"card-{card}", classes="card")
-        yield Label("Needs attention", classes="title")
+        yield Label("Needs attention", classes="title", id="attention-title")
         yield OptionList(id="attention")
         yield Static("", id="status-detail")
 
     def on_mount(self) -> None:
         for card, title in (("health", "Health"), ("updates", "Updates"), ("files", "Files"), ("tools", "Tools")):
             self.query_one(f"#card-{card}").border_title = title
+        self.load_state()
         self.render_status()
+
+    # The last check survives restarts: doctor and the fetch are slow, and
+    # the result is still useful when it's a few hours old.
+    @staticmethod
+    def state_file() -> Path:
+        base = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
+        return Path(base) / "dotfiles" / "tui-status.json"
+
+    def save_state(self) -> None:
+        state = {
+            "time": self.checked_at,
+            "doctor": self.doctor,
+            "doctor_rc": self.doctor_rc,
+            "doctor_error": self.doctor_error,
+            "check": self.check,
+            "check_rc": self.check_rc,
+        }
+        with suppress(OSError):
+            f = self.state_file()
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(json.dumps(state))
+
+    def load_state(self) -> None:
+        try:
+            state = json.loads(self.state_file().read_text())
+            doctor = [(str(k), str(t), [str(d) for d in ds]) for k, t, ds in state["doctor"]]
+            check = {str(k): [str(x) for x in v] for k, v in (state.get("check") or {}).items()}
+            self.doctor, self.check = doctor, check
+            self.doctor_rc, self.check_rc = int(state.get("doctor_rc", 0)), int(state.get("check_rc", 0))
+            self.doctor_error = str(state.get("doctor_error") or "")
+            self.checked_at = float(state["time"])
+        except (OSError, ValueError, KeyError, TypeError):
+            return
+
+    def age(self) -> str:
+        if not self.checked_at:
+            return ""
+        mins = int((time.time() - self.checked_at) // 60)
+        if mins < 1:
+            return "just now"
+        if mins < 60:
+            return f"{mins} min ago"
+        if mins < 48 * 60:
+            return f"{mins // 60} h ago"
+        return f"{mins // (24 * 60)} days ago"
 
     @work(exclusive=True, group="status")
     async def action_check(self) -> None:
@@ -604,6 +622,8 @@ class StatusPane(Pane):
         self.check_rc, out, _ = await capture("update", "--check")
         self.check = parse_check(out)
         self.checking = False
+        self.checked_at = time.time()
+        self.save_state()
         self.render_status()
 
     def action_update(self) -> None:
@@ -692,6 +712,12 @@ class StatusPane(Pane):
         self.render_attention(missing, drift, local, pending)
 
     def render_attention(self, missing, drift, local, pending) -> None:
+        title = Text("Needs attention", style=tone(self.app, "bold $accent"))
+        if self.checking:
+            title.append("   ● checking…", style=tone(self.app, "$accent"))
+        elif self.checked_at:
+            title.append(f"   health and updates checked {self.age()} · r checks again", style="dim")
+        self.query_one("#attention-title", Label).update(title)
         items: list[tuple[str, Text, Text]] = []
 
         def add(key: str, mark: str, style: str, text: str, hint: str, detail: Text | None = None) -> None:
@@ -1169,48 +1195,213 @@ class MachinePane(Pane):
             self.app.reload_all()
 
 
+# ANSI colours 0-15 -> base16 slots (the standard base16 terminal mapping)
+ANSI_BASE = [
+    "base00", "base08", "base0B", "base0A", "base0D", "base0E", "base0C", "base05",
+    "base03", "base08", "base0B", "base0A", "base0D", "base0E", "base0C", "base07",
+]  # fmt: skip
+
+
+def hex_rgb(h: str) -> tuple[int, int, int]:
+    h = h.lstrip("#")
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
+def recolor(text: Text, src: dict[str, str], dst: dict[str, str]) -> Text:
+    """TEXT (fastfetch, coloured for palette SRC) repainted in palette DST:
+    exact SRC colours and ANSI 0-15 map to the same base16 slot in DST."""
+    rev = {v.lower(): k for k, v in src.items()}
+
+    def swap(color: Color | None) -> Color | None:
+        if color is None or color.is_default:
+            return None
+        if color.type in (ColorType.STANDARD, ColorType.EIGHT_BIT) and color.number is not None and color.number < 16:
+            return Color.parse(dst[ANSI_BASE[color.number]])
+        if color.triplet is not None and (key := rev.get(color.triplet.hex.lower())):
+            return Color.parse(dst[key])
+        return color
+
+    out = Text(text.plain, style=Style(color=dst["base05"]))
+    for span in text.spans:
+        st = span.style if isinstance(span.style, Style) else Style.parse(str(span.style))
+        out.stylize(Style(color=swap(st.color), bgcolor=swap(st.bgcolor), bold=st.bold, italic=st.italic),
+                    span.start, span.end)  # fmt: skip
+    return out
+
+
+class Preview(Widget):
+    """The terminal start screen (fastfetch + a prompt) painted in a palette,
+    over the theme's wallpaper blended as Ghostty does (opacity over base00)."""
+
+    def __init__(self, **kw: Any) -> None:
+        super().__init__(**kw)
+        self.palette: dict[str, str] | None = None
+        self.src: dict[str, str] | None = None
+        self.slug = self.active_slug = ""
+        self.fetch: list[Text] = []
+        self.fetch_small: list[Text] = []
+        self.image: Any = None  # PIL image of the wallpaper, or None
+        self.wall_opacity = 0.15
+        self.footer = Text()
+        self._grid: tuple[Any, int, int, str, list[list[str]]] | None = None
+
+    def paint(self, slug: str, palette: dict[str, str], src: dict[str, str] | None, footer: Text) -> None:
+        self.slug, self.palette, self.src, self.footer = slug, palette, src, footer
+        self.refresh()
+
+    def bg_grid(self, w: int, h: int) -> list[list[str]] | None:
+        """Per-cell background: the wallpaper blended over base00 (cached)."""
+        if self.image is None or not self.palette or w <= 0 or h <= 0:
+            return None
+        base = self.palette["base00"]
+        if self._grid and self._grid[:4] == (self.image, w, h, base):
+            return self._grid[4]
+        from PIL import ImageOps
+
+        # two pixels per cell (top and bottom half: cells are ~twice as tall as wide)
+        img = ImageOps.fit(self.image, (w, h * 2))
+        br, bg_, bb = hex_rgb(base)
+        o = self.wall_opacity
+        px = img.load()
+        rows = [
+            [
+                "#{:02x}{:02x}{:02x}".format(
+                    *(round(c * (1 - o) + p * o) for c, p in zip((br, bg_, bb), px[x, y][:3], strict=True))
+                )
+                for x in range(w)
+            ]
+            for y in range(h * 2)
+        ]
+        self._grid = (self.image, w, h, base, rows)
+        return rows
+
+    def build_lines(self, w: int) -> list[Text]:
+        p = self.palette or {}
+        out: list[Text] = [Text("")]
+        fetch = self.fetch if self.fetch and max(t.cell_len for t in self.fetch) + 2 <= w else self.fetch_small
+        if fetch and self.src:
+            for t in fetch:
+                line = recolor(t, self.src, p)
+                if self.active_slug and self.active_slug in line.plain and self.slug != self.active_slug:
+                    i = line.plain.index(self.active_slug)
+                    line = (
+                        line[:i] + Text(self.slug, style=Style(color=p["base05"])) + line[i + len(self.active_slug) :]
+                    )
+                out.append(Text("  ") + line)
+        else:
+            # no fastfetch: the palette itself
+            for row in (BASES[:8], BASES[8:]):
+                t = Text("  ")
+                for k in row:
+                    t.append("███", style=p[k])
+                    t.append(" ")
+                out.append(t)
+        out.append(Text(""))
+        prompt = Text("  ")
+        prompt.append("~/workspace/dotfiles", style=Style(color=p["base0D"], bold=True))
+        prompt.append(" on ", style=p["base04"])
+        prompt.append(" main", style=Style(color=p["base0E"], bold=True))
+        prompt.append(" !1", style=p["base0A"])
+        out.append(prompt)
+        cmd = Text("  ")
+        cmd.append("❯ ", style=Style(color=p["base0B"], bold=True))
+        cmd.append("git commit -m ", style=p["base05"])
+        cmd.append('"look: preview"', style=p["base0B"])
+        cmd.append(" ▏", style=p["base05"])
+        out.append(cmd)
+        return out
+
+    @staticmethod
+    def over_wallpaper(row: Text, top: list[str], bottom: list[str]) -> Text:
+        """ROW over two wallpaper pixel rows: blank cells become ▀ (top pixel as
+        the glyph, bottom as the background); text keeps its colour over the
+        bottom pixel."""
+        styles = [row.style if isinstance(row.style, Style) else Style()] * len(row.plain)
+        for span in row.spans:
+            st = span.style if isinstance(span.style, Style) else Style.parse(str(span.style))
+            for i in range(span.start, min(span.end, len(styles))):
+                styles[i] = styles[i] + st
+        out = Text()
+        for x, ch in enumerate(row.plain[: len(top)]):
+            if ch == " ":
+                out.append("▀", Style(color=top[x], bgcolor=bottom[x]))
+            else:
+                out.append(ch, styles[x] + Style(bgcolor=bottom[x]))
+        return out
+
+    def render(self) -> Text:
+        w, h = self.size.width, self.size.height
+        if not self.palette or w <= 0 or h <= 0:
+            return Text("")
+        p = self.palette
+        content = self.build_lines(w)
+        foot = Text("  ") + self.footer
+        rows = content[: max(0, h - 2)] + [Text("")] * max(0, h - 2 - len(content)) + [Text(""), foot]
+        grid = self.bg_grid(w, h)
+        out = Text()
+        for y, row in enumerate(rows[:h]):
+            row = row[:w]
+            row.pad_right(w - row.cell_len)
+            if grid is None:
+                row.stylize(Style(bgcolor=p["base00"]), 0, len(row))
+                out.append(row)
+            else:
+                out.append(self.over_wallpaper(row, grid[2 * y], grid[2 * y + 1]))
+            if y < h - 1:
+                out.append("\n")
+        return out
+
+
 class LookPane(Pane):
-    """Theme and glass, with a live palette preview."""
+    """Themes, glass and wallpaper, with the start screen previewed in each."""
 
     BINDINGS = [
         Binding("slash", "filter", "filter"),
+        Binding("w", "wallpaper", "wallpaper preview"),
+        Binding("W", "apply_wallpaper", "apply wallpaper"),
         Binding("g", "glass", "glass"),
-        Binding("w", "wallpaper", "wallpaper"),
         Binding("t", "themes", "themes", show=False),
         Binding("r", "refresh", "refresh"),
         Binding("escape", "clear_filter", "clear", show=False),
     ]
     main = "#theme-list"
-
-    def action_glass(self) -> None:
-        glass = self.query_one("#glass-list", OptionList)
-        glass.focus()
-        glass.scroll_visible()
-
-    def action_themes(self) -> None:
-        self.focus_main()
-
     filter_id = "#theme-filter"
 
     def __init__(self) -> None:
         super().__init__("Look", id="look")
         self.look: dict[str, Any] = {}
+        self.wall_preview: bool | None = None  # None: follow the machine's setting
+        self.images: dict[str, Any] = {}
 
     def compose(self) -> ComposeResult:
         with Horizontal():
             with Vertical(id="look-left"):
                 yield Input(placeholder="filter themes", id="theme-filter", classes="filter")
                 yield OptionList(id="theme-list")
-            with VerticalScroll(id="look-right"):
-                yield Static("", id="swatch")
-                yield Label("Glass (Ghostty) · g", classes="title")
+                yield Label("Glass · g", classes="title")
                 yield OptionList(id="glass-list")
-                yield Label("Wallpaper · w", classes="title")
-                yield Static("", id="wallpaper")
+            yield Preview(id="preview")
 
     def on_mount(self) -> None:
         self.query_one("#theme-filter").display = False
         self.action_refresh()
+        self.load_fetch()
+
+    def action_glass(self) -> None:
+        self.query_one("#glass-list", OptionList).focus()
+
+    def action_themes(self) -> None:
+        self.focus_main()
+
+    @work(group="fetch")
+    async def load_fetch(self) -> None:
+        """The real start screen, once per launch (fastfetch only reads)."""
+        preview = self.query_one(Preview)
+        for args, attr in ((["look", "--fetch"], "fetch"), (["look", "--fetch", "--no-logo"], "fetch_small")):
+            rc, out, _ = await capture(*args)
+            lines = [Text.from_ansi(s) for s in out.rstrip("\n").split("\n")] if rc == 0 and out.strip() else []
+            setattr(preview, attr, lines)
+        self.render_preview()
 
     @work(exclusive=True, group="look")
     async def action_refresh(self) -> None:
@@ -1222,9 +1413,14 @@ class LookPane(Pane):
             if not isinstance(look, dict):
                 raise ValueError("not an object")
         except (ValueError, json.JSONDecodeError) as e:
-            self.query_one("#swatch", Static).update(empty("Couldn't load themes", f"dotfiles look failed: {e}"))
+            self.notify(f"dotfiles look failed: {e}", severity="error")
             return
         self.look = look
+        preview = self.query_one(Preview)
+        preview.active_slug = field(look, "theme")
+        preview.src = self.palette(preview.active_slug)
+        if isinstance(look.get("wallpaper_opacity"), int | float):
+            preview.wall_opacity = float(look["wallpaper_opacity"])
         self.render_themes()
         glass = self.query_one("#glass-list", OptionList)
         glass.clear_options()
@@ -1234,14 +1430,9 @@ class LookPane(Pane):
             for lv in look.get("levels") or []
             if isinstance(lv, str)
         )
-        wall = field(look, "wallpaper") or "off"
-        w = Text()
-        w.append("● on" if wall == "on" else "○ off", style=tone(self.app, "$success") if wall == "on" else "dim")
-        w.append("   w toggles the themed terminal background", style="dim")
-        self.query_one("#wallpaper", Static).update(w)
         if isinstance(self.app, DotfilesApp):
             self.app.look_status = (field(look, "theme"), field(look, "glass") or "default")
-            self.app.apply_palette(self.palette(look.get("theme")))
+            self.app.apply_palette(preview.src)
             self.app.render_bar()
 
     def palette(self, slug: str | None) -> dict[str, str] | None:
@@ -1271,20 +1462,88 @@ class LookPane(Pane):
         elif slugs:
             themes.highlighted = 0
         else:
-            self.query_one("#swatch", Static).update(empty(f"No themes match “{needle}”", "esc clears the filter"))
+            self.notify(f"no themes match “{needle}”")
 
     @on(Input.Changed, "#theme-filter")
     def filtered(self) -> None:
         self.render_themes()
 
+    def highlighted_slug(self) -> str:
+        themes = self.query_one("#theme-list", OptionList)
+        if themes.highlighted is None or not themes.option_count:
+            return field(self.look, "theme")
+        return str(themes.get_option_at_index(themes.highlighted).id)
+
+    def wall_on(self) -> bool:
+        if self.wall_preview is not None:
+            return self.wall_preview
+        return (field(self.look, "wallpaper") or "on") != "off"  # absent = on, as the template
+
     @on(OptionList.OptionHighlighted, "#theme-list")
-    def preview(self, event: OptionList.OptionHighlighted) -> None:
-        slug = event.option.id
-        colors = self.palette(slug)
-        if slug and colors:
-            self.query_one("#swatch", Static).update(swatch(slug, colors, slug == self.look.get("theme")))
-        elif slug:
-            self.query_one("#swatch", Static).update(empty(slug, "no preview: its palette is incomplete"))
+    def preview_theme(self) -> None:
+        self.render_preview()
+        self.load_image(self.highlighted_slug())
+
+    @work(exclusive=True, group="image", thread=True)
+    def load_image(self, slug: str) -> None:
+        path = (self.look.get("wallpapers") or {}).get(slug)
+        img = None
+        if isinstance(path, str) and self.wall_on():
+            img = self.images.get(path)
+            if img is None:
+                try:
+                    from PIL import Image
+
+                    with Image.open(path) as im:
+                        im.thumbnail((640, 640))
+                        img = im.convert("RGB")
+                    self.images[path] = img
+                except OSError:
+                    img = None
+        self.app.call_from_thread(self.set_image, slug, img)
+
+    def set_image(self, slug: str, img: Any) -> None:
+        if slug == self.highlighted_slug():
+            self.query_one(Preview).image = img
+            self.render_preview()
+
+    def render_preview(self) -> None:
+        slug = self.highlighted_slug()
+        palette = self.palette(slug)
+        preview = self.query_one(Preview)
+        if not palette:
+            preview.palette = None
+            preview.refresh()
+            return
+        has_wall = slug in (self.look.get("wallpapers") or {})
+        on = self.wall_on()
+        if not (has_wall and on):
+            preview.image = None
+        dim, fg = palette["base03"], palette["base05"]
+        f = Text()
+        f.append(slug, style=Style(color=fg, bold=True))
+        active = slug == field(self.look, "theme")
+        f.append("  ● active" if active else "  enter applies", style=dim)
+        f.append("  ·  wallpaper ", style=dim)
+        if not has_wall:
+            f.append("none for this theme", style=dim)
+        else:
+            f.append("on" if on else "off", style=Style(color=palette["base0B"] if on else dim, bold=True))
+            machine = (field(self.look, "wallpaper") or "on") != "off"
+            f.append("  w previews" + ("  W applies" if on != machine else ""), style=dim)
+        preview.paint(slug, palette, preview.src, f)
+
+    def action_wallpaper(self) -> None:
+        self.wall_preview = not self.wall_on()
+        self.render_preview()
+        self.load_image(self.highlighted_slug())
+
+    def action_apply_wallpaper(self) -> None:
+        mode = "on" if self.wall_on() else "off"
+        if mode == (field(self.look, "wallpaper") or "on"):
+            self.notify(f"wallpaper is already {mode}")
+            return
+        self.app.push_screen(Run(f"wallpaper {mode}", [["wallpaper", mode]]), self.applied)
 
     @on(OptionList.OptionSelected, "#theme-list")
     def pick_theme(self, event: OptionList.OptionSelected) -> None:
@@ -1296,11 +1555,10 @@ class LookPane(Pane):
         if level := event.option.id:
             self.app.push_screen(Run(f"glass {level}", [["glass", level]]), self.applied)
 
-    def action_wallpaper(self) -> None:
-        self.app.push_screen(Run("wallpaper toggle", [["wallpaper", "toggle"]]), self.applied)
-
     def applied(self, _rc: int | None) -> None:
+        self.wall_preview = None
         self.action_refresh()
+        self.load_fetch()  # the splash is re-rendered with the new theme's colours
         if isinstance(self.app, DotfilesApp):
             self.app.query_one(FilesPane).action_refresh()
 
@@ -1330,10 +1588,9 @@ class DotfilesApp(App[None]):
     #look-left { width: 38; border-right: tall $surface; }
     #theme-list { height: 1fr; border: none; padding: 0; background: $background; scrollbar-size-vertical: 1; }
     #theme-list > .option-list--option { padding: 0 0 0 1; }
-    #look-right { padding: 1 2; scrollbar-size-vertical: 1; }
-    #swatch { height: auto; width: auto; }
-    #glass-list { height: auto; max-height: 7; border: none; background: $background; width: 24; }
-    #wallpaper { height: 1; padding: 0 0 0 2; }
+    #preview { width: 1fr; height: 1fr; }
+    #glass-list { height: auto; max-height: 6; border: none; background: $background; }
+    #look-left .title { padding: 0 1; }
     #cards { height: 5; padding: 1 1 0 1; }
     .card { width: 1fr; height: 4; border: round $surface; border-title-color: $text-muted; padding: 0 1;
             margin: 0 1 0 0; }

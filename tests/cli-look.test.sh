@@ -32,7 +32,7 @@ stub zsh 'printf "%s\n" "$@" >"$STUB_CALL"; printf "stdin=[%s]\n" "$(cat)" >>"$S
 stub uv 'printf "%s\n" "$@" >"$STUB_CALL"'
 
 cat >"$STUB_DATA" <<'J'
-{"theme": "zeta", "glass": "", "wallpaper_mode": "on",
+{"theme": "zeta", "glass": "", "wallpaper_mode": "on", "wallpaper": {"opacity": 0.15, "map": {"zeta": "z.png"}},
 	"glass_levels": {"default": {}, "clear": {}, "solid": {}, "frosted": {}, "tinted": {}, "extra": {}},
 	"themes": {
 		"zeta": {"base00": "#000000", "base0F": "#ffffff", "name": "not a colour"},
@@ -48,7 +48,9 @@ run() { # run ARGS...: sets out, rc (stdin closed)
 # look_json: the contract the TUI parses
 run look --json
 assert_eq 0 "$rc" "look: exit 0 ($out)"
-assert_eq '["glass","levels","theme","themes","wallpaper"]' "$(jq -c 'keys' <<<"$out")" "look: keys"
+assert_eq '["glass","levels","theme","themes","wallpaper","wallpaper_opacity","wallpapers"]' "$(jq -c 'keys' <<<"$out")" "look: keys"
+assert_eq "$TESTS_REPO/home/dot_config/wallpapers/z.png" "$(jq -r .wallpapers.zeta <<<"$out")" "look: wallpaper image paths"
+assert_eq 0.15 "$(jq -r .wallpaper_opacity <<<"$out")" "look: wallpaper opacity"
 assert_eq on "$(jq -r .wallpaper <<<"$out")" "look: wallpaper mode"
 assert_eq zeta "$(jq -r .theme <<<"$out")" "look: active theme"
 assert_eq null "$(jq -r .glass <<<"$out")" "look: empty glass is null"
@@ -61,6 +63,9 @@ assert_eq 1 "$rc" "look: chezmoi failure exits 1"
 assert_contains "$out" "chezmoi data failed" "look: says why"
 run look
 assert_eq 2 "$rc" "look: --json is required"
+run look --fetch
+assert_eq 0 "$rc" "look --fetch: no fastfetch, no output, exit 0"
+assert_eq "" "$out" "look --fetch: silent without fastfetch"
 
 # theme_glass_dispatch: the repo's 45-theme.zsh in zsh -f, stdin closed
 run theme rose-pine

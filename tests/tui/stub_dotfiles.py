@@ -7,6 +7,7 @@ STUB_PROC: file that gets one JSON {argv, pid, leader, prompt} per call.
 STUB_SLOW: a full command line (e.g. "update") that sleeps 30s (quit/cancel tests).
 STUB_BIG: a subcommand that prints 200 KB with no newline first.
 STUB_THEME: the active theme slug in `look --json`.
+STUB_WALL: an image path offered as dark-one's wallpaper.
 STUB_WORST: worst realistic data everywhere (the WORST_* fixtures), for the
   break-the-UI pass and its screenshots.
 """
@@ -15,6 +16,8 @@ import json
 import os
 import sys
 import time
+
+from palettes import LIGHT, PAL  # shared with the tests
 
 args = sys.argv[1:]
 with open(os.environ["STUB_LOG"], "a") as f:
@@ -57,55 +60,6 @@ TOOLS = [
     tool("lazygit", "git", "mise", False, False, "0.60.0"),
     tool("zellij", "terminal", "native", True, False),
 ]
-# real palettes from the repo: catppuccin-mocha and iglass-light
-PAL = dict(
-    zip(
-        [f"base0{c}" for c in "0123456789ABCDEF"],
-        [
-            "#1e1e2e",
-            "#181825",
-            "#313244",
-            "#45475a",
-            "#585b70",
-            "#cdd6f4",
-            "#f5e0dc",
-            "#b4befe",
-            "#f38ba8",
-            "#fab387",
-            "#f9e2af",
-            "#a6e3a1",
-            "#94e2d5",
-            "#89b4fa",
-            "#cba6f7",
-            "#f2cdcd",
-        ],
-        strict=True,
-    )
-)
-LIGHT = dict(
-    zip(
-        PAL,
-        [
-            "#f5f5f7",
-            "#e5e5ea",
-            "#bad7f9",
-            "#605f64",
-            "#3a3a3c",
-            "#1d1d1f",
-            "#1d1d1f",
-            "#000000",
-            "#92000b",
-            "#c30006",
-            "#763200",
-            "#00521b",
-            "#004a6e",
-            "#0035bb",
-            "#6a238a",
-            "#902fbd",
-        ],
-        strict=True,
-    )
-)
 THEMES = [
     {"slug": "dark-one", "colors": PAL},
     {"slug": "light-two", "colors": LIGHT},
@@ -228,6 +182,13 @@ DIFF = [
 
 if sub and sub == os.environ.get("STUB_BIG"):
     print("x" * 200_000, end="\r")
+if args[:2] == ["look", "--fetch"]:
+    # a fastfetch-like splash, coloured for the active theme (dark-one: PAL)
+    r, g, b = (int(PAL["base08"][i : i + 2], 16) for i in (1, 3, 5))
+    logo = "" if args[2:] == ["--no-logo"] else f"\x1b[1m\x1b[38;2;{r};{g};{b}m  ,xNMM.  \x1b[m"
+    print(f"{logo}\x1b[1m\x1b[32maleksandra\x1b[m@host")
+    print(f"{logo}\x1b[38;2;{r};{g};{b}m theme\x1b[m  {os.environ.get('STUB_THEME', 'dark-one')}")
+    sys.exit(0)
 if args == ["files", "--json"]:
     print(json.dumps(WORST_FILES if worst else FILES))
 elif args[:2] == ["files", "diff"]:
@@ -244,6 +205,8 @@ elif args == ["look", "--json"]:
         "glass": "frosted" if worst else None,
         "levels": levels,
         "themes": WORST_THEMES if worst else THEMES,
+        "wallpapers": {"dark-one": os.environ["STUB_WALL"]} if os.environ.get("STUB_WALL") else {},
+        "wallpaper_opacity": 0.15,
     }
     print(json.dumps(look))
 elif sub == "doctor":

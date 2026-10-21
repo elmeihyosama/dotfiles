@@ -2,6 +2,7 @@
 # requires-python = ">=3.13"
 # dependencies = [
 #   "textual==8.2.8",
+#   "pillow==12.3.0",
 #   "pytest==9.1.1",
 #   "pytest-asyncio==1.4.0",
 #   "ruff==0.16.10",
@@ -29,6 +30,7 @@ REPO = HERE.parents[1]
 sys.path.insert(0, str(REPO / "scripts" / "tui"))
 
 import dotfiles_tui as tui  # noqa: E402
+import palettes as stub  # noqa: E402
 from textual.widgets import DataTable, Input, Label, OptionList, RichLog  # noqa: E402
 
 SIZE = (120, 40)
@@ -41,6 +43,8 @@ def calls(tmp_path, monkeypatch):
     log.touch()
     monkeypatch.setenv("STUB_LOG", str(log))
     monkeypatch.setenv("DOTFILES_CMD", f"{sys.executable} {HERE / 'stub_dotfiles.py'}")
+    # the saved Status check: never the real one
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     for var in ("STUB_FAIL", "STUB_LIST", "STUB_THEME", "STUB_PROC", "STUB_SLOW", "STUB_BIG"):
         monkeypatch.delenv(var, raising=False)
     return lambda: [json.loads(x) for x in log.read_text().splitlines()]
@@ -313,23 +317,60 @@ async def test_machine_toggles_sudo_and_keeps_readonly_rows(calls):
         assert len(calls()) == before
 
 
-async def test_look_previews_and_applies_theme_glass_and_wallpaper(calls):
+async def test_look_previews_the_start_screen_in_each_theme(calls):
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
         await pilot.press("4")
         await settle(pilot)
         themes = pilot.app.query_one("#theme-list", OptionList)
         assert [o.id for o in themes.options] == ["dark-one", "light-two", "bad-hex"]  # "junk" dropped
-        assert themes.highlighted == 0
+        preview = pilot.app.query_one(tui.Preview)
+        assert preview.fetch and "aleksandra" in preview.fetch[0].plain
         await pilot.press("down")
         await pilot.pause()
-        assert "light-two" in text(pilot.app.query_one("#swatch"))
+        assert preview.slug == "light-two"
+        shown = preview.render()
+        assert "theme  light-two" in shown.plain, "the theme line names the previewed theme"
+        light = stub.LIGHT
+        colours = {
+            str(sp.style.color.triplet.hex)
+            for sp in shown.spans
+            if isinstance(sp.style, tui.Style) and sp.style.color and sp.style.color.triplet
+        }
+        assert light["base08"] in colours, "the active theme's red is repainted as the previewed theme's red"
+        assert light["base0B"] in colours, "ANSI green maps to the previewed base0B"
+        assert stub.PAL["base08"] not in colours
         await pilot.press("enter")
         await settle(pilot)
         assert ["theme", "light-two"] in calls()
-        await pilot.press("escape")
+
+
+async def test_look_wallpaper_previews_before_applying(calls, tmp_path, monkeypatch):
+    from PIL import Image
+
+    wall = tmp_path / "wall.png"
+    Image.new("RGB", (40, 20), (255, 255, 255)).save(wall)
+    monkeypatch.setenv("STUB_WALL", str(wall))
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
-        await pilot.press("g")
+        await pilot.press("4")
+        await settle(pilot)
+        preview = pilot.app.query_one(tui.Preview)
+        grid = preview.bg_grid(10, 5)
+        assert grid and grid[0][0] != stub.PAL["base00"], "the wallpaper shows through (absent mode = on)"
+        await pilot.press("w")
+        await settle(pilot)
+        assert preview.image is None and preview.bg_grid(10, 5) is None, "w turns the preview off"
+        assert not [c for c in calls() if c[0] == "wallpaper"], "previewing applies nothing"
+        await pilot.press("W")
+        await settle(pilot)
+        assert ["wallpaper", "off"] in calls(), "W applies what the preview shows"
+
+
+async def test_look_glass_applies(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        await settle(pilot)
+        await pilot.press("4", "g")
         glass = pilot.app.query_one("#glass-list", OptionList)
         assert pilot.app.focused is glass
         assert [o.id for o in glass.options] == ["clear", "frosted", "solid", "default"]
@@ -337,9 +378,18 @@ async def test_look_previews_and_applies_theme_glass_and_wallpaper(calls):
         await pilot.press("enter")
         await settle(pilot)
         assert ["glass", "frosted"] in calls()
-        await pilot.press("escape", "w")
+
+
+async def test_status_check_persists_across_launches(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
-        assert ["wallpaper", "toggle"] in calls()
+        await pilot.press("r")
+        await settle(pilot)
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        await settle(pilot)
+        assert calls().count(["doctor"]) == 1, "the second launch runs nothing"
+        assert "1 failing" in card(pilot, "health") and "1 incoming" in card(pilot, "updates")
+        assert "checked just now" in text(pilot.app.query_one("#attention-title"))
 
 
 async def test_tui_colours_follow_the_active_theme(calls, monkeypatch):
@@ -377,13 +427,15 @@ async def test_children_get_no_terminal_and_no_git_prompts(calls, tmp_path, monk
 
 
 async def test_long_line_without_newline_does_not_crash(calls, monkeypatch):
-    monkeypatch.setenv("STUB_BIG", "wallpaper")
+    monkeypatch.setenv("STUB_BIG", "glass")
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
-        await pilot.press("4", "w")
+        await pilot.press("4", "g")
+        pilot.app.query_one("#glass-list", OptionList).highlighted = 0
+        await pilot.press("enter")
         await settle(pilot)
         assert "done" in text(pilot.app.screen.query_one("#run-status", Label))
-        assert "applied wallpaper toggle" in log_text(pilot.app.screen.query_one("#run-log", RichLog))
+        assert "applied glass clear" in log_text(pilot.app.screen.query_one("#run-log", RichLog))
 
 
 async def test_missing_cli_shows_errors_instead_of_crashing(calls, monkeypatch):
@@ -467,7 +519,14 @@ async def test_update_cancels_a_running_check_first(calls, tmp_path, monkeypatch
         assert not alive(check), "the slow check was stopped before update ran"
 
 
-READS = {("list", "--json"), ("look", "--json"), ("files", "--json"), ("machine", "--json")}
+READS = {
+    ("list", "--json"),
+    ("look", "--json"),
+    ("files", "--json"),
+    ("machine", "--json"),
+    ("look", "--fetch"),
+    ("look", "--fetch", "--no-logo"),
+}
 
 
 async def test_opening_tabs_runs_nothing(calls):
