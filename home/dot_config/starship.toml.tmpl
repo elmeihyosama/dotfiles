@@ -3,6 +3,13 @@
   the defaults are the lean, two-line, framed prompt. */ -}}
 {{- $o := includeTemplate "prompt-settings" . | fromJson -}}
 {{- $rb := eq $o.style "rainbow" -}}
+{{- /* bar: one strip of bar_color, capped at each end, segments split by a
+  thin divider; on surface or muted the text keeps the segment's colour,
+  on a bright bar it is dark */ -}}
+{{- $bar := eq $o.style "bar" -}}
+{{- $bc := $o.bar_color -}}
+{{- $onbar := or (eq $bc "surface") (eq $bc "muted") -}}
+{{- $quiet := ternary (ternary "muted" "text" (eq $bc "surface")) "bg" $onbar -}}
 {{- $nerd := eq $o.icons "nerd" -}}
 {{- $two := eq $o.lines "two" -}}
 {{- $split := eq $o.layout "split" -}}
@@ -10,10 +17,18 @@
 {{- $ends := get (dict "round" (list "" "") "angled" (list "" "") "slanted" (list "" "") "flat" (list "" "")) $o.separator -}}
 {{- $L := index $ends 0 -}}
 {{- $R := index $ends 1 -}}
+{{- $D := print "[" (get (dict "round" "\ue0b5" "angled" "\ue0b1" "slanted" "\ue0bd" "flat" "│") $o.separator) "](fg:" (ternary (ternary "muted" "bg" (eq $bc "surface")) "bg" $onbar) " bg:" $bc ")" -}}
+{{- /* on the right edge (split) the clock ends the line; on the left a
+  space keeps it off what follows */ -}}
+{{- $sp := ternary "" " " $split -}}
 {{- $left := "$hostname$directory$git_branch$git_status$jobs" -}}
 {{- if eq $o.langs "on" }}{{ $left = print $left "$nodejs$python$rust$golang" }}{{ end -}}
 {{- $left = print $left "$docker_context$kubernetes" -}}
 {{- $right := "$cmd_duration$time" -}}
+{{- if $bar -}}
+{{-   $left = printf "[%s](fg:%s)%s[%s](fg:%s) " $L $bc $left $R $bc -}}
+{{-   if ne $o.time "off" }}{{ $right = printf "[%s](fg:%s)%s[%s](fg:%s)%s" $L $bc $right $R $bc $sp }}{{ end -}}
+{{- end -}}
 {{- /* block: a rainbow segment, text T on colour C between the two ends */ -}}
 {{- define "block" }}[{{ .L }}](fg:{{ .c }})[ {{ .t }} ]($style)[{{ .R }}](fg:{{ .c }}){{ end -}}
 "$schema" = 'https://starship.rs/config-schema.json'
@@ -57,7 +72,10 @@ magenta = "{{ $p.base0E }}"
 [hostname]
 ssh_only = true
 ssh_symbol = "{{ if $nerd }} {{ else }}ssh {{ end }}"
-{{- if $rb }}
+{{- if $bar }}
+style = "bold fg:{{ ternary "orange" "bg" $onbar }} bg:{{ $bc }}"
+format = '[ $ssh_symbol$hostname ]($style){{ $D }}'
+{{- else if $rb }}
 style = "bold fg:bg bg:orange"
 format = '{{ template "block" (dict "L" $L "R" $R "c" "orange" "t" "$ssh_symbol$hostname") }} '
 {{- else }}
@@ -76,7 +94,10 @@ style = "{{ $o.frame_color }}"
 [directory]
 truncation_length = 0
 truncate_to_repo = true
-{{- if $rb }}
+{{- if $bar }}
+style = "bold fg:{{ ternary $o.dir_color "bg" $onbar }} bg:{{ $bc }}"
+format = '[ {{ ternary "󰉋 " "" $nerd }}$path$read_only ]($style)'
+{{- else if $rb }}
 style = "bold fg:bg bg:{{ $o.dir_color }}"
 format = '{{ template "block" (dict "L" $L "R" $R "c" $o.dir_color "t" (print (ternary "󰉋 " "" $nerd) "$path$read_only")) }} '
 {{- else }}
@@ -86,7 +107,10 @@ format = "[{{ if $nerd }}󰉋 {{ end }}$path]($style)[$read_only]($read_only_sty
 
 [git_branch]
 symbol = "{{ ternary "\ue725 " "" $nerd }}"
-{{- if $rb }}
+{{- if $bar }}
+style = "bold fg:{{ ternary $o.git_color "bg" $onbar }} bg:{{ $bc }}"
+format = '{{ $D }}[ $symbol$branch ]($style)'
+{{- else if $rb }}
 style = "bold fg:bg bg:{{ $o.git_color }}"
 format = '{{ template "block" (dict "L" $L "R" $R "c" $o.git_color "t" "$symbol$branch") }} '
 {{- else }}
@@ -95,7 +119,10 @@ format = "[$symbol$branch]($style) "
 {{- end }}
 
 [git_status]
-{{- if $rb }}
+{{- if $bar }}
+style = "bold fg:{{ ternary "err" "bg" $onbar }} bg:{{ $bc }}"
+format = '([$all_status$ahead_behind ]($style))'
+{{- else if $rb }}
 style = "bold fg:bg bg:err"
 format = '({{ template "block" (dict "L" $L "R" $R "c" "err" "t" "$all_status$ahead_behind") }} )'
 {{- else }}
@@ -105,7 +132,10 @@ format = '([$all_status$ahead_behind]($style)) '
 
 [jobs]
 symbol = "✦"
-{{- if $rb }}
+{{- if $bar }}
+style = "bold fg:{{ ternary "warn" "bg" $onbar }} bg:{{ $bc }}"
+format = '{{ $D }}[ $symbol $number ]($style)'
+{{- else if $rb }}
 style = "bold fg:bg bg:warn"
 format = '{{ template "block" (dict "L" $L "R" $R "c" "warn" "t" "$symbol $number") }} '
 {{- else }}
@@ -115,7 +145,10 @@ format = "[$symbol $number]($style) "
 
 [nodejs]
 symbol = "{{ ternary "\ue718 " "node " $nerd }}"
-{{- if $rb }}
+{{- if $bar }}
+style = "fg:{{ ternary "green" "bg" $onbar }} bg:{{ $bc }}"
+format = '{{ $D }}[ $symbol($version) ]($style)'
+{{- else if $rb }}
 style = "bold fg:bg bg:green"
 format = '{{ template "block" (dict "L" $L "R" $R "c" "green" "t" "$symbol($version)") }} '
 {{- else }}
@@ -125,7 +158,10 @@ format = "[$symbol($version )]($style)"
 
 [python]
 symbol = "{{ ternary "\ue73c " "py " $nerd }}"
-{{- if $rb }}
+{{- if $bar }}
+style = "fg:{{ ternary "yellow" "bg" $onbar }} bg:{{ $bc }}"
+format = '{{ $D }}[ $symbol${version}( \($virtualenv\)) ]($style)'
+{{- else if $rb }}
 style = "bold fg:bg bg:yellow"
 format = '{{ template "block" (dict "L" $L "R" $R "c" "yellow" "t" "$symbol${version}( \\($virtualenv\\))") }} '
 {{- else }}
@@ -135,7 +171,10 @@ format = '[$symbol(${version} )(\($virtualenv\) )]($style)'
 
 [rust]
 symbol = "{{ ternary "\ue7a8 " "rs " $nerd }}"
-{{- if $rb }}
+{{- if $bar }}
+style = "fg:{{ ternary "orange" "bg" $onbar }} bg:{{ $bc }}"
+format = '{{ $D }}[ $symbol($version) ]($style)'
+{{- else if $rb }}
 style = "bold fg:bg bg:orange"
 format = '{{ template "block" (dict "L" $L "R" $R "c" "orange" "t" "$symbol($version)") }} '
 {{- else }}
@@ -145,7 +184,10 @@ format = "[$symbol($version )]($style)"
 
 [golang]
 symbol = "{{ ternary "\ue627 " "go " $nerd }}"
-{{- if $rb }}
+{{- if $bar }}
+style = "fg:{{ ternary "cyan" "bg" $onbar }} bg:{{ $bc }}"
+format = '{{ $D }}[ $symbol($version) ]($style)'
+{{- else if $rb }}
 style = "bold fg:bg bg:cyan"
 format = '{{ template "block" (dict "L" $L "R" $R "c" "cyan" "t" "$symbol($version)") }} '
 {{- else }}
@@ -156,7 +198,10 @@ format = "[$symbol($version )]($style)"
 [docker_context]
 symbol = "{{ ternary "\uf308 " "docker " $nerd }}"
 only_with_files = true
-{{- if $rb }}
+{{- if $bar }}
+style = "fg:{{ $quiet }} bg:{{ $bc }}"
+format = '{{ $D }}[ $symbol$context ]($style)'
+{{- else if $rb }}
 style = "fg:text bg:muted"
 format = '{{ template "block" (dict "L" $L "R" $R "c" "muted" "t" "$symbol$context") }} '
 {{- else }}
@@ -167,7 +212,10 @@ format = "[$symbol$context]($style) "
 [kubernetes]
 symbol = "{{ if $nerd }}☸ {{ else }}k8s {{ end }}"
 disabled = false
-{{- if $rb }}
+{{- if $bar }}
+style = "bold fg:{{ ternary "warn" "bg" $onbar }} bg:{{ $bc }}"
+format = '{{ $D }}[ $symbol$context( \($namespace\)) ]($style)'
+{{- else if $rb }}
 style = "bold fg:bg bg:warn"
 format = '{{ template "block" (dict "L" $L "R" $R "c" "warn" "t" "$symbol$context( \\($namespace\\))") }} '
 {{- else }}
@@ -178,7 +226,14 @@ format = '[$symbol$context( \($namespace\))]($style) '
 [cmd_duration]
 min_time = 2000
 {{- $took := ternary "󱦟 $duration" "took $duration" $nerd }}
-{{- if $rb }}
+{{- if $bar }}
+style = "fg:{{ $quiet }} bg:{{ $bc }}"
+{{- if eq $o.time "off" }}
+format = '[{{ $L }}](fg:{{ $bc }})[ {{ $took }} ]($style)[{{ $R }}](fg:{{ $bc }}){{ $sp }}'
+{{- else }}
+format = '[ {{ $took }} ]($style){{ $D }}'
+{{- end }}
+{{- else if $rb }}
 style = "fg:text bg:muted"
 format = '{{ template "block" (dict "L" $L "R" $R "c" "muted" "t" $took) }} '
 {{- else }}
@@ -189,10 +244,10 @@ format = "[{{ $took }}]($style) "
 [time]
 disabled = {{ eq $o.time "off" }}
 time_format = "{{ ternary "%I:%M %p" "%R" (eq $o.time "12h") }}"
-{{- /* on the right edge (split) the clock ends the line; on the left a
-  space keeps it off what follows */}}
-{{- $sp := ternary "" " " $split }}
-{{- if $rb }}
+{{- if $bar }}
+style = "fg:{{ $quiet }} bg:{{ $bc }}"
+format = '[ $time ]($style)'
+{{- else if $rb }}
 style = "fg:text bg:muted"
 format = '{{ template "block" (dict "L" $L "R" $R "c" "muted" "t" "$time") }}{{ $sp }}'
 {{- else }}

@@ -56,8 +56,9 @@ on the right, `❯`.
 
 | Option | Choices (default first) |
 |---|---|
-| `style` | `lean` (coloured text), `rainbow` (coloured blocks) |
-| `separator` | `round`, `angled`, `slanted`, `flat` — the blocks' ends (rainbow) |
+| `style` | `lean` (coloured text), `rainbow` (coloured blocks), `bar` (one strip, segments split by thin dividers) |
+| `separator` | `round`, `angled`, `slanted`, `flat` — the blocks' or the bar's ends, and the bar's dividers |
+| `bar_color` | `surface`, or any colour below — the bar (bar style); on `surface`/`muted` the text keeps each segment's colour, on a bright bar it is dark |
 | `lines` | `two`, `one` |
 | `frame` | `on`, `off` (two lines) |
 | `layout` | `split` (duration and time on the right), `left` |

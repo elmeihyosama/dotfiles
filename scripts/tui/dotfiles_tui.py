@@ -1921,8 +1921,10 @@ class PromptPane(Pane):
     @staticmethod
     def not_applicable(key: str, eff: dict[str, str]) -> str:
         """Why KEY does nothing with EFF's other choices, else ""."""
-        if key == "separator" and eff.get("style") != "rainbow":
-            return "rainbow only"
+        if key == "separator" and eff.get("style") not in ("rainbow", "bar"):
+            return "rainbow or bar only"
+        if key == "bar_color" and eff.get("style") != "bar":
+            return "bar style only"
         if key == "frame" and eff.get("lines") != "two":
             return "two lines only"
         split2 = eff.get("lines") == "two" and eff.get("layout") == "split"

@@ -66,11 +66,15 @@ while read -r key choice; do
 	render "$key-$choice" "prompt_$key=$choice"
 	loads "$key-$choice"
 done <<<"$options"
-# ...and the rainbow block ends with each, on one and two lines
+# ...and the rainbow block ends and the bar's ends with each, on one and two lines
 for sep in round angled slanted flat; do
 	for lines in one two; do
 		render "rb-$sep-$lines" prompt_style=rainbow "prompt_separator=$sep" "prompt_lines=$lines"
 		loads "rb-$sep-$lines"
+		for t in 24h off; do
+			render "bar-$sep-$lines-$t" prompt_style=bar "prompt_separator=$sep" "prompt_lines=$lines" "prompt_time=$t"
+			loads "bar-$sep-$lines-$t"
+		done
 	done
 done
 
@@ -97,6 +101,18 @@ assert_eq '" "' "$(get "$scratch/dots-one.toml" fill.symbol)" "fill only on two 
 assert_contains "$(get "$scratch/rb-angled-two.toml" directory.format)" $'[](fg:accent2)[ ' "rainbow: angled block start"
 assert_contains "$(get "$scratch/rb-angled-two.toml" directory.format)" $'[](fg:accent2)' "rainbow: angled block end"
 assert_eq '"bold fg:bg bg:accent2"' "$(get "$scratch/rb-angled-two.toml" directory.style)" "rainbow: text on the colour"
+# bar: one strip, capped once at each end, thin dividers inside
+bar_fmt="$(get "$scratch/bar-round-two-24h.toml" format)"
+assert_contains "$bar_fmt" '[](fg:surface)$hostname$directory' "bar: one cap before the left side"
+assert_contains "$bar_fmt" '$kubernetes[](fg:surface) $fill' "bar: one cap after it"
+assert_contains "$bar_fmt" '[](fg:surface)$cmd_duration$time[](fg:surface)' "bar: the right side is a bar too"
+assert_eq '"bold fg:accent2 bg:surface"' "$(get "$scratch/bar-round-two-24h.toml" directory.style)" "bar: segment colour on the bar"
+assert_eq '"[](fg:muted bg:surface)[ $symbol$branch ]($style)"' \
+	"$(get "$scratch/bar-round-two-24h.toml" git_branch.format)" "bar: a thin divider before the branch"
+assert_contains "$(get "$scratch/bar-round-two-off.toml" cmd_duration.format)" '[](fg:surface)[ ' "bar, no clock: the duration caps itself"
+assert_contains "$(get "$scratch/bar-round-two-off.toml" format)" ' $fill$cmd_duration$time' "bar, no clock: no empty right bar"
+render bar-blue prompt_style=bar prompt_bar_color=blue
+assert_eq '"bold fg:bg bg:blue"' "$(get "$scratch/bar-blue.toml" directory.style)" "bright bar: dark text"
 assert_eq false "$(get "$scratch/spacing-compact.toml" add_newline)" "compact: no blank line"
 assert_eq true "$(get "$scratch/time-off.toml" time.disabled)" "clock off"
 assert_eq '"%I:%M %p"' "$(get "$scratch/time-12h.toml" time.time_format)" "clock 12h"

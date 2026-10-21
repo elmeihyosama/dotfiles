@@ -453,7 +453,8 @@ async def test_prompt_lists_every_option_with_this_machines_values(calls):
         )
         assert "one" in rows["lines"], "the machine's value"
         assert "accent2" in rows["dir_color"], "a value that is not a choice reads as the default"
-        assert "rainbow only" in rows["separator"] and "two lines only" in rows["frame"], "what does nothing says why"
+        assert "rainbow or bar only" in rows["separator"], "what does nothing says why"
+        assert "two lines only" in rows["frame"]
         assert "no frame or fill" in rows["frame_color"]
         assert "lean · rainbow" in text(pilot.app.query_one("#prompt-about"))
         shown = preview.render().plain
@@ -713,6 +714,13 @@ async def test_escape_leaves_the_filter_so_tab_keys_work(calls):
         await pilot.pause()
         assert pilot.app.query_one("#tool-filter", Input).value == ""
         assert pilot.app.query_one(tui.TabbedContent).active == "files"
+
+
+def test_prompt_bar_style_marks_what_it_uses():
+    na = tui.PromptPane.not_applicable
+    assert na("separator", {"style": "bar"}) == "" and na("bar_color", {"style": "bar"}) == ""
+    assert na("separator", {"style": "lean"}) == "rainbow or bar only"
+    assert na("bar_color", {"style": "rainbow"}) == "bar style only"
 
 
 async def test_narrow_terminal_hides_the_about_panel(calls):
