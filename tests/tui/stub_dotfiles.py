@@ -29,6 +29,7 @@ if proc_log := os.environ.get("STUB_PROC"):
             "pid": os.getpid(),
             "leader": os.getsid(0) == os.getpid(),
             "prompt": os.environ.get("GIT_TERMINAL_PROMPT"),
+            "path": os.environ.get("PATH", ""),
         }
         f.write(json.dumps(record) + "\n")
 sub = args[0] if args else ""

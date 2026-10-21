@@ -473,6 +473,8 @@ async def test_children_get_no_terminal_and_no_git_prompts(calls, tmp_path, monk
     assert procs, "the stub recorded no calls"
     assert all(p["leader"] for p in procs), "each child leads its own session (no controlling tty)"
     assert all(p["prompt"] == "0" for p in procs)
+    venv = os.path.dirname(sys.executable)
+    assert all(venv not in p["path"].split(os.pathsep) for p in procs), "the TUI's Python isn't on the CLI's PATH"
 
 
 async def test_long_line_without_newline_does_not_crash(calls, monkeypatch):

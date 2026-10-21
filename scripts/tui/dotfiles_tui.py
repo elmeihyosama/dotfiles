@@ -78,11 +78,21 @@ async def spawn(args: list[str] | tuple[str, ...], *, merge: bool) -> asyncio.su
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT if merge else asyncio.subprocess.PIPE,
-        env={**os.environ, **CHILD_ENV},
+        env=child_env(),
         start_new_session=True,
     )
     LIVE.add(proc)
     return proc
+
+
+def child_env() -> dict[str, str]:
+    """os.environ for the CLI, minus this TUI's own Python (uv puts its
+    environment first on PATH; ansible would run its modules with it)."""
+    env = {**os.environ, **CHILD_ENV}
+    here = os.path.dirname(sys.executable)
+    env["PATH"] = os.pathsep.join(d for d in env.get("PATH", "").split(os.pathsep) if d and d != here)
+    env.pop("VIRTUAL_ENV", None)
+    return env
 
 
 async def stop(proc: asyncio.subprocess.Process) -> None:

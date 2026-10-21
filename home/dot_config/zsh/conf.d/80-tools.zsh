@@ -4,13 +4,7 @@ if command -v zoxide >/dev/null 2>&1; then
 fi
 
 
-# dotfiles: this repo's CLI; resolve the script like `theme` does.
-dotfiles() {
-  local src
-  src=$(chezmoi source-path 2>/dev/null) || { echo "dotfiles: chezmoi not found" >&2; return 1; }
-  sh "${src:h}/scripts/dotfiles.sh" "$@"
-}
-
+# dotfiles is a command in ~/.local/bin (dot_local/bin/executable_dotfiles.tmpl).
 # doctor: same as `dotfiles doctor`.
 doctor() { dotfiles doctor "$@" }
 
@@ -19,7 +13,7 @@ _dotfiles() {
   local src
   local -a subs names
   if (( CURRENT == 2 )); then
-    subs=('list:tools and their install state' 'add:select tools or groups' 'remove:deselect tools or groups' 'update:pull, apply and verify (--check to preview)' 'doctor:read-only health check' 'tui:full-screen tools, health, update and look' 'look:theme and glass as JSON (--json)' 'theme:switch theme (headless)' 'glass:set the glass level (headless)' 'help:show usage')
+    subs=('list:tools and their install state' 'add:select tools or groups' 'remove:deselect tools or groups' 'update:pull, apply and verify (--check to preview)' 'doctor:read-only health check' 'tui:full-screen tools, health, update and look' 'look:theme and glass as JSON (--json)' 'theme:switch theme (headless)' 'glass:set the glass level (headless)' 'wallpaper:wallpaper on, off or toggle (headless)' 'install:install the selected tools' 'files:files edited here or waiting to apply' 'machine:this machine'"'"'s install answers' 'help:show usage')
     _describe 'subcommand' subs
     return
   fi

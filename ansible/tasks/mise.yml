@@ -38,7 +38,8 @@
     dest: "{{ local_bin }}/mise"
     checksum: "sha256:{{ mise_sha256[_mise_os ~ '-' ~ _mise_arch] }}"
     mode: "0755"
-    timeout: 120
+    # ~130 MB: 120 s timed out (all retries) on a ~0.5 MB/s link
+    timeout: 600
   register: _mise_dl
   until: _mise_dl is succeeded
   retries: 3

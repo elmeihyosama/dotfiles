@@ -139,3 +139,10 @@ assert_contains "$out" "uv not on PATH" "tui: says uv is missing"
 run
 assert_eq 2 "$rc" "bare dotfiles without a tty: exit 2"
 assert_contains "$out" "usage: dotfiles" "bare dotfiles without a tty: usage"
+
+# dotfiles_command: ~/.local/bin/dotfiles runs this checkout's script (bare
+# `dotfiles` then opens the TUI on a terminal); the zsh function is gone
+w="$(render_tmpl "$TESTS_REPO/home/dot_local/bin/executable_dotfiles.tmpl")"
+assert_contains "$w" '/scripts/dotfiles.sh" "$@"' "dotfiles command: execs the repo script with all args"
+assert_contains "$w" "exec sh \"" "dotfiles command: exec, so exit codes pass through"
+assert_eq "" "$(grep -E '^dotfiles\(\)' "$TESTS_REPO/home/dot_config/zsh/conf.d/80-tools.zsh")" "no zsh function shadows the command"
