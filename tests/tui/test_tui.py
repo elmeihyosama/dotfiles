@@ -720,6 +720,7 @@ def test_prompt_bar_style_marks_what_it_uses():
     na = tui.PromptPane.not_applicable
     assert na("separator", {"style": "bar"}) == "" and na("bar_color", {"style": "bar"}) == ""
     assert na("separator", {"style": "lean"}) == na("start", {"style": "lean"}) == "rainbow or bar only"
+    assert na("right_ends", {"style": "lean"}) == "rainbow or bar only" and na("right_ends", {"style": "bar"}) == ""
     assert na("bar_color", {"style": "rainbow"}) == "bar style only"
 
 
