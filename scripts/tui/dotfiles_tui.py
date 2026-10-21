@@ -1825,6 +1825,10 @@ class DotfilesApp(App[None]):
     .field Input { width: 46; height: 1; border: none; padding: 0 1; background: $surface; }
     .field Input:focus { background-tint: $accent 15%; }
     .field Switch { width: 8; height: 1; border: none; padding: 0; background: $background; }
+    .field Switch:focus { background: $accent 35%; }
+    .field Switch:focus > .switch--slider { color: $accent; }
+    .field:focus-within { background: $accent 12%; }
+    .field:focus-within .flabel { color: $accent; }
     .fhint { width: 1fr; padding: 0 0 0 2; }
     #machine-readonly { padding: 1 0 0 0; }
 
