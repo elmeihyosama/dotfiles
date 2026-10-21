@@ -32,13 +32,31 @@
     state: directory
     mode: "0755"
 
+# `dotfiles` as a command (bare `dotfiles` on a terminal opens the TUI). It
+# finds the checkout through chezmoi at run time, so it always follows the one
+# chezmoi applies from; installed here, not by chezmoi, so chezmoi never owns
+# local_bin (whose mode the task above sets).
+- name: Install the dotfiles command
+  ansible.builtin.copy:
+    dest: "{{ local_bin }}/dotfiles"
+    mode: "0755"
+    content: |
+      #!/bin/sh
+      # dotfiles: this repo's CLI, from the checkout chezmoi applies from.
+      src="$(chezmoi source-path 2>/dev/null)" || {
+        echo "dotfiles: chezmoi not found (or not set up)" >&2
+        exit 1
+      }
+      exec sh "$(dirname "$src")/scripts/dotfiles.sh" "$@"
+
 - name: Install pinned mise {{ mise_version }}
   ansible.builtin.get_url:
     url: "https://github.com/jdx/mise/releases/download/v{{ mise_version }}/{{ _mise_asset }}"
     dest: "{{ local_bin }}/mise"
     checksum: "sha256:{{ mise_sha256[_mise_os ~ '-' ~ _mise_arch] }}"
     mode: "0755"
-    timeout: 120
+    # ~130 MB: 120 s timed out (all retries) on a ~0.5 MB/s link
+    timeout: 600
   register: _mise_dl
   until: _mise_dl is succeeded
   retries: 3

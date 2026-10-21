@@ -16,7 +16,8 @@ curl -fsSL https://elmeihyosama.github.io/dotfiles/install.sh | sh
 One command — clones to `~/workspace/dotfiles`, prompts for your details, and provisions. Served from the project's [landing page](https://elmeihyosama.github.io/dotfiles/).
 
 It installs Ansible (a pinned [uv], then the pinned ansible-core, on every
-OS), prompts once for `git_name`, `git_email`, and whether to use sudo, then
+OS), prompts once for `git_name`, `git_email`, whether to use sudo and which
+tools to install (all, core only, or pick groups and single tools), then
 runs the playbook (toolchain, JetBrains Mono Nerd Font, shell plugins, login
 shell) and applies the config with `chezmoi apply`. Answers are saved to a git-ignored
 `ansible/local.yml`.
@@ -118,6 +119,39 @@ saying so.
   (no file changes) and reports incoming commits, chezmoi drift and missing
   tools.
 - `dotfiles doctor` — read-only health check (also `doctor`).
+- `dotfiles tui`, or bare `dotfiles` in a terminal — a full-screen view, five
+  tabs (`1`–`5`, or `←`/`→` on the tab bar; opening a tab never runs
+  anything, `q` quits):
+  - **Status**: a verdict and the few things worth doing, each opening where
+    it's fixed; `r` checks health and updates (kept for the next launch),
+    `u` updates.
+  - **Tools**: the catalog, with the highlighted tool explained beside it;
+    `space` marks it to add or remove, `a` applies, `i` installs every
+    selected tool that's missing (`dotfiles install`: the playbook's packages
+    step only), `/` filters.
+  - **Files**: managed files edited here or waiting to apply, with a diff;
+    `a` applies (asks before discarding your edits), `k` keeps yours
+    (`chezmoi re-add`), `A` applies everything waiting.
+  - **Look**: your real start screen (fastfetch and the prompt) painted in
+    each theme as you move through the list, with its wallpaper and the
+    glass level composed as Ghostty draws them; `enter` applies the theme
+    (or the glass level), `w` previews the wallpaper on or off, `W` applies
+    that, `g` jumps to glass.
+  - **Machine**: the `install.sh` answers in `ansible/local.yml`, edited in
+    place (`enter` or leaving a field saves it; sudo and shared home are
+    switches, shared home asks first since it moves where tools live);
+    `ctrl+s` applies them without overwriting edited files.
+
+  It runs with uv from a locked environment (`scripts/tui/`); its colours
+  follow the active theme. Run from a second checkout or worktree, it edits
+  this machine's `local.yml` but refuses anything that runs the playbook
+  (that would point chezmoi at that checkout). `theme`, `glass` and `wallpaper` (in the TUI or
+  the shell) apply only the files that use them.
+- `dotfiles install` — install the selected tools at their pins without the
+  playbook's chezmoi step (which applies with `--force`).
+- The commands behind it: `dotfiles look --json | --fetch`, `theme SLUG`, `glass LEVEL`,
+  `wallpaper on|off|toggle`, `files --json | diff|apply|keep PATH...`,
+  `machine --json | set KEY VALUE [--no-apply] | apply`.
 
 On macOS, Raycast has *Dotfiles Update* and *Dotfiles Doctor* commands
 ([Raycast](docs/raycast.md)).

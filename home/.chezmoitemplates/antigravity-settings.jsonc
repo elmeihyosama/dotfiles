@@ -1,0 +1,51 @@
+{
+  "workbench.colorTheme": "Catppuccin Mocha",
+  "workbench.editor.enablePreview": false,
+  "editor.minimap.enabled": false,
+  "diffEditor.ignoreTrimWhitespace": false,
+  "go.toolsManagement.autoUpdate": true,
+  "workbench.activityBar.compact": true,
+  "yaml.disableSchemaDetection": [
+    "**/.github/workflows/*.yml",
+    "**/.github/workflows/*.yaml",
+    "**/.gitea/workflows/*.yml",
+    "**/.gitea/workflows/*.yaml",
+    "**/.forgejo/workflows/*.yml",
+    "**/.forgejo/workflows/*.yaml",
+  ],
+  "docker.extension.enableComposeLanguageServer": false,
+  // basedpyright provides Python IntelliSense and type checking (Pylance is not on Open VSX).
+  "python.languageServer": "None",
+  // The Open VSX "universal" ms-python build ships without its native env finder (python-env-tools/bin/pet),
+  // so interpreter discovery fails. Use the built-in JS finder and the classic interpreter picker instead.
+  "python.locator": "js",
+  "python.useEnvironmentsExtension": false,
+  "github.gitProtocol": "ssh",
+  "editor.formatOnSave": true,
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+      "source.organizeImports": "explicit"
+    }
+  },
+  "[javascript][javascriptreact][typescript][typescriptreact][json][jsonc][css]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.biome": "explicit",
+      "source.organizeImports.biome": "explicit"
+    }
+  },
+  "terminal.integrated.defaultProfile.osx": "zsh",
+{{- if eq .chezmoi.os "darwin" }}
+  // Docker runs in Colima. Explicit paths so the Containers view works however the app was launched.
+  "containers.containerClient": "com.microsoft.visualstudio.containers.docker",
+  "containers.containerCommand": "/opt/homebrew/bin/docker",
+  "containers.composeCommand": "/opt/homebrew/bin/docker compose",
+  "containers.environment": { "DOCKER_HOST": "unix://{{ .chezmoi.homeDir }}/.config/colima/default/docker.sock" },
+  "containers.contexts.showInStatusBar": true,
+{{- end }}
+  "redhat.telemetry.enabled": false
+}

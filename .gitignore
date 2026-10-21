@@ -12,3 +12,4 @@ ansible/local.yml
 
 # Claude Code project dir (local-only)
 .claude/
+__pycache__/

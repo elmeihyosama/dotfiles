@@ -25,6 +25,30 @@ _chezmoi_set_data() {
   rm -f "$tmp"
 }
 
+# _theme_apply: `chezmoi apply` for the targets whose templates use the
+# theme, glass or wallpaper data only. A full apply would also roll out every
+# other pending change (and run its scripts); a file edited here is left alone
+# and named (without a tty chezmoi can't ask about it).
+_THEME_DATA_RE='\.theme\b|\.themes\b|\.glass\b|glass_levels|wallpaper_mode|\.wallpaper\b|base0[0-9A-F]'
+_theme_apply() {
+  emulate -L zsh
+  local src t
+  local -a tmpls targets edited kept managed
+  src=$(chezmoi source-path) || return 1
+  tmpls=(${(f)"$(command grep -rlE $_THEME_DATA_RE --include='*.tmpl' $src)"})
+  (( ${#tmpls} )) || return 0
+  edited=(${(f)"$(chezmoi status | command awk 'substr($0, 1, 1) != " " { print substr($0, 4) }')"})
+  # only targets managed here: one ignored on this OS fails the whole apply
+  managed=(${(f)"$(chezmoi managed --path-style absolute)"})
+  for t in ${(f)"$(chezmoi target-path $tmpls)"}; do
+    (( ${managed[(Ie)$t]} )) || continue
+    if (( ${edited[(Ie)${t#$HOME/}]} )); then kept+=(${t#$HOME/}); else targets+=($t); fi
+  done
+  (( ${#kept} )) && print -r -- "kept your edits, not applied: ${(j:, :)kept}"
+  (( ${#targets} )) || return 0
+  chezmoi apply $targets
+}
+
 # theme: switch the active base16 theme (per-machine; no git diff).
 #   theme            fzf-pick from available themes
 #   theme <slug>     set directly
@@ -52,7 +76,7 @@ theme() {
     echo "theme: unknown theme '${slug}'" >&2; return 1
   fi
   _chezmoi_set_data theme "$slug" "$cfg" || return 1
-  chezmoi apply || return 1
+  _theme_apply || return 1
   echo "theme → ${slug}"
   _theme_live_reload
   # Only interactive terminals: a headless caller (Raycast, cron) exec'ing an
@@ -100,7 +124,7 @@ wallpaper() {
     *) echo "usage: wallpaper on|off|toggle" >&2; return 1 ;;
   esac
   _chezmoi_set_data wallpaper_mode "$next" "$cfg" || return 1
-  chezmoi apply || return 1
+  _theme_apply || return 1
   echo "wallpaper → ${next}"
   _theme_live_reload
 }
@@ -198,7 +222,7 @@ glass() {
     echo "usage: glass ${(j:|:)levels}|off" >&2; print -l -- $levels off >&2; return 1
   fi
   _chezmoi_set_data glass "$level" "$cfg" || return 1
-  chezmoi apply || return 1
+  _theme_apply || return 1
   echo "glass → ${level}"
   _theme_live_reload
 }

@@ -3,6 +3,7 @@
 #
 # Per-tool fields:
 #   group         one of tool_groups
+#   about         one line on what it is (the TUI shows it)
 #   bin           command name (default: the tool name)
 #   backend       mise backend string (omitted for native_only / bootstrap)
 #   version       exact pinned version, never "latest" (omitted for native_only)
@@ -28,154 +29,188 @@ tool_groups: [core, git, files, containers, system, media, dev]
 tools:
   chezmoi:
     group: core
+    about: "Manages these dotfiles: renders templates into your home directory"
     backend: aqua:twpayne/chezmoi
     version: "2.73.2"
   mise:
     group: core
+    about: "Installs and pins every CLI tool (and runtimes) to exact versions"
     bootstrap: true
     version: "2026.10.11"
   sheldon:
     group: core
+    about: "Fast zsh plugin manager, pinned per plugin"
     backend: aqua:rossmacarthur/sheldon
     version: "0.8.5"
   starship:
     group: core
+    about: "The shell prompt: directory, git state, languages"
     backend: aqua:starship/starship
     version: "1.24.1"
   fzf:
     group: core
+    about: "Fuzzy finder for files, history and anything piped in"
     backend: aqua:junegunn/fzf
     version: "0.67.0"
   jq:
     group: core
+    about: "Query and reshape JSON on the command line"
     backend: aqua:jqlang/jq
     version: "1.8.2"
   yq:
     group: core
+    about: "jq for YAML, TOML and XML"
     backend: aqua:mikefarah/yq
     version: "4.54.1"
   zoxide:
     group: core
+    about: "Smarter cd: jump to frequent directories with z"
     backend: aqua:ajeetdsouza/zoxide
     version: "0.10.0"
   atuin:
     group: core
+    about: "Searchable shell history with context (ctrl-r)"
     backend: github:atuinsh/atuin
     version: "18.17.1"
     # musl on Linux: the gnu build needs glibc 2.39 (Debian 12, EL9 ship older)
     mise_options: {matching_regex: "^atuin-[a-z0-9_]+-(apple-darwin|unknown-linux-musl)[.]tar[.]gz$"}
   bat:
     group: core
+    about: "cat with syntax highlighting and git marks"
     backend: aqua:sharkdp/bat
     version: "0.26.0"
     native_bin: {apt: batcat}
   eza:
     group: core
+    about: "Modern ls with icons, git status and tree view"
     backend: github:eza-community/eza
     version: "0.23.4"
     native_on: [darwin] # upstream ships no macOS binary (the github: backend picks the man-page tarball); brew builds it
   ripgrep:
     group: core
+    about: "Very fast recursive search (rg)"
     bin: rg
     backend: aqua:BurntSushi/ripgrep
     version: "15.1.0"
   fd:
     group: core
+    about: "Simple, fast find replacement"
     backend: aqua:sharkdp/fd
     version: "10.3.0"
     native_pkg: {apt: fd-find, dnf: fd-find}
     native_bin: {apt: fdfind}
   vivid:
     group: core
+    about: "Generates LS_COLORS from the active theme"
     backend: aqua:sharkdp/vivid
     version: "0.11.1"
   uv:
     group: core
+    about: "Fast Python installer and runner (also runs this TUI)"
     backend: aqua:astral-sh/uv
     version: "0.13.1"
   git-delta:
     group: git
+    about: "Readable, syntax-highlighted git diffs"
     bin: delta
     backend: aqua:dandavison/delta
     version: "0.20.1"
   lazygit:
     group: git
+    about: "Terminal UI for git: stage, commit, rebase"
     backend: aqua:jesseduffield/lazygit
     version: "0.56.0"
   gh:
     group: git
+    about: "GitHub from the terminal: PRs, issues, actions"
     backend: aqua:cli/cli
     version: "2.87.3"
   gh-dash:
     group: git
+    about: "Dashboard of your GitHub PRs and issues"
     backend: github:dlvhdr/gh-dash
     version: "4.26.2"
   git-absorb:
     group: git
+    about: "Folds staged fixes into the right earlier commits"
     backend: github:tummychow/git-absorb
     version: "0.9.0"
     native_on: [darwin] # macOS asset is x86_64 only (the github: backend picks the man page on arm64); brew has it
     missing_on: [linux-arm64] # only a 32-bit arm (gnueabihf) Linux asset
   gitleaks:
     group: git
+    about: "Scans git history for leaked secrets"
     backend: aqua:gitleaks/gitleaks
     version: "8.30.1"
   yazi:
     group: files
+    about: "Fast terminal file manager with previews"
     backend: github:sxyazi/yazi
     version: "26.9.1"
     # musl on Linux: the gnu build needs glibc 2.39 (Debian 12, EL9 ship older)
     mise_options: {matching_regex: "^yazi-[a-z0-9_]+-(apple-darwin|unknown-linux-musl)[.]zip$"}
   dust:
     group: files
+    about: "Shows what's using disk space, as a tree"
     backend: aqua:bootandy/dust
     version: "1.2.4"
     native_on: [darwin] # the macOS asset is x86_64 only (needs Rosetta 2, absent on a fresh Apple Silicon Mac); brew builds arm64
   duf:
     group: files
+    about: "Friendly disk usage and free space overview"
     backend: aqua:muesli/duf
     version: "0.9.1"
   age:
     group: files
+    about: "Simple file encryption (chezmoi secrets)"
     backend: aqua:FiloSottile/age
     version: "1.3.1"
   age-keygen:
     group: files
+    about: "Creates age keys (ships with age)"
     provided_by: age
   lazydocker:
     group: containers
+    about: "Terminal UI for Docker containers and logs"
     backend: aqua:jesseduffield/lazydocker
     version: "0.24.2"
   btop:
     group: system
+    about: "Resource monitor: CPU, memory, disks, processes"
     backend: aqua:aristocratos/btop
     version: "1.4.7"
     native_on: [darwin]
   fastfetch:
     group: system
+    about: "System info splash shown when a shell opens"
     backend: aqua:fastfetch-cli/fastfetch
     version: "2.65.2"
   zellij:
     group: system
+    about: "Terminal workspace: panes, tabs and sessions"
     backend: aqua:zellij-org/zellij
     version: "0.44.3"
   navi:
     group: system
+    about: "Interactive cheatsheets for shell commands"
     backend: aqua:denisidoro/navi
     version: "2.24.0"
     no_checksum_on: [linux-x64, linux-arm64] # 2.24.0 assets: no checksum file or GitHub digest
     native_on: [darwin]
   cava:
     group: media
+    about: "Audio visualizer in the terminal"
     native_only: true  # karlstav/cava ships only source tarballs
   neovim:
     group: dev
+    about: "The editor"
     bin: nvim
     backend: aqua:neovim/neovim
     version: "0.11.5"
     smoke: "nvim --clean --headless -c qa"
   editorconfig-checker:
     group: dev
+    about: "Checks files follow .editorconfig rules (ec)"
     bin: ec
     backend: github:editorconfig-checker/editorconfig-checker
     version: "4.0.2"
@@ -183,19 +218,23 @@ tools:
     mise_options: {rename_exe: ec}
   hyperfine:
     group: dev
+    about: "Command-line benchmarking"
     backend: aqua:sharkdp/hyperfine
     version: "1.20.0"
   xh:
     group: dev
+    about: "Friendly HTTP client, like HTTPie"
     backend: aqua:ducaale/xh
     version: "0.26.2"
   jless:
     group: dev
+    about: "Viewer for exploring JSON and YAML"
     backend: aqua:PaulJuliusMartinez/jless
     version: "0.9.0"
     no_checksum_on: [macos-arm64] # 0.9.0 assets: no checksum file or GitHub digest
     native_on: [linux] # the Linux binary links libxcb (clipboard): unusable on minimal/no-sudo hosts; distro package where there is one (no linux-arm64 asset either)
   watchexec:
     group: dev
+    about: "Re-runs a command when files change"
     backend: aqua:watchexec/watchexec
     version: "2.5.1"

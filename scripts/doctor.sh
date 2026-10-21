@@ -92,6 +92,8 @@ else
 	printf '%s\n' "$tools_out" | grep -Ev '^(OK|SKIP|WARN):|^All tool assertions|^Tool assertions FAILED' | sed 's/^/      /'
 fi
 printf '%s\n' "$tools_out" | sed -n 's/^WARN: //p' | while IFS= read -r w; do warn "$w"; done
+# shadowed copies another Homebrew formula needs: shown, but nothing to fix
+printf '%s\n' "$tools_out" | sed -n 's/^OK: \(.* (kept: .*\)$/\1/p' | while IFS= read -r w; do ok "$w"; done
 
 # --- Nerd Font -------------------------------------------------------------
 if [ "$(uname -s)" = "Darwin" ]; then

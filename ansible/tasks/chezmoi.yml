@@ -107,6 +107,7 @@
   ansible.builtin.command: "{{ _chezmoi.stdout }} status"
   register: _cz_status
   changed_when: false
+  tags: [chezmoi_apply]
 
 # --force: no TTY to prompt; the run_once script backs pre-existing files up.
 - name: Apply chezmoi (only when there are pending changes)
@@ -114,6 +115,7 @@
   register: _cz_apply
   when: _cz_status.stdout | length > 0
   changed_when: true
+  tags: [chezmoi_apply]
 
 # Surfaces run_onchange script output; CI greps it for "command not found".
 - name: Show chezmoi apply output
@@ -122,3 +124,4 @@
   when: >-
     _cz_apply is changed
     and ((_cz_apply.stdout | default('')) ~ (_cz_apply.stderr | default(''))) | length > 0
+  tags: [chezmoi_apply]
