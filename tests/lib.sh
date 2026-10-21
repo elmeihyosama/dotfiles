@@ -28,6 +28,14 @@ for _t in cmux zellij pkill pgrep ghostty; do
 	printf '#!/bin/sh\nexit 0\n' >"$_tests_safe/stubbin/$_t"
 	chmod +x "$_tests_safe/stubbin/$_t"
 done
+# Where mise reaches tools through shims (a dev machine), put the real install
+# dirs first, as CI does: shims resolve via XDG_DATA_HOME, and mise trusts
+# configs via XDG_STATE_HOME, both of which mk_home moves. Resolved now, while
+# HOME is still the real one; the stubs above still win.
+if [ -z "${CI:-}" ] && command -v mise >/dev/null 2>&1; then
+	_tests_bins="$(mise bin-paths 2>/dev/null | paste -sd: -)"
+	[ -z "$_tests_bins" ] || PATH="$_tests_bins:$PATH"
+fi
 export PATH="$_tests_safe/stubbin:$PATH"
 export THEME_NVIM_GLOB="$_tests_safe/no-nvim/*.0" DOTFILES_TEST=1
 

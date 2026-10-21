@@ -1,0 +1,10 @@
+{{- /* The prompt options (.chezmoidata/prompt.toml) as JSON {key: value}:
+  the machine's prompt_<key> when it is one of the choices, else the
+  default. Use: includeTemplate "prompt-settings" . | fromJson */ -}}
+{{- $o := dict -}}
+{{- range .prompt_options -}}
+{{-   $v := toString (get $ (printf "prompt_%s" .key)) -}}
+{{-   if not (has $v .choices) }}{{ $v = .default }}{{ end -}}
+{{-   $_ := set $o .key $v -}}
+{{- end -}}
+{{- toJson $o -}}

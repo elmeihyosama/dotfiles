@@ -14,6 +14,11 @@
 #                       the fastfetch start screen, coloured (for the preview)
 #   theme SLUG | glass LEVEL | wallpaper on|off|toggle
 #                       the zsh `theme`/`glass`/`wallpaper`, headless (TUI)
+#   prompt --json       the prompt options, this machine's values, palette
+#   prompt --preview [--width N] [KEY=VALUE...]
+#                       the real starship prompt with those options (TUI)
+#   prompt KEY=VALUE... | reset
+#                       set prompt options (zsh `prompt_set`), apply them
 #   files --json        managed files changed here or waiting to apply
 #   files diff|apply|keep PATH...
 #                       chezmoi diff; apply (overwrites local edits); re-add
@@ -55,6 +60,12 @@
 #   wallpaper  "on"|"off"|null
 #   wallpapers {slug: image path}, wallpaper_opacity number|null
 #   glass_levels {level: {opacity, blur}} (strings, as glass.toml)
+#
+# `prompt --json` (TUI contract): {options: [{key, label, about, default,
+# choices}] in prompt.toml order, values: {key: choice} (unset or unknown =
+# default), palette: {colour name: "#rrggbb"} for the colour choices}.
+# `prompt --preview`: {ok, err: {left, right}}, ANSI prompt text after a
+# command that worked and after a slow one that failed.
 #
 # `files --json`: an array of {path (relative to ~), local (changed here since
 # chezmoi last wrote it), pending (the repo would change it), template}.
@@ -102,7 +113,7 @@ require_home_checkout() {
 usage() { # usage [FD]: to stderr by default, stdout with 1
 	{
 		echo "usage: dotfiles <subcommand> [args]"
-		echo "subcommands: list [--json] | add TOOL|GROUP... | remove TOOL|GROUP... | update [--check] | install | doctor [args] | look --json | theme SLUG | glass LEVEL | wallpaper on|off|toggle | files ... | machine ... | tui | help"
+		echo "subcommands: list [--json] | add TOOL|GROUP... | remove TOOL|GROUP... | update [--check] | install | doctor [args] | look --json | theme SLUG | glass LEVEL | wallpaper on|off|toggle | prompt ... | files ... | machine ... | tui | help"
 	} >&"${1:-2}"
 }
 
@@ -794,6 +805,131 @@ cmd_zsh() {
 		"$repo_root/home/dot_config/zsh/conf.d/45-theme.zsh" "$@" </dev/null
 }
 
+# --- prompt: starship and cursor options (.chezmoidata/prompt.toml) --------
+
+# prompt_data: chezmoi data from this checkout's templates and data (a
+# worktree previews its own options) and the machine's config
+prompt_data() { cz --source "$repo_root" data --format json; }
+
+# prompt_pairs_json KEY=VALUE...: {"prompt_KEY": "VALUE", ...}; exit 2 on a
+# malformed pair
+prompt_pairs_json() {
+	_j='{}'
+	for _kv in "$@"; do
+		case "$_kv" in
+		[a-z]*=*) ;;
+		*)
+			echo "dotfiles prompt: expected KEY=VALUE, got '$_kv'" >&2
+			exit 2
+			;;
+		esac
+		_j="$(printf '%s' "$_j" | jq -c --arg k "prompt_${_kv%%=*}" --arg v "${_kv#*=}" '. + {($k): $v}')"
+	done
+	printf '%s\n' "$_j"
+}
+
+# prompt_run STATUS DURATION JOBS [--right]: starship's prompt, from the
+# rendered $_cfg at $_width, for this checkout's scripts/tui (git and python
+# segments show); never shell-escaped, always coloured
+prompt_run() {
+	(cd / && env -u STARSHIP_SHELL -u NO_COLOR STARSHIP_CONFIG="$_cfg" \
+		starship prompt -w "$_width" -p "$repo_root/scripts/tui" -P "$repo_root/scripts/tui" \
+		-s "$1" -d "$2" -j "$3" ${4:+"$4"})
+}
+
+cmd_prompt() {
+	for t in chezmoi jq; do
+		command -v "$t" >/dev/null 2>&1 || {
+			echo "dotfiles prompt: $t not on PATH" >&2
+			exit 1
+		}
+	done
+	case "${1:-}" in
+	--json)
+		[ $# -eq 1 ] || {
+			echo "usage: dotfiles prompt --json" >&2
+			exit 2
+		}
+		data="$(prompt_data)" || {
+			echo "dotfiles prompt: chezmoi data failed" >&2
+			exit 1
+		}
+		printf '%s\n' "$data" | jq '
+			. as $d
+			| (.themes[.theme] // {}) as $p
+			| [.prompt_options // [] | .[] | select(type == "object")] as $opts
+			| {options: [$opts[] | {key, label, about, default, choices}],
+				values: ([$opts[]
+					| ($d["prompt_" + .key]) as $v
+					| {key: .key, value: (if any(.choices[]; . == $v) then $v else .default end)}]
+					| from_entries),
+				palette: ({bg: $p.base00, surface: $p.base01, raised: $p.base02, muted: $p.base03, text: $p.base05,
+					red: $p.base08, orange: $p.base09, yellow: $p.base0A, green: $p.base0B,
+					cyan: $p.base0C, blue: $p.base0D, magenta: $p.base0E}
+					+ ($d.design // {} | with_entries(select((.value | type) == "string"
+						and (.value | test("^base0[0-9A-F]$"))) | .value = $p[.value])))}'
+		;;
+	--preview)
+		shift
+		command -v starship >/dev/null 2>&1 || {
+			echo "dotfiles prompt: starship not on PATH" >&2
+			exit 1
+		}
+		_width=80
+		if [ "${1:-}" = --width ]; then
+			case "${2:-}" in
+			'' | *[!0-9]*)
+				echo "usage: dotfiles prompt --preview [--width N] [KEY=VALUE...]" >&2
+				exit 2
+				;;
+			esac
+			_width="$2"
+			shift 2
+		fi
+		over="$(prompt_pairs_json "$@")" || exit 2
+		_cfg="$(mktemp)"
+		trap 'rm -f "$_cfg"' EXIT
+		cz --source "$repo_root" --override-data "$over" execute-template \
+			<"$repo_root/home/dot_config/starship.toml.tmpl" >"$_cfg" || {
+			echo "dotfiles prompt: rendering starship.toml failed" >&2
+			exit 1
+		}
+		# a prompt after a command that worked, then after a slow one that
+		# failed; each run on its own line so a starship failure exits 1
+		if ! { okl="$(prompt_run 0 0 0)" && okr="$(prompt_run 0 0 0 --right)" &&
+			el="$(prompt_run 1 3200 1)" && er="$(prompt_run 1 3200 1 --right)"; }; then
+			echo "dotfiles prompt: starship failed" >&2
+			exit 1
+		fi
+		jq -n --arg okl "$okl" --arg okr "$okr" --arg el "$el" --arg er "$er" \
+			'{ok: {left: $okl, right: $okr}, err: {left: $el, right: $er}}'
+		;;
+	'')
+		echo "usage: dotfiles prompt --json | --preview [--width N] [KEY=VALUE...] | KEY=VALUE... | reset" >&2
+		exit 2
+		;;
+	*)
+		command -v zsh >/dev/null 2>&1 || {
+			echo "dotfiles prompt: zsh not on PATH" >&2
+			exit 1
+		}
+		# chezmoi applies from its own checkout: from another, the choices
+		# would be checked and applied against templates this one doesn't show
+		if _cr="$(chezmoi_repo)" &&
+			[ "$(CDPATH='' cd "$_cr" 2>/dev/null && pwd -P)" != "$(CDPATH='' cd "$repo_root" && pwd -P)" ]; then
+			echo "dotfiles prompt: chezmoi applies from $_cr; set prompt options from there (previews here show this checkout)" >&2
+			exit 1
+		fi
+		# prompt_set from the repo's 45-theme.zsh, headless as cmd_zsh runs theme
+		# shellcheck disable=SC2016 # expanded by zsh
+		exec zsh -fc '
+			compdef() { :; }
+			source "$1" || exit 1; shift; prompt_set "$@"' zsh \
+			"$repo_root/home/dot_config/zsh/conf.d/45-theme.zsh" "$@" </dev/null
+		;;
+	esac
+}
+
 # --- files: chezmoi drift --------------------------------------------------
 
 # cz ARGS...: chezmoi from / (no repo mise.toml), never paging or prompting
@@ -1083,6 +1219,7 @@ install) cmd_install "$@" ;;
 doctor) exec sh "$repo_root/scripts/doctor.sh" "$@" ;;
 look) cmd_look "$@" ;;
 theme | glass | wallpaper) cmd_zsh "$sub" "$@" ;;
+prompt) cmd_prompt "$@" ;;
 files) cmd_files "$@" ;;
 machine) cmd_machine "$@" ;;
 tui) cmd_tui "$@" ;;

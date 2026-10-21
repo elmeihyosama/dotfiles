@@ -1,0 +1,138 @@
+# Prompt (Starship) and cursor options, in the order the TUI's Prompt tab
+# lists them. A machine picks with `prompt_<key> = "<choice>"` in
+# ~/.config/chezmoi/chezmoi.toml [data] (`dotfiles prompt KEY=VALUE` writes
+# it); unset or unknown = the default, which is the prompt as it always was.
+# .chezmoitemplates/prompt-settings resolves the values for the templates.
+
+[[prompt_options]]
+key = "style"
+label = "Style"
+about = "lean: coloured text. rainbow: each segment a coloured block. bar: one strip, segments split by a thin divider."
+default = "lean"
+choices = ["lean", "rainbow", "bar"]
+
+[[prompt_options]]
+key = "separator"
+label = "Ends"
+about = "The shape of each block's or the bar's ends and the bar's dividers (rainbow and bar only). Needs a Nerd Font."
+default = "round"
+choices = ["round", "angled", "slanted", "flat"]
+
+[[prompt_options]]
+key = "start"
+label = "Left end"
+about = "The left end's own shape: same as Ends, or e.g. round or flat with angled Ends for an arrow pointing right (rainbow and bar only)."
+default = "same"
+choices = ["same", "round", "angled", "slanted", "flat"]
+
+[[prompt_options]]
+key = "bar_color"
+label = "Bar colour"
+about = "The bar's colour (bar style only). theme: from the active theme, so it changes with it — directory and git in the directory colour, the rest a shade above the background. Any other: one strip of that colour; on surface, raised or muted the text keeps each segment's colour, on a bright one it is dark."
+default = "theme"
+choices = ["theme", "surface", "raised", "accent", "accent2", "link", "ok", "warn", "err", "rail", "muted", "text", "red", "orange", "yellow", "green", "cyan", "blue", "magenta"]
+
+[[prompt_options]]
+key = "lines"
+label = "Lines"
+about = "two: info on one line, the cursor on its own line below. one: all on one line."
+default = "two"
+choices = ["two", "one"]
+
+[[prompt_options]]
+key = "frame"
+label = "Frame"
+about = "The ╭─ ╰─ rail joining the two lines (two lines only)."
+default = "on"
+choices = ["on", "off"]
+
+[[prompt_options]]
+key = "layout"
+label = "Right side"
+about = "split: command duration and time on the right edge. left: everything on the left."
+default = "split"
+choices = ["split", "left"]
+
+[[prompt_options]]
+key = "fill"
+label = "Fill"
+about = "What fills the gap between left and right (two lines, split only)."
+default = "space"
+choices = ["space", "dots", "line", "dashed"]
+
+[[prompt_options]]
+key = "char"
+label = "Prompt symbol"
+about = "The symbol before the cursor: ❯ ➜ λ $ ▶. Turns red after a failed command."
+default = "chevron"
+choices = ["chevron", "arrow", "lambda", "dollar", "triangle"]
+
+[[prompt_options]]
+key = "time"
+label = "Clock"
+about = "The time each prompt was drawn."
+default = "24h"
+choices = ["24h", "12h", "off"]
+
+[[prompt_options]]
+key = "icons"
+label = "Icons"
+about = "nerd: Nerd Font glyphs. plain: short text labels, for fonts without them."
+default = "nerd"
+choices = ["nerd", "plain"]
+
+[[prompt_options]]
+key = "langs"
+label = "Languages"
+about = "Node, Python, Rust and Go versions in project directories."
+default = "on"
+choices = ["on", "off"]
+
+[[prompt_options]]
+key = "spacing"
+label = "Spacing"
+about = "sparse: a blank line before each prompt. compact: none."
+default = "sparse"
+choices = ["sparse", "compact"]
+
+[[prompt_options]]
+key = "dir_color"
+label = "Directory colour"
+about = "Colour of the current directory, from the active theme."
+default = "accent2"
+choices = ["accent", "accent2", "link", "ok", "warn", "err", "rail", "muted", "text", "red", "orange", "yellow", "green", "cyan", "blue", "magenta"]
+
+[[prompt_options]]
+key = "git_color"
+label = "Branch colour"
+about = "Colour of the git branch, from the active theme."
+default = "link"
+choices = ["accent", "accent2", "link", "ok", "warn", "err", "rail", "muted", "text", "red", "orange", "yellow", "green", "cyan", "blue", "magenta"]
+
+[[prompt_options]]
+key = "char_color"
+label = "Symbol colour"
+about = "Colour of the prompt symbol after a command that worked."
+default = "accent"
+choices = ["accent", "accent2", "link", "ok", "warn", "err", "rail", "muted", "text", "red", "orange", "yellow", "green", "cyan", "blue", "magenta"]
+
+[[prompt_options]]
+key = "frame_color"
+label = "Frame colour"
+about = "Colour of the frame and the fill."
+default = "rail"
+choices = ["accent", "accent2", "link", "ok", "warn", "err", "rail", "muted", "text", "red", "orange", "yellow", "green", "cyan", "blue", "magenta"]
+
+[[prompt_options]]
+key = "cursor"
+label = "Cursor"
+about = "The cursor's shape at the prompt and in programs (Ghostty). vi command mode stays a block."
+default = "bar"
+choices = ["bar", "block", "underline"]
+
+[[prompt_options]]
+key = "blink"
+label = "Cursor blink"
+about = "Whether the cursor blinks (Ghostty)."
+default = "on"
+choices = ["on", "off"]

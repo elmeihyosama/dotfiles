@@ -119,8 +119,8 @@ saying so.
   (no file changes) and reports incoming commits, chezmoi drift and missing
   tools.
 - `dotfiles doctor` — read-only health check (also `doctor`).
-- `dotfiles tui`, or bare `dotfiles` in a terminal — a full-screen view, five
-  tabs (`1`–`5`, or `←`/`→` on the tab bar; opening a tab never runs
+- `dotfiles tui`, or bare `dotfiles` in a terminal — a full-screen view, six
+  tabs (`1`–`6`, or `←`/`→` on the tab bar; opening a tab never runs
   anything, `q` quits):
   - **Status**: a verdict and the few things worth doing, each opening where
     it's fixed; `r` checks health and updates (kept for the next launch),
@@ -137,6 +137,11 @@ saying so.
     glass level composed as Ghostty draws them; `enter` applies the theme
     (or the glass level), `w` previews the wallpaper on or off, `W` applies
     that, `g` jumps to glass.
+  - **Prompt**: every prompt option (one or two lines, frame, left or split,
+    the fill between them, block style, symbol, clock, icons, colours, the
+    cursor), shown as the real prompt as you change them with `←`/`→`;
+    `enter` applies, `esc` reverts, `d` picks the defaults
+    ([Prompt](docs/eye-candy.md#prompt-starship-and-cursor)).
   - **Machine**: the `install.sh` answers in `ansible/local.yml`, edited in
     place (`enter` or leaving a field saves it; sudo and shared home are
     switches, shared home asks first since it moves where tools live);
@@ -145,12 +150,12 @@ saying so.
   It runs with uv from a locked environment (`scripts/tui/`); its colours
   follow the active theme. Run from a second checkout or worktree, it edits
   this machine's `local.yml` but refuses anything that runs the playbook
-  (that would point chezmoi at that checkout). `theme`, `glass` and `wallpaper` (in the TUI or
+  (that would point chezmoi at that checkout). `theme`, `glass`, `wallpaper` and `prompt` (in the TUI or
   the shell) apply only the files that use them.
 - `dotfiles install` — install the selected tools at their pins without the
   playbook's chezmoi step (which applies with `--force`).
 - The commands behind it: `dotfiles look --json | --fetch`, `theme SLUG`, `glass LEVEL`,
-  `wallpaper on|off|toggle`, `files --json | diff|apply|keep PATH...`,
+  `wallpaper on|off|toggle`, `prompt --json | --preview | KEY=VALUE... | reset`, `files --json | diff|apply|keep PATH...`,
   `machine --json | set KEY VALUE [--no-apply] | apply`.
 
 On macOS, Raycast has *Dotfiles Update* and *Dotfiles Doctor* commands

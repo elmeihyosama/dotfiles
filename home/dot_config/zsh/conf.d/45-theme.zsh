@@ -25,17 +25,32 @@ _chezmoi_set_data() {
   rm -f "$tmp"
 }
 
-# _theme_apply: `chezmoi apply` for the targets whose templates use the
-# theme, glass or wallpaper data only. A full apply would also roll out every
-# other pending change (and run its scripts); a file edited here is left alone
-# and named (without a tty chezmoi can't ask about it).
+# _chezmoi_unset_data KEY CFG: drop `KEY = ...` from the chezmoi config's
+# [data] table, in place as _chezmoi_set_data. KEY must be literal.
+_chezmoi_unset_data() {
+  local key=$1 cfg=$2 tmp
+  tmp=$(mktemp) || return 1
+  awk -v key="$key" '
+    /^[[:space:]]*\[/ { indata = ($0 ~ /^[[:space:]]*\[data\][[:space:]]*$/); print; next }
+    indata && $0 ~ ("^[[:space:]]*" key "[[:space:]]*=") { next }
+    { print }
+  ' "$cfg" > "$tmp" || { rm -f "$tmp"; return 1; }
+  cat "$tmp" > "$cfg"
+  rm -f "$tmp"
+}
+
+# _theme_apply [RE]: `chezmoi apply` for the targets whose templates use the
+# theme, glass or wallpaper data only (or match RE: prompt_set passes the
+# prompt templates' marker). A full apply would also roll out every other
+# pending change (and run its scripts); a file edited here is left alone and
+# named (without a tty chezmoi can't ask about it).
 _THEME_DATA_RE='\.theme\b|\.themes\b|\.glass\b|glass_levels|wallpaper_mode|\.wallpaper\b|base0[0-9A-F]'
 _theme_apply() {
   emulate -L zsh
-  local src t
+  local src t re=${1:-$_THEME_DATA_RE}
   local -a tmpls targets edited kept managed
   src=$(chezmoi source-path) || return 1
-  tmpls=(${(f)"$(command grep -rlE $_THEME_DATA_RE --include='*.tmpl' $src)"})
+  tmpls=(${(f)"$(command grep -rlE $re --include='*.tmpl' $src)"})
   (( ${#tmpls} )) || return 0
   edited=(${(f)"$(chezmoi status | command awk 'substr($0, 1, 1) != " " { print substr($0, 4) }')"})
   # only targets managed here: one ignored on this OS fails the whole apply
@@ -233,3 +248,54 @@ _glass_levels() {
   _describe 'level' levels
 }
 compdef _glass_levels glass
+
+# prompt_set: set prompt (starship) and cursor options (machine-local; no git
+# diff), then apply. Starship reads its config at every prompt, and
+# 70-prompt.zsh the cursor, so open shells change on their next one. A default
+# is stored as no key at all, so a later change of default reaches this
+# machine. Options come from .chezmoidata/prompt.toml.
+#   prompt_set KEY=VALUE...   e.g. prompt_set lines=one fill=dots
+#   prompt_set reset          every option back to its default
+# Every pair is checked before anything is written.
+prompt_set() {
+  emulate -L zsh
+  local cfg opts kv key val choices def
+  local -a pairs keys
+  command -v chezmoi >/dev/null 2>&1 || { echo "prompt: chezmoi not found" >&2; return 1; }
+  command -v jq >/dev/null 2>&1 || { echo "prompt: jq not found" >&2; return 1; }
+  cfg=${CHEZMOI_CONFIG:-$HOME/.config/chezmoi/chezmoi.toml}
+  [[ -f $cfg ]] || { echo "prompt: missing $cfg" >&2; return 1; }
+  opts=$(chezmoi data --format json 2>/dev/null | jq -c '[.prompt_options // [] | .[] | {key, default, choices}]')
+  [[ -n $opts && $opts != '[]' ]] || { echo "prompt: no prompt options in chezmoi data" >&2; return 1; }
+  keys=(${(f)"$(jq -r '.[].key' <<<$opts)"})
+  (( $# )) || { echo "usage: prompt_set KEY=VALUE... | reset  (keys: ${(j: :)keys})" >&2; return 2; }
+  if [[ $# -eq 1 && $1 == reset ]]; then
+    pairs=(${(f)"$(jq -r '.[] | "\(.key)=\(.default)"' <<<$opts)"})
+  else
+    pairs=("$@")
+  fi
+  for kv in "${pairs[@]}"; do
+    [[ $kv == ?*=* ]] || { echo "prompt: expected KEY=VALUE, got '${kv}'" >&2; return 2; }
+    key=${kv%%=*} val=${kv#*=}
+    if (( ! ${keys[(Ie)$key]} )); then
+      echo "prompt: unknown option '${key}' (one of: ${(j: :)keys})" >&2; return 2
+    fi
+    choices=$(jq -r --arg k $key '.[] | select(.key == $k) | .choices | join("|")' <<<$opts)
+    if (( ! ${${(s:|:)choices}[(Ie)$val]} )); then
+      echo "prompt: ${key} must be ${choices}, not '${val}'" >&2; return 2
+    fi
+  done
+  for kv in "${pairs[@]}"; do
+    key=${kv%%=*} val=${kv#*=}
+    def=$(jq -r --arg k $key '.[] | select(.key == $k) | .default' <<<$opts)
+    if [[ $val == "$def" ]]; then
+      _chezmoi_unset_data prompt_$key $cfg || return 1
+    else
+      _chezmoi_set_data prompt_$key $val $cfg || return 1
+    fi
+  done
+  # only the templates that read the options (starship, ghostty's cursor)
+  _theme_apply 'prompt-settings' || return 1
+  echo "prompt → ${(j:, :)pairs}"
+  _theme_live_reload
+}
