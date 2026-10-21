@@ -719,7 +719,7 @@ async def test_escape_leaves_the_filter_so_tab_keys_work(calls):
 def test_prompt_bar_style_marks_what_it_uses():
     na = tui.PromptPane.not_applicable
     assert na("separator", {"style": "bar"}) == "" and na("bar_color", {"style": "bar"}) == ""
-    assert na("separator", {"style": "lean"}) == "rainbow or bar only"
+    assert na("separator", {"style": "lean"}) == na("start", {"style": "lean"}) == "rainbow or bar only"
     assert na("bar_color", {"style": "rainbow"}) == "bar style only"
 
 

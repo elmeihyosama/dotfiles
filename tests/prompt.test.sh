@@ -111,6 +111,11 @@ assert_eq '"[](fg:muted bg:surface)[ $symbol$branch ]($style)"' \
 	"$(get "$scratch/bar-round-two-24h.toml" git_branch.format)" "bar: a thin divider before the branch"
 assert_contains "$(get "$scratch/bar-round-two-off.toml" cmd_duration.format)" '[](fg:surface)[ ' "bar, no clock: the duration caps itself"
 assert_contains "$(get "$scratch/bar-round-two-off.toml" format)" ' $fill$cmd_duration$time' "bar, no clock: no empty right bar"
+render arrow prompt_style=bar prompt_separator=angled prompt_start=round
+assert_contains "$(get "$scratch/arrow.toml" format)" '[](fg:surface)$hostname' "left end: its own shape"
+assert_contains "$(get "$scratch/arrow.toml" format)" '$kubernetes[](fg:surface)' "left end: the right end keeps Ends"
+render arrow-rb prompt_style=rainbow prompt_separator=angled prompt_start=flat
+assert_contains "$(get "$scratch/arrow-rb.toml" directory.format)" '[](fg:accent2)[ ' "left end: rainbow blocks too"
 render bar-blue prompt_style=bar prompt_bar_color=blue
 assert_eq '"bold fg:bg bg:blue"' "$(get "$scratch/bar-blue.toml" directory.style)" "bright bar: dark text"
 assert_eq false "$(get "$scratch/spacing-compact.toml" add_newline)" "compact: no blank line"

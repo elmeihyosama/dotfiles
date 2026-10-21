@@ -19,6 +19,13 @@ default = "round"
 choices = ["round", "angled", "slanted", "flat"]
 
 [[prompt_options]]
+key = "start"
+label = "Left end"
+about = "The left end's own shape: same as Ends, or e.g. round or flat with angled Ends for an arrow pointing right (rainbow and bar only)."
+default = "same"
+choices = ["same", "round", "angled", "slanted", "flat"]
+
+[[prompt_options]]
 key = "bar_color"
 label = "Bar colour"
 about = "The bar's colour (bar style only). On surface or muted the text keeps each segment's colour; on a bright bar it is dark."

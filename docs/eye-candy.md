@@ -58,6 +58,7 @@ on the right, `❯`.
 |---|---|
 | `style` | `lean` (coloured text), `rainbow` (coloured blocks), `bar` (one strip, segments split by thin dividers) |
 | `separator` | `round`, `angled`, `slanted`, `flat` — the blocks' or the bar's ends, and the bar's dividers |
+| `start` | `same` (as `separator`), `round`, `angled`, `slanted`, `flat` — the left end alone, e.g. `round` with `angled` ends for an arrow pointing right |
 | `bar_color` | `surface`, or any colour below — the bar (bar style); on `surface`/`muted` the text keeps each segment's colour, on a bright bar it is dark |
 | `lines` | `two`, `one` |
 | `frame` | `on`, `off` (two lines) |

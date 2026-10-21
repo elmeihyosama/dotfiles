@@ -16,6 +16,7 @@
 {{- $frame := and $two (eq $o.frame "on") -}}
 {{- $ends := get (dict "round" (list "" "") "angled" (list "" "") "slanted" (list "" "") "flat" (list "" "")) $o.separator -}}
 {{- $L := index $ends 0 -}}
+{{- if ne $o.start "same" }}{{ $L = get (dict "round" "\ue0b6" "angled" "\ue0b2" "slanted" "\ue0ba" "flat" "") $o.start }}{{ end -}}
 {{- $R := index $ends 1 -}}
 {{- $D := print "[" (get (dict "round" "\ue0b5" "angled" "\ue0b1" "slanted" "\ue0bd" "flat" "│") $o.separator) "](fg:" (ternary (ternary "muted" "bg" (eq $bc "surface")) "bg" $onbar) " bg:" $bc ")" -}}
 {{- /* on the right edge (split) the clock ends the line; on the left a
