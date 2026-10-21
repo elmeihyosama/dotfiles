@@ -4,7 +4,7 @@ if command -v zoxide >/dev/null 2>&1; then
 fi
 
 
-# dotfiles is a command in ~/.local/bin (dot_local/bin/executable_dotfiles.tmpl).
+# dotfiles is a command in ~/.local/bin (installed by ansible/tasks/mise.yml).
 # doctor: same as `dotfiles doctor`.
 doctor() { dotfiles doctor "$@" }
 

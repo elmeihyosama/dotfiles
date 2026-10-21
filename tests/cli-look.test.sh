@@ -141,9 +141,10 @@ run
 assert_eq 2 "$rc" "bare dotfiles without a tty: exit 2"
 assert_contains "$out" "usage: dotfiles" "bare dotfiles without a tty: usage"
 
-# dotfiles_command: ~/.local/bin/dotfiles runs this checkout's script (bare
-# `dotfiles` then opens the TUI on a terminal); the zsh function is gone
-w="$(render_tmpl "$TESTS_REPO/home/dot_local/bin/executable_dotfiles.tmpl")"
-assert_contains "$w" '/scripts/dotfiles.sh" "$@"' "dotfiles command: execs the repo script with all args"
-assert_contains "$w" "exec sh \"" "dotfiles command: exec, so exit codes pass through"
+# dotfiles_command: the playbook installs `dotfiles` into local_bin (chezmoi
+# must not own that dir); it runs chezmoi's checkout's script with all args
+task="$(cat "$TESTS_REPO/ansible/tasks/mise.yml")"
+assert_contains "$task" 'dest: "{{ local_bin }}/dotfiles"' "dotfiles command: installed into local_bin"
+assert_contains "$task" 'exec sh "$(dirname "$src")/scripts/dotfiles.sh" "$@"' "dotfiles command: execs the checkout's script with all args"
+assert_eq "" "$(find "$TESTS_REPO/home" -path '*dot_local/bin*' -name '*dotfiles*')" "dotfiles command: not a chezmoi file"
 assert_eq "" "$(grep -E '^dotfiles\(\)' "$TESTS_REPO/home/dot_config/zsh/conf.d/80-tools.zsh")" "no zsh function shadows the command"

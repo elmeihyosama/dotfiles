@@ -174,7 +174,8 @@ jobs:
             exit 1
           fi
           # The preinstalled Homebrew fzf must be reported as shadowed.
-          grep -qF 'WARN  fzf also installed at /opt/homebrew/bin/fzf (shadowed); remove with: brew uninstall fzf' "$RUNNER_TEMP/doctor.log" || {
+          # (or as kept, when another installed formula depends on it)
+          grep -qE '^(WARN  fzf also installed at /opt/homebrew/bin/fzf \(shadowed\); remove with: brew uninstall fzf|OK    fzf also installed at /opt/homebrew/bin/fzf \(kept: )' "$RUNNER_TEMP/doctor.log" || {
             echo "doctor did not report the shadowed Homebrew fzf" >&2
             exit 1
           }
