@@ -27,11 +27,12 @@ from typing import Any
 
 from rich.color import Color, ColorType
 from rich.style import Style
+from rich.table import Table
 from rich.text import Text
 from textual import events, on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.theme import Theme
 from textual.widget import Widget
@@ -44,6 +45,7 @@ from textual.widgets import (
     OptionList,
     RichLog,
     Static,
+    Switch,
     TabbedContent,
     TabPane,
     Tabs,
@@ -291,7 +293,7 @@ class Pane(TabPane):
 
 
 class ToolsPane(Pane):
-    """The tool catalog with selection and install state."""
+    """The tool catalog: a table, and the highlighted tool explained beside it."""
 
     BINDINGS = [
         Binding("space", "toggle", "mark"),
@@ -311,15 +313,21 @@ class ToolsPane(Pane):
         self.want = ""  # a row to put the cursor on once it exists
 
     def compose(self) -> ComposeResult:
-        yield Input(placeholder="filter tools", id="tool-filter", classes="filter")
-        yield DataTable(id="tool-table", cursor_type="row")
-        yield Static("", id="tool-empty", classes="empty")
-        yield Label("", id="tool-summary", classes="summary")
+        with Horizontal():
+            with Vertical(id="tools-box", classes="box"):
+                yield Input(placeholder="filter tools", id="tool-filter", classes="filter")
+                yield DataTable(id="tool-table", cursor_type="row")
+                yield Static("", id="tool-empty", classes="empty")
+                yield Label("", id="tool-summary", classes="summary")
+            with VerticalScroll(id="tool-detail-box", classes="box side"):
+                yield Static("", id="tool-detail")
 
-    compact: bool | None = None  # under 100 cells: no group column, shorter versions
+    compact: bool | None = None  # under 100 cells: no About panel, shorter versions
 
     def on_mount(self) -> None:
         self.query_one("#tool-filter").display = False
+        self.query_one("#tools-box").border_title = "Tools"
+        self.query_one("#tool-detail-box").border_title = "About"
         self.action_refresh()
 
     def on_resize(self) -> None:
@@ -327,17 +335,10 @@ class ToolsPane(Pane):
         if compact == self.compact:
             return
         self.compact = compact
+        self.query_one("#tool-detail-box").display = not compact
         table = self.query_one(DataTable)
-        table.clear(columns=True)
-        for label, key in (
-            (" ", "mark"),
-            ("tool", "name"),
-            ("group", "group"),
-            ("source", "source"),
-            ("state", "state"),
-            ("version", "version"),
-        ):
-            if not (compact and key == "group"):
+        if not table.columns:
+            for label, key in ((" ", "mark"), ("tool", "name"), ("state", "state"), ("version", "version")):
                 table.add_column(label, key=key)
         self.render_rows()
 
@@ -372,7 +373,6 @@ class ToolsPane(Pane):
         if box.value:
             box.value = ""
             box.display = False
-            self.render_rows()
         # the rows may not exist yet (columns come with the first resize)
         self.want = name
         self.render_rows()
@@ -381,23 +381,24 @@ class ToolsPane(Pane):
     def mark_cell(self, tool: dict[str, Any]) -> Text:
         match self.pending.get(tool["name"]):
             case "add":
-                return Text("+", style=tone(self.app, "bold $success"))
+                return Text("+", style=tone(self.app, "bold $accent"))
             case "remove":
                 return Text("−", style=tone(self.app, "bold $error"))
-        return Text("✓", style=tone(self.app, "$primary")) if tool.get("selected") else Text("·", style="dim")
+        return Text("✓") if tool.get("selected") else Text("·", style="dim")
 
     def state_cell(self, tool: dict[str, Any]) -> Text:
+        # colour only for problems; everything fine stays neutral
         if tool.get("installed"):
-            return Text("● installed", style=tone(self.app, "$success") if tool.get("selected") else "dim")
+            return Text("installed", style="" if tool.get("selected") else "dim")
         if tool.get("selected"):
-            return Text("○ missing", style=tone(self.app, "bold $error"))
-        return Text("·", style="dim")
+            return Text("missing", style=tone(self.app, "bold $error"))
+        return Text("—", style="dim")
 
     def version_cell(self, tool: dict[str, Any]) -> Text:
         pinned, actual = field(tool, "pinned"), field(tool, "actual")
-        n = 9 if self.compact else 14
+        n = 9 if self.compact else 12
         if actual and pinned and actual != pinned:
-            return Text(f"{clip(actual, n)} → {clip(pinned, n)}", style=tone(self.app, "bold $warning"))
+            return Text(f"{clip(actual, n)} → {clip(pinned, n)}", style=tone(self.app, "$warning"))
         return Text(clip(pinned or actual, 2 * n), style="" if tool.get("installed") else "dim")
 
     def render_rows(self) -> None:
@@ -410,22 +411,13 @@ class ToolsPane(Pane):
         shown = drift = missing = 0
         for t in self.tools:
             group, source = field(t, "group"), field(t, "source")
-            if needle and needle not in f"{t['name']} {group} {source}".lower():
+            if needle and needle not in f"{t['name']} {group} {source} {field(t, 'about')}".lower():
                 continue
             shown += 1
             pinned, actual = field(t, "pinned"), field(t, "actual")
             drift += bool(actual and pinned and actual != pinned)
             missing += bool(t.get("selected") and not t.get("installed"))
-            cells = [
-                self.mark_cell(t),
-                clip(t["name"], 22),
-                Text(clip(group, 12), style="dim"),
-                Text(clip(source, 10), style="dim"),
-                self.state_cell(t),
-                self.version_cell(t),
-            ]
-            if self.compact:
-                del cells[2]
+            cells = [self.mark_cell(t), clip(t["name"], 22), self.state_cell(t), self.version_cell(t)]
             table.add_row(*cells, key=t["name"])
         if shown:
             table.move_cursor(row=min(cursor, shown - 1))
@@ -442,6 +434,65 @@ class ToolsPane(Pane):
         elif not shown:
             empty_box.update(empty(f"No tools match “{needle}”", "esc clears the filter"))
         self.render_summary(shown, missing, drift)
+        self.render_detail()
+
+    def current(self) -> dict[str, Any] | None:
+        table = self.query_one(DataTable)
+        if not table.row_count or not table.display:
+            return None
+        name = str(table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value)
+        return next((t for t in self.tools if t["name"] == name), None)
+
+    @on(DataTable.RowHighlighted, "#tool-table")
+    def highlighted(self) -> None:
+        self.render_detail()
+
+    def render_detail(self) -> None:
+        t = self.current()
+        detail = self.query_one("#tool-detail", Static)
+        if not t:
+            detail.update("")
+            return
+        d = Text()
+        d.append(t["name"] + "\n", style="bold")
+        d.append((field(t, "about") or "no description") + "\n\n", style="" if field(t, "about") else "dim")
+        pinned, actual = field(t, "pinned"), field(t, "actual")
+        if t.get("installed"):
+            state = Text("installed")
+        elif t.get("selected"):
+            state = Text("missing · dotfiles update installs it", style=tone(self.app, "$error"))
+        else:
+            state = Text("not selected", style="dim")
+        rows: list[tuple[str, Text | str]] = [
+            ("state", state),
+            ("selected", "yes" if t.get("selected") else "no"),
+            ("group", field(t, "group")),
+            ("source", field(t, "source")),
+            ("command", field(t, "bin")),
+        ]
+        if pinned:
+            rows.append(("pinned", pinned))
+        if actual:
+            off = actual != pinned and bool(pinned)
+            rows.append(
+                (
+                    "installed",
+                    Text(actual + ("  ≠ pin" if off else ""), style=tone(self.app, "$warning") if off else ""),
+                )
+            )
+        if field(t, "backend"):
+            rows.append(("from", field(t, "backend")))
+        for label, value in rows:
+            d.append(f"{label:<10}", style="dim")
+            d.append(value if isinstance(value, Text) else Text(value))
+            d.append("\n")
+        mark = self.pending.get(t["name"])
+        d.append("\n")
+        if mark:
+            d.append(f"marked to {mark} · space unmarks · a applies", style=tone(self.app, "$accent"))
+        else:
+            d.append("space marks it to " + ("remove" if t.get("selected") else "add"), style="dim")
+        detail.update(d)
 
     def render_summary(self, shown: int, missing: int, drift: int) -> None:
         total = len(self.tools)
@@ -454,7 +505,7 @@ class ToolsPane(Pane):
             t.append(f"{drift} off pin", style=tone(self.app, "$warning"))
         if self.pending:
             t.append(" · ", style="dim")
-            t.append(f"{len(self.pending)} marked, a applies", style=tone(self.app, "bold $primary"))
+            t.append(f"{len(self.pending)} marked, a applies", style=tone(self.app, "bold $accent"))
         self.query_one("#tool-summary", Label).update(t)
 
     @on(Input.Changed, "#tool-filter")
@@ -462,18 +513,16 @@ class ToolsPane(Pane):
         self.render_rows()
 
     def action_toggle(self) -> None:
-        table = self.query_one(DataTable)
-        if not table.row_count or not table.display:
+        tool = self.current()
+        if not tool:
             return
-        name = str(table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value)
-        tool = next(t for t in self.tools if t["name"] == name)
+        name = tool["name"]
         if name in self.pending:
             del self.pending[name]
         else:
             self.pending[name] = "remove" if tool.get("selected") else "add"
-        row = table.cursor_row
+        # the cursor stays: space again undoes it
         self.render_rows()
-        table.move_cursor(row=min(row + 1, table.row_count - 1))
 
     def action_apply(self) -> None:
         if not self.pending:
@@ -484,7 +533,7 @@ class ToolsPane(Pane):
         commands = [["add", *adds]] if adds else []
         commands += [["remove", *removes]] if removes else []
         body = Text()
-        for verb, names, style in (("add", adds, "$success"), ("remove", removes, "$error")):
+        for verb, names, style in (("add", adds, "$accent"), ("remove", removes, "$error")):
             if names:
                 body.append(f"{verb:<7}", style=tone(self.app, f"bold {style}"))
                 body.append(", ".join(names) + "\n")
@@ -531,7 +580,7 @@ def parse_check(out: str) -> dict[str, list[str]]:
 
 
 class StatusPane(Pane):
-    """Is this machine healthy and in sync? Cards, then what needs attention."""
+    """Is this machine healthy and in sync? A verdict, then what to do."""
 
     BINDINGS = [
         Binding("r", "check", "check health + updates"),
@@ -548,20 +597,18 @@ class StatusPane(Pane):
         self.check_rc = 0
         self.checking = False
         self.checked_at = 0.0
+        self.show_all = False
         self.doctor_error = ""
         self.details: dict[str, Text] = {}
 
     def compose(self) -> ComposeResult:
-        with Horizontal(id="cards"):
-            for card in ("health", "updates", "files", "tools"):
-                yield Static("", id=f"card-{card}", classes="card")
-        yield Label("Needs attention", classes="title", id="attention-title")
-        yield OptionList(id="attention")
-        yield Static("", id="status-detail")
+        with Vertical(id="status-box", classes="box"):
+            yield Static("", id="verdict")
+            yield OptionList(id="attention")
+            yield Static("", id="meters")
 
     def on_mount(self) -> None:
-        for card, title in (("health", "Health"), ("updates", "Updates"), ("files", "Files"), ("tools", "Tools")):
-            self.query_one(f"#card-{card}").border_title = title
+        self.query_one("#status-box").border_title = "Status"
         self.load_state()
         self.render_status()
 
@@ -655,131 +702,159 @@ class StatusPane(Pane):
     def app_files(self) -> list[dict[str, Any]]:
         return getattr(self.app, "files_data", None) or []
 
-    def card(self, name: str, lines: list[tuple[str, str]]) -> None:
-        t = Text()
-        for i, (text, style) in enumerate(lines):
-            t.append(("\n" if i else "") + text, style=tone(self.app, style) if "$" in style else style)
-        self.query_one(f"#card-{name}", Static).update(t)
-
-    def render_status(self) -> None:
+    def items(self) -> list[tuple[str, int, str, str, str, str]]:
+        """What needs doing, aggregated: (key, rank, mark, style, text, hint).
+        Rank 1-2 need fixing; the rest are things you could do."""
         tools, files = self.app_tools(), self.app_files()
-        # health
-        if self.doctor is None:
-            self.card(
-                "health",
-                [("● checking…", "$accent")] if self.checking else [("not checked", "dim"), ("r checks", "dim")],
+        out: list[tuple[str, int, str, str, str, str]] = []
+
+        def plural(n: int, one: str, many: str) -> str:
+            return f"{n} {one if n == 1 else many}"
+
+        doctor = self.doctor or []
+        fails = sum(1 for e in doctor if e[0] == "FAIL")
+        warns = sum(1 for e in doctor if e[0] == "WARN")
+        if self.doctor_error:
+            out.append(("health-fail", 1, "✗", "$error", "doctor didn't run", "enter shows why"))
+        if fails:
+            out.append(
+                (
+                    "health-fail",
+                    1,
+                    "✗",
+                    "$error",
+                    plural(fails, "health check failing", "health checks failing"),
+                    "enter",
+                )
             )
-        elif self.doctor_error:
-            self.card("health", [("✗ doctor didn't run", "bold $error"), ("r tries again", "dim")])
-        else:
-            n = {k: sum(1 for e in self.doctor if e[0] == k) for k in DOCTOR_MARK}
-            first = f"✗ {n['FAIL']} failing" if n["FAIL"] else ("▲ " if n["WARN"] else "✓ ") + "healthy"
-            style = "bold $error" if n["FAIL"] else ("$warning" if n["WARN"] else "$success")
-            self.card("health", [(first, style), (f"{n['WARN']} warn · {n['OK']} ok", "dim")])
-        # updates
-        if self.check is None:
-            busy = self.checking and self.doctor is not None
-            self.card(
-                "updates", [("● fetching…", "$accent")] if busy else [("not checked", "dim"), ("r checks", "dim")]
-            )
-        else:
-            commits = self.check.get("incoming commits", [])
-            commits = [c for c in commits if not c.startswith("(")]
-            if self.check_rc:
-                self.card("updates", [("✗ check failed", "$error"), ("r tries again", "dim")])
-            elif commits:
-                self.card("updates", [(f"↓ {len(commits)} incoming", "bold $warning"), ("u updates", "dim")])
-            else:
-                self.card("updates", [("✓ up to date", "$success"), ("nothing to pull", "dim")])
-        # files
-        local = [f for f in files if f.get("local")]
-        pending = [f for f in files if f.get("pending") and not f.get("local")]
-        if getattr(self.app, "files_data", None) is None:
-            self.card("files", [("loading…", "dim")])
-        else:
-            first = (f"● {len(local)} edited", "bold $warning") if local else ("✓ no local edits", "$success")
-            self.card("files", [first, (f"{len(pending)} to apply", "dim")])
-        # tools
         missing = [t for t in tools if t.get("selected") and not t.get("installed")]
+        if missing:
+            names = ", ".join(t["name"] for t in missing[:3]) + ("…" if len(missing) > 3 else "")
+            out.append(
+                (
+                    "tools-missing",
+                    2,
+                    "○",
+                    "$error",
+                    f"{plural(len(missing), 'tool', 'tools')} not installed: {names}",
+                    "→ Tools",
+                )
+            )
+        local = [f for f in files if f.get("local")]
+        if local:
+            out.append(
+                (
+                    "files-local",
+                    3,
+                    "●",
+                    "$warning",
+                    plural(len(local), "file edited here", "files edited here"),
+                    "→ Files",
+                )
+            )
+        if warns:
+            out.append(("health-warn", 4, "▲", "$warning", plural(warns, "health warning", "health warnings"), "enter"))
+        commits = [c for c in (self.check or {}).get("incoming commits", []) if not c.startswith("(")]
+        if commits:
+            out.append(
+                ("updates", 5, "↓", "$accent", plural(len(commits), "update waiting", "updates waiting"), "u update")
+            )
         drift = [
             t for t in tools if field(t, "actual") and field(t, "pinned") and field(t, "actual") != field(t, "pinned")
         ]
-        if getattr(self.app, "tools_data", None) is None:
-            self.card("tools", [("loading…", "dim")])
-        else:
-            first = (f"○ {len(missing)} missing", "bold $error") if missing else ("✓ all installed", "$success")
-            self.card("tools", [first, (f"{len(drift)} off pin · {len(tools)}", "dim")])
-        self.render_attention(missing, drift, local, pending)
-
-    def render_attention(self, missing, drift, local, pending) -> None:
-        title = Text("Needs attention", style=tone(self.app, "bold $accent"))
-        if self.checking:
-            title.append("   ● checking…", style=tone(self.app, "$accent"))
-        elif self.checked_at:
-            title.append(f"   health and updates checked {self.age()} · r checks again", style="dim")
-        self.query_one("#attention-title", Label).update(title)
-        items: list[tuple[str, Text, Text]] = []
-
-        def add(key: str, mark: str, style: str, text: str, hint: str, detail: Text | None = None) -> None:
-            width = max(20, self.size.width - len(hint) - 8)
-            prompt = Text(no_wrap=True, overflow="ellipsis")
-            prompt.append(f"{mark} ", style=tone(self.app, style))
-            prompt.append(clip(text, width))
-            prompt.append(f"   {hint}", style="dim")
-            items.append((key, prompt, detail or Text(text)))
-
-        if self.doctor_error:
-            add("doctor:error", "✗", "$error", "doctor didn't run", "r tries again", Text(self.doctor_error))
-        # failures first, then warnings, each in doctor's order
-        ranked = sorted(enumerate(self.doctor or []), key=lambda e: e[1][0] != "FAIL")
-        for i, (kind, text, details) in ranked:
-            if kind == "OK":
-                continue
-            mark, style = DOCTOR_MARK[kind]
-            d = Text(text)
-            for line in details:
-                d.append("\n" + line, style="dim")
-            add(f"doctor:{i}", mark, style, text, "doctor", d)
-        for f in local:
-            add(f"file:{f['path']}", "●", "$warning", f"{f['path']} changed here", "enter: Files")
-        for t in missing:
-            add(f"tool:{t['name']}", "○", "$error", f"{t['name']} is selected but not installed", "enter: Tools")
-        for t in drift:
-            add(
-                f"tool:{t['name']}",
-                "→",
-                "$warning",
-                f"{t['name']} {field(t, 'actual')} → pinned {field(t, 'pinned')}",
-                "enter: Tools",
+        if drift:
+            out.append(
+                (
+                    "tools-drift",
+                    6,
+                    "→",
+                    "$warning",
+                    plural(len(drift), "tool off its pin", "tools off their pin"),
+                    "→ Tools",
+                )
             )
-        commits = [c for c in (self.check or {}).get("incoming commits", []) if not c.startswith("(")]
-        if commits:
-            d = Text("\n".join(commits[:20]) + (f"\n… {len(commits) - 20} more" if len(commits) > 20 else ""))
-            add("commits", "↓", "$warning", f"{len(commits)} incoming commit(s)", "u updates", d)
+        pending = [f for f in files if f.get("pending") and not f.get("local")]
         if pending:
-            d = Text("\n".join(f["path"] for f in pending[:20]), style="dim")
-            add("pending", "◌", "$primary", f"{len(pending)} file(s) waiting to apply", "enter: Files", d)
+            out.append(
+                (
+                    "files-pending",
+                    7,
+                    "◌",
+                    "",
+                    plural(len(pending), "file waiting to apply", "files waiting to apply"),
+                    "→ Files",
+                )
+            )
+        return sorted(out, key=lambda i: i[1])
+
+    def render_status(self) -> None:
+        items = self.items()
+        verdict = Text()
+        needs_fix = [i for i in items if i[1] <= 2]
+        if self.checking:
+            verdict.append("◌  Checking…\n", style=tone(self.app, "bold $accent"))
+            verdict.append("doctor, then a fetch: nothing changes", style="dim")
+        else:
+            if needs_fix:
+                what = "thing needs" if len(needs_fix) == 1 else "things need"
+                verdict.append(f"✗  {len(needs_fix)} {what} fixing\n", style=tone(self.app, "bold $error"))
+            elif items:
+                n = len(items)
+                verdict.append(
+                    f"▲  {n} {'thing' if n == 1 else 'things'} you could do\n", style=tone(self.app, "bold $warning")
+                )
+            else:
+                verdict.append("✓  All good\n", style=tone(self.app, "bold $success"))
+            if self.checked_at:
+                verdict.append(f"health and updates checked {self.age()} · r checks again", style="dim")
+            else:
+                verdict.append("health and updates not checked yet · r checks (reads and fetches only)", style="dim")
+        self.query_one("#verdict", Static).update(verdict)
 
         attention = self.query_one("#attention", OptionList)
         keep = attention.highlighted
         attention.clear_options()
-        self.details = {k: d for k, _, d in items}
-        detail = self.query_one("#status-detail", Static)
+        width = max(30, self.size.width - 16)
+        shown = items if self.show_all or len(items) <= 5 else items[:4]
+        for key, _rank, mark, style, text, hint in shown:
+            prompt = Table.grid(expand=True, padding=(0, 2))
+            prompt.add_column(width=1)
+            prompt.add_column(ratio=1, no_wrap=True, overflow="ellipsis")
+            prompt.add_column(justify="right", no_wrap=True)
+            prompt.add_row(
+                Text(mark, style=tone(self.app, style) if style else "dim"), clip(text, width), Text(hint, style="dim")
+            )
+            attention.add_option(Option(prompt, id=key))
+        if len(shown) < len(items):
+            attention.add_option(Option(Text(f"  + {len(items) - len(shown)} more", style="dim"), id="more"))
+        attention.display = bool(items)
         if items:
-            attention.display = True
-            attention.add_options(Option(p, id=k) for k, p, _ in items)
             attention.highlighted = min(keep or 0, len(items) - 1)
-        else:
-            attention.display = False
-            if self.doctor is None:
-                detail.update(empty("Nothing flagged yet", "r checks health and updates · it only reads and fetches"))
-            else:
-                detail.update(empty("All clear", "healthy, in sync, nothing changed here"))
+        self.render_meters()
 
-    @on(OptionList.OptionHighlighted, "#attention")
-    def show_detail(self, event: OptionList.OptionHighlighted) -> None:
-        if (key := event.option.id) in self.details:
-            self.query_one("#status-detail", Static).update(self.details[key])
+    def render_meters(self) -> None:
+        """One btop-style line: tools as a bar, then health, files, updates."""
+        tools, files = self.app_tools(), self.app_files()
+        m = Text()
+        if tools:
+            selected = [t for t in tools if t.get("selected")]
+            ok = sum(1 for t in selected if t.get("installed"))
+            width = 16
+            fill = round(width * ok / len(selected)) if selected else 0
+            m.append("tools ", style="dim")
+            m.append("█" * fill, style=tone(self.app, "$accent"))
+            m.append("░" * (width - fill), style="dim")
+            m.append(f" {ok}/{len(selected)}", style="dim")
+        if self.doctor:
+            n = {k: sum(1 for e in self.doctor if e[0] == k) for k in DOCTOR_MARK}
+            m.append("    health ", style="dim")
+            m.append(f"✓{n['OK']}", style="dim")
+            m.append(f" ▲{n['WARN']}", style=tone(self.app, "$warning") if n["WARN"] else "dim")
+            m.append(f" ✗{n['FAIL']}", style=tone(self.app, "$error") if n["FAIL"] else "dim")
+        if files:
+            local = sum(1 for f in files if f.get("local"))
+            m.append(f"    files {local} edited · {len(files) - local} to apply", style="dim")
+        self.query_one("#meters", Static).update(m)
 
     @on(OptionList.OptionSelected, "#attention")
     def open_item(self, event: OptionList.OptionSelected) -> None:
@@ -787,19 +862,73 @@ class StatusPane(Pane):
         app = self.app
         if not isinstance(app, DotfilesApp):
             return
-        if key.startswith("file:") or key == "pending":
+        tools = self.app_tools()
+        if key == "more":
+            self.show_all = True
+            self.render_status()
+        elif key.startswith("health"):
+            app.push_screen(HealthReport(self.doctor or [], self.doctor_error, self.age()))
+        elif key == "files-local" or key == "files-pending":
+            files = [f for f in self.app_files() if f.get("local") == (key == "files-local")]
             app.action_tab("files")
-            app.query_one(FilesPane).select(key[5:] if key.startswith("file:") else None)
-        elif key.startswith("tool:"):
+            app.query_one(FilesPane).select(files[0]["path"] if files else None)
+        elif key == "tools-missing":
+            first = next((t for t in tools if t.get("selected") and not t.get("installed")), None)
             app.action_tab("tools")
-            app.query_one(ToolsPane).select(key[5:])
-        elif key == "commits":
+            if first:
+                app.query_one(ToolsPane).select(first["name"])
+        elif key == "tools-drift":
+            first = next((t for t in tools if field(t, "actual") and field(t, "actual") != field(t, "pinned")), None)
+            app.action_tab("tools")
+            if first:
+                app.query_one(ToolsPane).select(first["name"])
+        elif key == "updates":
             self.action_update()
 
     def action_open(self) -> None:
         attention = self.query_one("#attention", OptionList)
         if attention.highlighted is not None:
             attention.action_select()
+
+
+class HealthReport(ModalScreen[None]):
+    """doctor's problems with their details, then a count of what passed."""
+
+    BINDINGS = [Binding("escape,q,enter", "close", "close")]
+
+    def __init__(self, entries: list[tuple[str, str, list[str]]], error: str, age: str) -> None:
+        super().__init__()
+        self.entries, self.error, self.age = entries, error, age
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog wide") as box:
+            box.border_title = "Health" + (f" · checked {self.age}" if self.age else "")
+            yield RichLog(id="report", wrap=True, min_width=20, auto_scroll=False)
+            yield Label(Text("esc closes · r on Status checks again", style="dim"), id="run-status")
+
+    def on_mount(self) -> None:
+        log = self.query_one(RichLog)
+        if self.error:
+            log.write(Text("doctor didn't run", style=tone(self.app, "bold $error")))
+            log.write(Text(self.error, style="dim"))
+            return
+        problems = sorted((e for e in self.entries if e[0] != "OK"), key=lambda e: e[0] != "FAIL")
+        grid = Table.grid(padding=(0, 1))
+        grid.add_column(width=1)
+        grid.add_column(ratio=1)
+        for kind, text, details in problems:
+            mark, style = DOCTOR_MARK[kind]
+            body = Text(text)
+            for d in details:
+                body.append("\n" + d, style="dim")
+            grid.add_row(Text(mark, style=tone(self.app, style)), body)
+        if problems:
+            log.write(grid)
+        passing = sum(1 for e in self.entries if e[0] == "OK")
+        log.write(Text(f"\n✓ {passing} checks passing", style="dim"))
+
+    def action_close(self) -> None:
+        self.dismiss(None)
 
 
 class FilesPane(Pane):
@@ -823,15 +952,17 @@ class FilesPane(Pane):
 
     def compose(self) -> ComposeResult:
         with Horizontal():
-            with Vertical(id="files-left"):
+            with Vertical(id="files-left", classes="box"):
                 yield Input(placeholder="filter files", id="file-filter", classes="filter")
                 yield OptionList(id="file-list")
-            with Vertical(id="files-right"):
+            with Vertical(id="files-right", classes="box side"):
                 yield Label("", id="file-head", classes="summary top")
                 yield RichLog(id="file-diff", wrap=False, min_width=20, auto_scroll=False)
 
     def on_mount(self) -> None:
         self.query_one("#file-filter").display = False
+        self.query_one("#files-left").border_title = "Files"
+        self.query_one("#files-right").border_title = "Diff"
         self.action_refresh()
 
     @work(exclusive=True, group="files")
@@ -1010,62 +1141,43 @@ MACHINE_FIELDS = [
     ("git_email", "Git email", "commit author email"),
     ("personal_git_name", "Personal name", "identity for your personal repos"),
     ("personal_git_email", "Personal email", "prefer GitHub's noreply address"),
-    ("personal_git_dirs", "Personal dirs", "where it applies, comma-separated; trailing / = beneath"),
+    ("personal_git_dirs", "Personal dirs", "comma-separated; a trailing / covers everything beneath"),
     ("signing_key", "Signing key", "SSH .pub that signs personal commits"),
     ("allow_sudo", "Allow sudo", "native package installs may use sudo"),
 ]
 
 
-class Edit(ModalScreen[str | None]):
-    """One-field editor; dismisses with the new value, or None on cancel."""
-
-    BINDINGS = [Binding("escape", "cancel", "cancel")]
-
-    def __init__(self, title: str, value: str, hint: str) -> None:
-        super().__init__()
-        self.title_text, self.value, self.hint = title, value, hint
-
-    def compose(self) -> ComposeResult:
-        with Vertical(classes="dialog") as box:
-            box.border_title = self.title_text
-            yield Input(self.value, id="edit-value")
-            yield Static(Text(self.hint + "\nenter saves · esc cancels · empty unsets", style="dim"), classes="body")
-
-    def on_mount(self) -> None:
-        self.query_one(Input).focus()
-
-    @on(Input.Submitted)
-    def save(self, event: Input.Submitted) -> None:
-        self.dismiss(event.value)
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
-
-
 class MachinePane(Pane):
-    """This machine's install.sh answers (ansible/local.yml)."""
+    """This machine's install.sh answers (ansible/local.yml), edited in place:
+    enter (or leaving a field) saves it; ctrl+s applies them all."""
 
     BINDINGS = [
-        Binding("enter", "edit", "edit"),
-        Binding("a", "apply", "apply to this machine"),
-        Binding("r", "refresh", "refresh"),
+        Binding("ctrl+s", "apply", "apply to this machine"),
+        Binding("r", "refresh", "refresh", show=False),
     ]
-    main = "#machine-table"
+    main = "#m-git_name"
 
     def __init__(self) -> None:
         super().__init__("Machine", id="machine")
         self.data: dict[str, Any] = {}
         self.dirty = False
+        self.saved: dict[str, str] = {}  # what local.yml holds, per field
 
     def compose(self) -> ComposeResult:
-        yield DataTable(id="machine-table", cursor_type="row")
+        with VerticalScroll(id="machine-box", classes="box"):
+            for key, label, hint in MACHINE_FIELDS:
+                with Horizontal(classes="field"):
+                    yield Label(label, classes="flabel")
+                    if key == "allow_sudo":
+                        yield Switch(id=f"m-{key}")
+                    else:
+                        yield Input(id=f"m-{key}", placeholder="not set")
+                    yield Label(Text(hint, style="dim"), id=f"h-{key}", classes="fhint")
+            yield Static("", id="machine-readonly")
         yield Label("", id="machine-summary", classes="summary")
 
     def on_mount(self) -> None:
-        table = self.query_one(DataTable)
-        table.add_column("setting", key="label")
-        table.add_column("value", key="value")
-        table.add_column("", key="about")
+        self.query_one("#machine-box").border_title = "Machine · ansible/local.yml"
         self.action_refresh()
 
     @work(exclusive=True, group="machine")
@@ -1084,7 +1196,19 @@ class MachinePane(Pane):
             )
             return
         self.data = data
-        self.render_rows()
+        values = data["values"]
+        for key, _label, _hint in MACHINE_FIELDS:
+            v = values.get(key)
+            if key == "allow_sudo":
+                with self.prevent(Switch.Changed):
+                    self.query_one(f"#m-{key}", Switch).value = bool(v)
+                self.saved[key] = "true" if v else "false"
+            else:
+                shown = self.show(v)
+                self.query_one(f"#m-{key}", Input).value = shown
+                self.saved[key] = shown
+            self.query_one(f"#m-{key}").disabled = not data.get("exists")
+        self.render_extras()
 
     @staticmethod
     def show(value: Any) -> str:
@@ -1096,41 +1220,34 @@ class MachinePane(Pane):
             return ", ".join(str(v) for v in value)
         return str(value)
 
-    def render_rows(self) -> None:
-        table = self.query_one(DataTable)
-        cursor = table.cursor_row
-        table.clear()
+    def render_extras(self) -> None:
         values = self.data.get("values", {})
-        for key, label, about in MACHINE_FIELDS:
-            v = self.show(values.get(key))
-            cell = Text(clip(v, 40)) if v else Text("—", style="dim")
-            if key == "signing_key" and v:
-                ok = (self.data.get("signing") or {}).get("exists")
-                cell.append(
-                    "  ✓ found" if ok else "  ✗ file missing", style=tone(self.app, "$success" if ok else "$error")
+        key = self.show(values.get("signing_key"))
+        hint = self.query_one("#h-signing_key", Label)
+        if key:
+            ok = (self.data.get("signing") or {}).get("exists")
+            hint.update(
+                Text(
+                    "✓ key file found" if ok else "✗ key file missing", style="dim" if ok else tone(self.app, "$error")
                 )
-            table.add_row(Text(label, style="bold"), cell, Text(about, style="dim"), key=key)
+            )
+        else:
+            hint.update(Text("SSH .pub that signs personal commits", style="dim"))
         groups = values.get("tool_groups")
-        sel = self.show(groups) if groups else "every group"
-        extra = [
-            f"+{self.show(values.get('tools_add'))}" if values.get("tools_add") else "",
-            f"−{self.show(values.get('tools_remove'))}" if values.get("tools_remove") else "",
-        ]
-        sel += "".join(f"  {e}" for e in extra if e)
-        table.add_row(
-            Text("Tools", style="dim bold"),
-            Text(clip(sel, 40), style="dim"),
-            Text("change in the Tools tab", style="dim"),
-            key="-tools",
-        )
-        shared = self.show(values.get("shared_home")) or "no"
-        table.add_row(
-            Text("Shared home", style="dim bold"),
-            Text(shared, style="dim"),
-            Text("set at install; re-run install.sh --reconfigure", style="dim"),
-            key="-shared",
-        )
-        table.move_cursor(row=min(cursor, table.row_count - 1))
+        sel = self.show(groups) if groups is not None else "every group"
+        if values.get("tools_add"):
+            sel += f"  +{self.show(values['tools_add'])}"
+        if values.get("tools_remove"):
+            sel += f"  −{self.show(values['tools_remove'])}"
+        ro = Text()
+        for label, value, about in (
+            ("Tools", sel, "change in the Tools tab"),
+            ("Shared home", self.show(values.get("shared_home")) or "no", "set at install: install.sh --reconfigure"),
+        ):
+            ro.append(f"{label:<16}", style="bold dim")
+            ro.append(f"{clip(value, 34):<36}")
+            ro.append(about + "\n", style="dim")
+        self.query_one("#machine-readonly", Static).update(ro)
         path = str(self.data.get("path", ""))
         home = os.path.expanduser("~")
         path = "~" + path[len(home) :] if path.startswith(home + "/") else path
@@ -1138,48 +1255,46 @@ class MachinePane(Pane):
         if not self.data.get("exists"):
             s = Text("no local.yml yet: run install.sh first", style=tone(self.app, "$error"))
         elif self.dirty:
-            s.append("   ● saved to local.yml · a applies it to this machine", style=tone(self.app, "bold $warning"))
+            s.append(
+                "   ● saved to local.yml · ctrl+s applies it to this machine", style=tone(self.app, "bold $warning")
+            )
+        else:
+            s.append("   enter saves a field · ctrl+s applies", style="dim")
         self.query_one("#machine-summary", Label).update(s)
 
-    @on(DataTable.RowSelected, "#machine-table")
-    def row_selected(self) -> None:
-        # DataTable keeps enter for itself; selecting a row edits it
-        self.action_edit()
+    @on(Input.Submitted)
+    def submitted(self, event: Input.Submitted) -> None:
+        self.save_field(event.input)
 
-    def action_edit(self) -> None:
-        table = self.query_one(DataTable)
-        if not table.row_count or not self.data.get("exists"):
+    @on(Input.Blurred)
+    def blurred(self, event: Input.Blurred) -> None:
+        self.save_field(event.input)
+
+    @on(Switch.Changed, "#m-allow_sudo")
+    def sudo(self, event: Switch.Changed) -> None:
+        self.save("allow_sudo", "true" if event.value else "false")
+
+    def save_field(self, box: Input) -> None:
+        key = (box.id or "")[2:]
+        if key in self.saved and box.value.strip() != self.saved[key]:
+            self.save(key, box.value.strip())
+
+    @work(group="machine-save")
+    async def save(self, key: str, value: str) -> None:
+        rc, out, err = await capture("machine", "set", key, value, "--no-apply")
+        hint = self.query_one(f"#h-{key}", Label)
+        if rc:
+            msg = (err.strip() or out.strip() or f"exit {rc}").splitlines()[-1].removeprefix("dotfiles machine: ")
+            hint.update(Text(f"✗ {msg}", style=tone(self.app, "$error")))
             return
-        key = str(table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value)
-        meta = next((f for f in MACHINE_FIELDS if f[0] == key), None)
-        if not meta:
-            self.notify(
-                "read-only here: " + ("use the Tools tab" if key == "-tools" else "re-run install.sh --reconfigure")
-            )
-            return
-        value = self.data["values"].get(key)
-        if key == "allow_sudo":
-            self.save(key, "false" if value else "true")
-            return
-        hint = meta[2] + (" (must end in .pub)" if key == "signing_key" else "")
-
-        def edited(new: str | None) -> None:
-            if new is not None and new != self.show(value):
-                self.save(key, new)
-
-        self.app.push_screen(Edit(meta[1], self.show(value), hint), edited)
-
-    def save(self, key: str, value: str) -> None:
-        def saved(rc: int | None) -> None:
-            if rc == 0:
-                self.dirty = True
-            self.action_refresh()
-
-        self.app.push_screen(Run(f"set {key}", [["machine", "set", key, value, "--no-apply"]]), saved)
+        self.saved[key] = value
+        self.dirty = True
+        hint.update(Text("✓ saved", style=tone(self.app, "$success")))
+        self.render_extras()
 
     def action_apply(self) -> None:
         body = Text("Rewrites chezmoi's config from local.yml, then runs chezmoi apply.")
-        body.append("\n\nFiles changed here are not overwritten: apply stops and Files lists them.", style="dim")
+        body.append("\n\nFiles edited here are not overwritten: apply stops and Files lists them.", style="dim")
 
         def confirmed(yes: bool | None) -> None:
             if yes:
@@ -1229,6 +1344,34 @@ def recolor(text: Text, src: dict[str, str], dst: dict[str, str]) -> Text:
     return out
 
 
+_DESKTOP: list[Any] = []
+
+
+def desktop() -> Any:
+    """A stand-in desktop for glass previews: soft gradient and colour blobs."""
+    if not _DESKTOP:
+        from PIL import Image, ImageDraw, ImageFilter
+
+        w, h = 160, 100
+        img = Image.new("RGB", (w, h))
+        px = img.load()
+        for y in range(h):
+            for x in range(w):
+                t = (x / w + y / h) / 2
+                px[x, y] = (round(58 + (200 - 58) * t), round(110 + (107 - 110) * t), round(165 + (152 - 165) * t))
+        draw = ImageDraw.Draw(img)
+        draw.ellipse((20, 10, 75, 60), fill=(244, 194, 107))
+        draw.ellipse((95, 45, 150, 95), fill=(91, 192, 190))
+        draw.rectangle((0, 70, 60, 100), fill=(40, 44, 60))
+        _DESKTOP.append(img.filter(ImageFilter.GaussianBlur(3)))
+    return _DESKTOP[0]
+
+
+def glass_blur(blur: str) -> float:
+    """Ghostty's background-blur value as a preview blur radius."""
+    return {"false": 0, "macos-glass-clear": 1.5, "macos-glass-regular": 5}.get(blur, 6 if blur.isdigit() else 0)
+
+
 class Preview(Widget):
     """The terminal start screen (fastfetch + a prompt) painted in a palette,
     over the theme's wallpaper blended as Ghostty does (opacity over base00)."""
@@ -1242,37 +1385,40 @@ class Preview(Widget):
         self.fetch_small: list[Text] = []
         self.image: Any = None  # PIL image of the wallpaper, or None
         self.wall_opacity = 0.15
+        self.glass = (1.0, "false")  # (background opacity, blur) being previewed
         self.footer = Text()
-        self._grid: tuple[Any, int, int, str, list[list[str]]] | None = None
+        self._grid: tuple[Any, list[list[str]]] | None = None
 
     def paint(self, slug: str, palette: dict[str, str], src: dict[str, str] | None, footer: Text) -> None:
         self.slug, self.palette, self.src, self.footer = slug, palette, src, footer
         self.refresh()
 
     def bg_grid(self, w: int, h: int) -> list[list[str]] | None:
-        """Per-cell background: the wallpaper blended over base00 (cached)."""
-        if self.image is None or not self.palette or w <= 0 or h <= 0:
+        """Per half-cell background, as Ghostty composes it: the desktop
+        (blurred) under base00 at the glass opacity, then the wallpaper at
+        its opacity. None when it's plain base00 (opaque, no wallpaper)."""
+        if not self.palette or w <= 0 or h <= 0:
+            return None
+        opacity, blur = self.glass
+        if self.image is None and opacity >= 1:
             return None
         base = self.palette["base00"]
-        if self._grid and self._grid[:4] == (self.image, w, h, base):
-            return self._grid[4]
-        from PIL import ImageOps
+        key = (self.image, w, h, base, self.glass)
+        if self._grid and self._grid[0] == key:
+            return self._grid[1]
+        from PIL import Image, ImageFilter, ImageOps
 
-        # two pixels per cell (top and bottom half: cells are ~twice as tall as wide)
-        img = ImageOps.fit(self.image, (w, h * 2))
-        br, bg_, bb = hex_rgb(base)
-        o = self.wall_opacity
-        px = img.load()
-        rows = [
-            [
-                "#{:02x}{:02x}{:02x}".format(
-                    *(round(c * (1 - o) + p * o) for c, p in zip((br, bg_, bb), px[x, y][:3], strict=True))
-                )
-                for x in range(w)
-            ]
-            for y in range(h * 2)
-        ]
-        self._grid = (self.image, w, h, base, rows)
+        layer = Image.new("RGB", (w, h * 2), hex_rgb(base))
+        if opacity < 1:
+            back = ImageOps.fit(desktop(), (w, h * 2))
+            if (r := glass_blur(blur)) > 0:
+                back = back.filter(ImageFilter.GaussianBlur(r))
+            layer = Image.blend(back, layer, opacity)
+        if self.image is not None:
+            layer = Image.blend(layer, ImageOps.fit(self.image, (w, h * 2)), self.wall_opacity)
+        px = layer.load()
+        rows = [["#{:02x}{:02x}{:02x}".format(*px[x, y][:3]) for x in range(w)] for y in range(h * 2)]
+        self._grid = (key, rows)
         return rows
 
     def build_lines(self, w: int) -> list[Text]:
@@ -1371,19 +1517,25 @@ class LookPane(Pane):
         super().__init__("Look", id="look")
         self.look: dict[str, Any] = {}
         self.wall_preview: bool | None = None  # None: follow the machine's setting
+        self.glass_preview: str | None = None  # a glass level being previewed
         self.images: dict[str, Any] = {}
 
     def compose(self) -> ComposeResult:
         with Horizontal():
             with Vertical(id="look-left"):
-                yield Input(placeholder="filter themes", id="theme-filter", classes="filter")
-                yield OptionList(id="theme-list")
-                yield Label("Glass · g", classes="title")
-                yield OptionList(id="glass-list")
-            yield Preview(id="preview")
+                with Vertical(id="themes-box", classes="box"):
+                    yield Input(placeholder="filter themes", id="theme-filter", classes="filter")
+                    yield OptionList(id="theme-list")
+                with Vertical(id="glass-box", classes="box"):
+                    yield OptionList(id="glass-list")
+            with Vertical(id="preview-box", classes="box side"):
+                yield Preview(id="preview")
 
     def on_mount(self) -> None:
         self.query_one("#theme-filter").display = False
+        self.query_one("#themes-box").border_title = "Themes"
+        self.query_one("#glass-box").border_title = "Glass · g"
+        self.query_one("#preview-box").border_title = "Preview"
         self.action_refresh()
         self.load_fetch()
 
@@ -1519,6 +1671,12 @@ class LookPane(Pane):
         on = self.wall_on()
         if not (has_wall and on):
             preview.image = None
+        levels = self.look.get("glass_levels") or {}
+        level = levels.get(self.glass_level()) or {}
+        try:
+            preview.glass = (float(level.get("opacity", 1)), str(level.get("blur", "false")))
+        except (TypeError, ValueError):
+            preview.glass = (1.0, "false")
         dim, fg = palette["base03"], palette["base05"]
         f = Text()
         f.append(slug, style=Style(color=fg, bold=True))
@@ -1531,6 +1689,10 @@ class LookPane(Pane):
             f.append("on" if on else "off", style=Style(color=palette["base0B"] if on else dim, bold=True))
             machine = (field(self.look, "wallpaper") or "on") != "off"
             f.append("  w previews" + ("  W applies" if on != machine else ""), style=dim)
+        f.append("  ·  glass ", style=dim)
+        f.append(self.glass_level(), style=Style(color=fg, bold=True))
+        if self.glass_preview and self.glass_preview != (field(self.look, "glass") or "default"):
+            f.append("  enter applies", style=dim)
         preview.paint(slug, palette, preview.src, f)
 
     def action_wallpaper(self) -> None:
@@ -1550,6 +1712,15 @@ class LookPane(Pane):
         if slug := event.option.id:
             self.app.push_screen(Run(f"theme {slug}", [["theme", slug]]), self.applied)
 
+    @on(OptionList.OptionHighlighted, "#glass-list")
+    def preview_glass(self, event: OptionList.OptionHighlighted) -> None:
+        if self.query_one("#glass-list").has_focus:
+            self.glass_preview = event.option.id
+            self.render_preview()
+
+    def glass_level(self) -> str:
+        return self.glass_preview or field(self.look, "glass") or "default"
+
     @on(OptionList.OptionSelected, "#glass-list")
     def pick_glass(self, event: OptionList.OptionSelected) -> None:
         if level := event.option.id:
@@ -1557,6 +1728,7 @@ class LookPane(Pane):
 
     def applied(self, _rc: int | None) -> None:
         self.wall_preview = None
+        self.glass_preview = None
         self.action_refresh()
         self.load_fetch()  # the splash is re-rendered with the new theme's colours
         if isinstance(self.app, DotfilesApp):
@@ -1575,41 +1747,63 @@ class DotfilesApp(App[None]):
     #bar-right { width: auto; }
     TabbedContent { height: 1fr; }
     TabPane { padding: 0; }
-    .filter { height: 1; border: none; padding: 0 1; margin: 0 0 0 0; background: $surface; }
-    .filter:focus { border: none; background-tint: $primary 10%; }
+
+    /* boxes: the three looks (F2) differ only here */
+    .box { border: round $surface-lighten-2; border-title-color: $text-muted; border-title-style: bold;
+      padding: 0 1; background: $background; }
+    .box:focus-within { border: round $accent; border-title-color: $accent; }
+    .style-minimal .box { border: blank; padding: 1 3; }
+    .style-minimal .box:focus-within { border: blank; border-title-color: $accent; }
+    .style-classic .box { border: none; padding: 0 1; }
+    .style-classic .box.side, .style-classic #glass-box { border-left: tall $surface; }
+
+    .filter { height: 1; border: none; padding: 0 1; background: $surface; }
+    .filter:focus { border: none; background-tint: $accent 10%; }
     DataTable { height: 1fr; background: $background; scrollbar-size-vertical: 1; }
     DataTable > .datatable--header { background: $background; color: $text-muted; text-style: bold; }
-    DataTable > .datatable--cursor { background: $primary 25%; }
-    DataTable:focus > .datatable--cursor { background: $primary 35%; }
+    DataTable > .datatable--cursor { background: $accent 20%; }
+    DataTable:focus > .datatable--cursor { background: $accent 30%; }
+    OptionList { border: none; background: $background; scrollbar-size-vertical: 1; }
+    OptionList > .option-list--option-highlighted { background: $accent 20%; }
+    OptionList:focus > .option-list--option-highlighted { background: $accent 30%; }
     .empty { height: 1fr; content-align: center middle; color: $text; }
-    .summary { height: 1; width: 1fr; padding: 0 1; background: $surface; text-wrap: nowrap; text-overflow: ellipsis; }
-    .summary.top { background: $background; padding: 1 1 0 1; height: 2; }
-    RichLog { height: 1fr; padding: 0 1; background: $background; scrollbar-size-vertical: 1; }
-    #look-left { width: 38; border-right: tall $surface; }
-    #theme-list { height: 1fr; border: none; padding: 0; background: $background; scrollbar-size-vertical: 1; }
+    .summary { height: 1; width: 1fr; padding: 0 1; text-wrap: nowrap; text-overflow: ellipsis; color: $text-muted; }
+    .summary.top { padding: 1 0 0 0; height: 3; }
+    RichLog { height: 1fr; background: $background; scrollbar-size-vertical: 1; }
+
+    #tools-box { width: 1fr; }
+    #tool-detail-box { width: 44; }
+    #tool-detail { padding: 1 1; }
+
+    #status-box { height: 1fr; }
+    #verdict { height: auto; padding: 1 2; }
+    #attention { height: auto; max-height: 12; padding: 0 1; }
+    #meters { dock: bottom; height: 1; padding: 0 2; }
+
+    #files-left { width: 45%; max-width: 64; }
+    #files-right { width: 1fr; }
+
+    #look-left { width: 46; }
+    #themes-box { height: 1fr; }
     #theme-list > .option-list--option { padding: 0 0 0 1; }
+    #glass-box { height: auto; }
+    #glass-list { height: auto; max-height: 6; }
+    #preview-box { width: 1fr; padding: 0; }
     #preview { width: 1fr; height: 1fr; }
-    #glass-list { height: auto; max-height: 6; border: none; background: $background; }
-    #look-left .title { padding: 0 1; }
-    #cards { height: 5; padding: 1 1 0 1; }
-    .card { width: 1fr; height: 4; border: round $surface; border-title-color: $text-muted; padding: 0 1;
-            margin: 0 1 0 0; }
-    #status .title { padding: 0 1; }
-    #attention { height: 1fr; max-height: 14; border: none; background: $background; padding: 0 1;
-                  scrollbar-size-vertical: 1; }
-    #status-detail { height: 1fr; padding: 1 2; color: $text; border-top: solid $surface; }
-    #files-left { width: 45%; max-width: 64; border-right: tall $surface; }
-    #file-head { height: 3; padding: 1 0 0 0; }
-    #file-list { height: 1fr; border: none; background: $background; scrollbar-size-vertical: 1; }
-    #files-right { padding: 0 1; }
-    #file-diff { height: 1fr; }
-    #machine-table { height: 1fr; }
-    Edit { align: center middle; background: $background 60%; }
-    #edit-value { margin: 0 0 1 0; }
+
+    #machine-box { height: 1fr; }
+    .field { height: 2; }
+    .flabel { width: 18; text-style: bold; color: $text-muted; }
+    .field Input { width: 46; height: 1; border: none; padding: 0 1; background: $surface; }
+    .field Input:focus { background-tint: $accent 15%; }
+    .field Switch { width: 8; height: 1; border: none; padding: 0; background: $background; }
+    .fhint { width: 1fr; padding: 0 0 0 2; }
+    #machine-readonly { padding: 1 0 0 0; }
+
     .title { text-style: bold; color: $accent; margin: 1 0 0 0; }
-    Confirm, Run { align: center middle; background: $background 60%; }
-    .dialog { width: 70; max-width: 95%; height: auto; padding: 1 2; border: round $primary;
-              border-title-color: $primary; border-title-style: bold; background: $surface; }
+    Confirm, Run, HealthReport { align: center middle; background: $background 60%; }
+    .dialog { width: 70; max-width: 95%; height: auto; padding: 1 2; border: round $accent;
+      border-title-color: $accent; border-title-style: bold; background: $surface; }
     .dialog.wide { width: 95%; height: 85%; }
     .dialog .body { height: auto; }
     .dialog RichLog { height: 1fr; background: $surface; padding: 0; }
@@ -1624,9 +1818,12 @@ class DotfilesApp(App[None]):
         Binding("3", "tab('files')", "files", show=False),
         Binding("4", "tab('look')", "look", show=False),
         Binding("5", "tab('machine')", "machine", show=False),
+        Binding("f2", "cycle_style", "look of the TUI"),
     ]
+    STYLES = ("boxes", "minimal", "classic")
 
     quit_armed = False
+    ui_style = "boxes"
     look_status: tuple[str, str] | None = None
     # shared with the Status tab and the bar; None until loaded (or on error)
     tools_data: list[dict[str, Any]] | None = None
@@ -1655,7 +1852,31 @@ class DotfilesApp(App[None]):
             yield MachinePane()
         yield Footer()
 
+    @staticmethod
+    def prefs_file() -> Path:
+        base = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
+        return Path(base) / "dotfiles" / "tui.json"
+
+    def set_style(self, style: str) -> None:
+        for name in self.STYLES:
+            self.screen.set_class(name == style, f"style-{name}")
+        self.ui_style = style
+
+    def action_cycle_style(self) -> None:
+        nxt = self.STYLES[(self.STYLES.index(self.ui_style) + 1) % len(self.STYLES)]
+        self.set_style(nxt)
+        with suppress(OSError):
+            f = self.prefs_file()
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(json.dumps({"style": nxt}))
+        self.notify(f"look: {nxt} · F2 for the next one")
+
     def on_mount(self) -> None:
+        style = "boxes"
+        with suppress(OSError, ValueError, AttributeError):
+            saved = json.loads(self.prefs_file().read_text()).get("style")
+            style = saved if saved in self.STYLES else style
+        self.set_style(style)
         self.render_bar()
         # the first tab opens without a TabActivated
         self.call_after_refresh(lambda: self.query_one(StatusPane).focus_main())
@@ -1718,6 +1939,9 @@ class DotfilesApp(App[None]):
         # Opening a tab only moves focus, and not while browsing the tab bar
         # (←/→ keep going): nothing runs until a tab's own key is pressed.
         if isinstance(self.focused, Tabs):
+            return
+        # already inside it (a key like g ran before this event): stay there
+        if self.focused is not None and event.pane in self.focused.ancestors_with_self:
             return
         if isinstance(event.pane, Pane):
             event.pane.focus_main()

@@ -77,10 +77,13 @@ async def test_tools_table_shows_catalog_and_drift(calls):
         table = await tools(pilot)
         assert table.row_count == 4
         assert [str(k.value) for k in table.rows] == ["fzf", "ripgrep", "lazygit", "zellij"]
+        assert [str(c.value) for c in table.columns] == ["mark", "name", "state", "version"]
         assert str(table.get_cell("ripgrep", "version")) == "14.0.0 → 15.1.0"
-        assert str(table.get_cell("zellij", "state")) == "○ missing"
+        assert str(table.get_cell("zellij", "state")) == "missing"
         summary = text(pilot.app.query_one("#tool-summary", Label))
         assert "4 tools" in summary and "1 off pin" in summary and "1 missing" in summary
+        detail = text(pilot.app.query_one("#tool-detail"))
+        assert "fzf" in detail and "space marks it to remove" in detail
 
 
 async def test_filter_narrows_rows(calls):
@@ -95,11 +98,16 @@ async def test_filter_narrows_rows(calls):
 async def test_marks_apply_add_and_remove_after_confirm(calls):
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         table = await tools(pilot)
-        # fzf (selected) -> remove; skip ripgrep; lazygit (unselected) -> add
-        await pilot.press("space", "down", "space")
+        # space marks without moving: twice is undo
+        await pilot.press("space", "space")
+        await pilot.pause()
+        assert str(table.get_cell("fzf", "mark")) == "✓"
+        # fzf (selected) -> remove; lazygit (unselected) -> add
+        await pilot.press("space", "down", "down", "space")
         await pilot.pause()
         assert str(table.get_cell("fzf", "mark")) == "−"
         assert str(table.get_cell("lazygit", "mark")) == "+"
+        assert "marked to add" in text(pilot.app.query_one("#tool-detail"))
         await pilot.press("a")
         await pilot.pause()
         await pilot.press("y")
@@ -144,8 +152,8 @@ async def test_bad_list_output_shows_error(calls, monkeypatch):
         assert "dotfiles list failed" in text(pilot.app.query_one("#tool-empty"))
 
 
-def card(pilot, name: str) -> str:
-    return text(pilot.app.query_one(f"#card-{name}"))
+def verdict(pilot) -> str:
+    return text(pilot.app.query_one("#verdict"))
 
 
 def attention(pilot) -> list[str]:
@@ -156,49 +164,61 @@ async def test_status_is_the_default_and_shows_local_state_before_any_check(call
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
         assert pilot.app.query_one(tui.TabbedContent).active == "status"
-        assert "not checked" in card(pilot, "health") and "not checked" in card(pilot, "updates")
-        assert "2 edited" in card(pilot, "files") and "1 to apply" in card(pilot, "files")
-        assert "1 missing" in card(pilot, "tools") and "1 off pin" in card(pilot, "tools")
-        assert attention(pilot) == [
-            "file:.config/ghostty/config",
-            "file:.gitconfig.local",
-            "tool:zellij",
-            "tool:ripgrep",
-            "pending",
-        ]
+        assert "not checked yet" in verdict(pilot)
+        assert "1 thing needs fixing" in verdict(pilot)  # the missing tool
+        assert attention(pilot) == ["tools-missing", "files-local", "tools-drift", "files-pending"]
         assert not [c for c in calls() if c[0] in ("doctor", "update")], "nothing runs until r"
 
 
-async def test_status_r_checks_health_and_updates_problems_first(calls):
+async def test_status_r_checks_and_folds_the_rest(calls):
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
         await pilot.press("r")
         await settle(pilot)
         assert ["doctor"] in calls() and ["update", "--check"] in calls()
-        assert "1 failing" in card(pilot, "health")
-        assert "1 incoming" in card(pilot, "updates")
-        ids = attention(pilot)
-        assert ids[0].startswith("doctor:") and ids[1].startswith("doctor:")  # FAIL, then WARN
-        assert "commits" in ids
-        assert "zellij missing" in text(pilot.app.query_one("#status-detail"))
+        assert "2 things need fixing" in verdict(pilot) and "checked just now" in verdict(pilot)
+        # top four, then the rest folded behind "more"
+        assert attention(pilot) == ["health-fail", "tools-missing", "files-local", "health-warn", "more"]
+        pilot.app.query_one("#attention", OptionList).highlighted = 4
+        await pilot.press("enter")
+        await pilot.pause()
+        assert attention(pilot)[4:] == ["updates", "tools-drift", "files-pending"]
+        meters = text(pilot.app.query_one("#meters"))
+        assert "tools" in meters and "▲1" in meters and "✗1" in meters
+
+
+async def test_status_health_item_opens_the_report(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        await settle(pilot)
+        await pilot.press("r")
+        await settle(pilot)
+        await pilot.press("enter")  # health-fail
+        await pilot.pause()
+        assert isinstance(pilot.app.screen, tui.HealthReport)
+        report = log_text(pilot.app.screen.query_one("#report", RichLog))
+        assert report.index("zellij missing") < report.index("fzf also installed")
+        await pilot.press("escape")
+        await pilot.pause()
+        assert not isinstance(pilot.app.screen, tui.HealthReport)
 
 
 async def test_status_enter_opens_the_file_or_tool(calls):
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
-        await pilot.press("down", "enter")  # .gitconfig.local
+        attn = pilot.app.query_one("#attention", OptionList)
+        attn.highlighted = attention(pilot).index("files-local")
+        await pilot.press("enter")
         await settle(pilot)
         assert pilot.app.query_one(tui.TabbedContent).active == "files"
         lst = pilot.app.query_one("#file-list", OptionList)
-        assert lst.get_option_at_index(lst.highlighted).id == ".gitconfig.local"
+        assert lst.get_option_at_index(lst.highlighted).id == ".config/ghostty/config"
         await pilot.press("1")
         await pilot.pause()
-        pilot.app.query_one("#attention", OptionList).highlighted = 3  # tool:ripgrep
+        attn.highlighted = attention(pilot).index("tools-drift")
         await pilot.press("enter")
         await settle(pilot)
         assert pilot.app.query_one(tui.TabbedContent).active == "tools"
-        table = pilot.app.query_one("#tool-table", DataTable)
-        assert table.cursor_row == 1
+        assert pilot.app.query_one("#tool-table", DataTable).cursor_row == 1  # ripgrep
 
 
 async def test_status_update_warns_about_local_edits_then_rechecks(calls):
@@ -273,48 +293,56 @@ async def test_files_apply_all_skips_local_edits(calls):
         assert ["files", "apply", ".config/nvim/init.lua"] in calls()
 
 
-async def test_machine_shows_answers_and_edits_one(calls):
+async def machine(pilot) -> None:
+    await settle(pilot)
+    await pilot.press("5")
+    await settle(pilot)
+
+
+async def test_machine_edits_in_place(calls):
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
-        await settle(pilot)
-        await pilot.press("5")
-        await settle(pilot)
-        table = pilot.app.query_one("#machine-table", DataTable)
-        assert str(table.get_cell("signing_key", "value")).endswith("✗ file missing")
-        assert str(table.get_cell("personal_git_name", "value")) == "—"
-        await pilot.press("enter")  # git_name
-        await pilot.pause()
-        box = pilot.app.screen.query_one("#edit-value", Input)
-        box.value = "Ola"
+        await machine(pilot)
+        name = pilot.app.query_one("#m-git_name", Input)
+        assert name.value == "Aleksandra Wiśniewska-Kowalczyk"
+        assert pilot.app.focused is name
+        assert pilot.app.query_one("#m-personal_git_name", Input).value == ""
+        assert "key file missing" in text(pilot.app.query_one("#h-signing_key"))
+        name.value = "Ola"
         await pilot.press("enter")
         await settle(pilot)
         assert ["machine", "set", "git_name", "Ola", "--no-apply"] in calls()
-        await pilot.press("escape")
+        assert "saved" in text(pilot.app.query_one("#h-git_name"))
+        assert "ctrl+s applies" in text(pilot.app.query_one("#machine-summary"))
+        # leaving an unchanged field saves nothing
+        before = len(calls())
+        await pilot.press("tab")
         await settle(pilot)
-        assert "a applies it" in text(pilot.app.query_one("#machine-summary"))
-        await pilot.press("a")
+        assert len(calls()) == before
+        await pilot.press("ctrl+s")
         await pilot.pause()
         await pilot.press("y")
         await settle(pilot)
         assert ["machine", "apply"] in calls()
 
 
-async def test_machine_toggles_sudo_and_keeps_readonly_rows(calls):
+async def test_machine_shows_refusals_inline(calls, monkeypatch):
+    monkeypatch.setenv("STUB_FAIL", "machine")
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
         await pilot.press("5")
         await settle(pilot)
-        table = pilot.app.query_one("#machine-table", DataTable)
-        table.move_cursor(row=table.get_row_index("allow_sudo"))
-        await pilot.press("enter")
+        # machine --json failed too (STUB_FAIL covers the subcommand): no crash, an error line
+        assert "dotfiles machine failed" in text(pilot.app.query_one("#machine-summary"))
+
+
+async def test_machine_sudo_switch_saves(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        await machine(pilot)
+        switch = pilot.app.query_one("#m-allow_sudo", tui.Switch)
+        assert switch.value is True
+        switch.value = False
         await settle(pilot)
         assert ["machine", "set", "allow_sudo", "false", "--no-apply"] in calls()
-        await pilot.press("escape")
-        await settle(pilot)
-        table.move_cursor(row=table.get_row_index("-shared"))
-        before = len(calls())
-        await pilot.press("enter")
-        await settle(pilot)
-        assert len(calls()) == before
 
 
 async def test_look_previews_the_start_screen_in_each_theme(calls):
@@ -330,13 +358,11 @@ async def test_look_previews_the_start_screen_in_each_theme(calls):
         await pilot.pause()
         assert preview.slug == "light-two"
         shown = preview.render()
-        assert "theme  light-two" in shown.plain, "the theme line names the previewed theme"
+        # blank cells carry the glass background as half blocks
+        assert "theme  light-two" in shown.plain.replace("▀", " "), "the theme line names the previewed theme"
+        styles = [sp.style for sp in shown.spans if isinstance(sp.style, tui.Style)]
+        colours = {str(st.color.triplet.hex) for st in styles if st.color and st.color.triplet}
         light = stub.LIGHT
-        colours = {
-            str(sp.style.color.triplet.hex)
-            for sp in shown.spans
-            if isinstance(sp.style, tui.Style) and sp.style.color and sp.style.color.triplet
-        }
         assert light["base08"] in colours, "the active theme's red is repainted as the previewed theme's red"
         assert light["base0B"] in colours, "ANSI green maps to the previewed base0B"
         assert stub.PAL["base08"] not in colours
@@ -356,15 +382,36 @@ async def test_look_wallpaper_previews_before_applying(calls, tmp_path, monkeypa
         await pilot.press("4")
         await settle(pilot)
         preview = pilot.app.query_one(tui.Preview)
-        grid = preview.bg_grid(10, 5)
-        assert grid and grid[0][0] != stub.PAL["base00"], "the wallpaper shows through (absent mode = on)"
+        assert preview.image is not None, "absent mode = on: the wallpaper shows"
+        with_wall = preview.bg_grid(10, 5)
         await pilot.press("w")
         await settle(pilot)
-        assert preview.image is None and preview.bg_grid(10, 5) is None, "w turns the preview off"
+        assert preview.image is None and preview.bg_grid(10, 5) != with_wall, "w turns the preview off"
         assert not [c for c in calls() if c[0] == "wallpaper"], "previewing applies nothing"
         await pilot.press("W")
         await settle(pilot)
         assert ["wallpaper", "off"] in calls(), "W applies what the preview shows"
+
+
+async def test_look_glass_previews_before_applying(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        await settle(pilot)
+        await pilot.press("4", "g")
+        await pilot.pause()
+        preview = pilot.app.query_one(tui.Preview)
+        glass = pilot.app.query_one("#glass-list", OptionList)
+        levels = [o.id for o in glass.options]
+        glass.highlighted = levels.index("solid")
+        await pilot.pause()
+        assert preview.glass == (1.0, "false") and preview.bg_grid(10, 5) is None, "solid: plain base00"
+        glass.highlighted = levels.index("clear")
+        await pilot.pause()
+        assert preview.glass == (0.5, "macos-glass-clear")
+        assert preview.bg_grid(10, 5)[0][0] != stub.PAL["base00"], "the desktop shows through"
+        assert not [c for c in calls() if c[0] == "glass"], "previewing applies nothing"
+        await pilot.press("enter")
+        await settle(pilot)
+        assert ["glass", "clear"] in calls()
 
 
 async def test_look_glass_applies(calls):
@@ -388,8 +435,7 @@ async def test_status_check_persists_across_launches(calls):
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
         assert calls().count(["doctor"]) == 1, "the second launch runs nothing"
-        assert "1 failing" in card(pilot, "health") and "1 incoming" in card(pilot, "updates")
-        assert "checked just now" in text(pilot.app.query_one("#attention-title"))
+        assert "health-fail" in attention(pilot) and "checked just now" in verdict(pilot)
 
 
 async def test_tui_colours_follow_the_active_theme(calls, monkeypatch):
@@ -444,8 +490,11 @@ async def test_missing_cli_shows_errors_instead_of_crashing(calls, monkeypatch):
         await settle(pilot)
         await pilot.press("r")
         await settle(pilot)
-        assert "doctor didn't run" in card(pilot, "health")
-        assert "cannot run the dotfiles CLI" in text(pilot.app.query_one("#status-detail"))
+        assert attention(pilot)[0] == "health-fail"
+        await pilot.press("enter")
+        await pilot.pause()
+        assert "cannot run the dotfiles CLI" in log_text(pilot.app.screen.query_one("#report", RichLog))
+        await pilot.press("escape")
         await tools(pilot)
         assert "cannot run the dotfiles CLI" in text(pilot.app.query_one("#tool-empty"))
 
@@ -460,7 +509,8 @@ async def test_off_contract_tools_are_dropped_or_blanked(calls, monkeypatch):
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         table = await tools(pilot)
         assert [str(k.value) for k in table.rows] == ["ok"]
-        assert str(table.get_cell("ok", "group")) == ""
+        assert str(table.get_cell("ok", "version")) == ""
+        assert "group" in text(pilot.app.query_one("#tool-detail"))
 
 
 async def test_bad_palette_keeps_the_default_theme(calls, monkeypatch):
@@ -551,10 +601,10 @@ async def test_escape_leaves_the_filter_so_tab_keys_work(calls):
         assert pilot.app.query_one(tui.TabbedContent).active == "files"
 
 
-async def test_narrow_terminal_drops_the_group_column(calls):
+async def test_narrow_terminal_hides_the_about_panel(calls):
     async with tui.DotfilesApp().run_test(size=(80, 24)) as pilot:
-        table = await tools(pilot)
-        assert [str(c.value) for c in table.columns] == ["mark", "name", "source", "state", "version"]
+        await tools(pilot)
+        assert not pilot.app.query_one("#tool-detail-box").display
 
 
 async def test_tab_bar_arrows_keep_focus_on_the_tab_bar(calls):
@@ -570,7 +620,19 @@ async def test_tab_bar_arrows_keep_focus_on_the_tab_bar(calls):
         assert pilot.app.focused is pilot.app.query_one("#file-list", OptionList)
         await pilot.press("5")
         await pilot.pause()
-        assert pilot.app.focused is pilot.app.query_one("#machine-table", DataTable), "number keys go into the tab"
+        assert pilot.app.focused is pilot.app.query_one("#m-git_name", Input), "number keys go into the tab"
+
+
+async def test_f2_cycles_the_look_and_remembers_it(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        await settle(pilot)
+        assert pilot.app.screen.has_class("style-boxes")
+        await pilot.press("f2")
+        await pilot.pause()
+        assert pilot.app.screen.has_class("style-minimal") and not pilot.app.screen.has_class("style-boxes")
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        await settle(pilot)
+        assert pilot.app.screen.has_class("style-minimal"), "the choice survives a restart"
 
 
 def main() -> int:

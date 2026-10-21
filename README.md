@@ -120,24 +120,29 @@ saying so.
   tools.
 - `dotfiles doctor` — read-only health check (also `doctor`).
 - `dotfiles tui`, or bare `dotfiles` in a terminal — a full-screen view, five
-  tabs (`1`–`5`; opening a tab never runs anything, `q` quits):
-  - **Status**: health, incoming commits, local edits and tool problems at a
-    glance, then everything that needs attention; `r` checks (doctor + a
-    fetch; the result is kept for the next launch), `u` updates, `enter`
-    opens the file or tool.
-  - **Tools**: `space` marks a tool to add or remove, `a` applies, `/` filters.
+  tabs (`1`–`5`, or `←`/`→` on the tab bar; opening a tab never runs
+  anything, `q` quits, `F2` switches between three looks: boxes, minimal,
+  classic):
+  - **Status**: a verdict and the few things worth doing, each opening where
+    it's fixed; `r` checks health and updates (kept for the next launch),
+    `u` updates.
+  - **Tools**: the catalog, with the highlighted tool explained beside it;
+    `space` marks it to add or remove, `a` applies, `/` filters.
   - **Files**: managed files edited here or waiting to apply, with a diff;
     `a` applies (asks before discarding your edits), `k` keeps yours
     (`chezmoi re-add`), `A` applies everything waiting.
   - **Look**: your real start screen (fastfetch and the prompt) painted in
-    each theme as you move through the list, with its wallpaper blended in as
-    Ghostty draws it; `enter` applies the theme, `w` previews the wallpaper
-    on or off, `W` applies that, `g` picks the glass level.
-  - **Machine**: the `install.sh` answers in `ansible/local.yml`; `enter`
-    edits one, `a` applies them without overwriting edited files.
+    each theme as you move through the list, with its wallpaper and the
+    glass level composed as Ghostty draws them; `enter` applies the theme
+    (or the glass level), `w` previews the wallpaper on or off, `W` applies
+    that, `g` jumps to glass.
+  - **Machine**: the `install.sh` answers in `ansible/local.yml`, edited in
+    place (`enter` or leaving a field saves it); `ctrl+s` applies them
+    without overwriting edited files.
 
   It runs with uv from a locked environment (`scripts/tui/`); its colours
-  follow the active theme.
+  follow the active theme. `theme`, `glass` and `wallpaper` (in the TUI or
+  the shell) apply only the files that use them.
 - The commands behind it: `dotfiles look --json | --fetch`, `theme SLUG`, `glass LEVEL`,
   `wallpaper on|off|toggle`, `files --json | diff|apply|keep PATH...`,
   `machine --json | set KEY VALUE [--no-apply] | apply`.

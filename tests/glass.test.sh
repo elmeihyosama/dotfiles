@@ -59,7 +59,15 @@ cat >"$HOME/bin/chezmoi" <<'STUB'
 case "$1" in
 data) exec "$REAL_CHEZMOI" data --source "$STUB_SRC" --config "$STUB_CFG" --format json ;;
 source-path) echo "$STUB_SRC/home" ;;
-apply) echo apply >>"$STUB_LOG" ;;
+status) ;;
+target-path)
+	shift
+	for f in "$@"; do echo "$HOME/t/$(basename "$f" .tmpl)"; done
+	;;
+apply)
+	shift
+	echo "apply $*" >>"$STUB_LOG"
+	;;
 esac
 STUB
 chmod +x "$HOME/bin/chezmoi"
@@ -82,7 +90,9 @@ out="$(run_glass tinted)"
 assert_contains "$out" "glass → tinted" "reports level"
 assert_contains "$out" "rc=0" "valid level exits 0"
 assert_contains "$(cat "$cfg")" 'glass = "tinted"' "level written"
-assert_eq "apply" "$(cat "$STUB_LOG")" "chezmoi apply ran once"
+assert_eq 1 "$(grep -c '^apply ' "$STUB_LOG")" "chezmoi apply ran once"
+assert_contains "$(cat "$STUB_LOG")" "$HOME/t/config " "apply covers the theme templates (ghostty's config)"
+assert_not_contains "$(cat "$STUB_LOG")" "$HOME/t/dot_gitconfig" "apply skips files that don't use the theme"
 
 # off is an alias for default (a real value; keys can't be deleted).
 out="$(run_glass off)"

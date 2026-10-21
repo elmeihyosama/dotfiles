@@ -42,6 +42,7 @@
 #   installed         bool: mise tools, some version installed; others, bin on PATH
 #   pinned            string|null, tools.yaml version (mise tools only)
 #   actual            string|null, active version, else newest installed (mise only)
+#   about, backend    string|null, from tools.yaml
 # mise runs as `mise -C /` with the global config masked, as in assert-tools.sh,
 # so the repo's own mise.toml never answers.
 #
@@ -51,6 +52,7 @@
 #   themes  [{slug, colors: {base00..base0F: "#rrggbb"}}], sorted by slug
 #   wallpaper  "on"|"off"|null
 #   wallpapers {slug: image path}, wallpaper_opacity number|null
+#   glass_levels {level: {opacity, blur}} (strings, as glass.toml)
 #
 # `files --json`: an array of {path (relative to ~), local (changed here since
 # chezmoi last wrote it), pending (the repo would change it), template}.
@@ -162,7 +164,8 @@ cmd_list() {
 				selected: ($selsrc[$n] != null),
 				installed: (if $src == "mise" then $hit != null else ($onpath | index($bin)) != null end),
 				pinned: (if $src == "mise" then ($t.version | nz) else null end),
-				actual: ($hit.version | nz)}]
+				actual: ($hit.version | nz),
+				about: ($t.about | nz), backend: ($t.backend | nz)}]
 		| sort_by(.group as $g | [($groups | index($g)), .name])')"; then
 		echo "dotfiles list: could not build the tool list" >&2
 		exit 1
@@ -723,6 +726,7 @@ cmd_look() {
 		| {theme: (.theme | nz), glass: (.glass | nz), wallpaper: (.wallpaper_mode | nz),
 			wallpapers: (.wallpaper.map // {} | map_values($wdir + "/" + .)),
 			wallpaper_opacity: (.wallpaper.opacity // null),
+			glass_levels: (.glass_levels // {}),
 			levels: ([$known[] | select(IN($have[]))]
 				+ [$have[] | select(. != "default" and (IN($known[]) | not))]
 				+ [$have[] | select(. == "default")]),
@@ -733,8 +737,6 @@ cmd_look() {
 
 # cmd_zsh FUNC ARG: the zsh FUNC (theme, glass or wallpaper) from the repo's 45-theme.zsh,
 # without rc files and with stdin closed, so `theme` never execs a new shell.
-# Its `chezmoi apply` skips files edited here: without a tty chezmoi would
-# fail on them (after applying the rest), so they are left and named instead.
 cmd_zsh() {
 	[ $# -eq 2 ] || {
 		case "$1" in theme) _a=SLUG ;; glass) _a=LEVEL ;; *) _a="on|off|toggle" ;; esac
@@ -748,16 +750,6 @@ cmd_zsh() {
 	# shellcheck disable=SC2016 # expanded by zsh
 	exec zsh -fc '
 		compdef() { :; }
-		chezmoi() {
-			[[ $1 == apply && $# == 1 ]] || { command chezmoi "$@"; return; }
-			local l; local -a ok kept
-			for l in ${(f)"$(command chezmoi status)"}; do
-				if [[ ${l[1]} == " " ]]; then ok+=("$HOME/${l[4,-1]}"); else kept+=("${l[4,-1]}"); fi
-			done
-			(( ${#kept} )) && print -r -- "kept your edits, not applied: ${(j:, :)kept}"
-			(( ${#ok} )) || return 0
-			command chezmoi apply "${ok[@]}"
-		}
 		source "$1" || exit 1; shift; "$@"' zsh \
 		"$repo_root/home/dot_config/zsh/conf.d/45-theme.zsh" "$@" </dev/null
 }

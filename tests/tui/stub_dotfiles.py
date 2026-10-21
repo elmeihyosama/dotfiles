@@ -207,6 +207,13 @@ elif args == ["look", "--json"]:
         "themes": WORST_THEMES if worst else THEMES,
         "wallpapers": {"dark-one": os.environ["STUB_WALL"]} if os.environ.get("STUB_WALL") else {},
         "wallpaper_opacity": 0.15,
+        "glass_levels": {
+            "clear": {"opacity": "0.50", "blur": "macos-glass-clear"},
+            "frosted": {"opacity": "0.66", "blur": "macos-glass-regular"},
+            "tinted": {"opacity": "0.82", "blur": "macos-glass-regular"},
+            "solid": {"opacity": "1.0", "blur": "false"},
+            "default": {"opacity": "0.8", "blur": "20"},
+        },
     }
     print(json.dumps(look))
 elif sub == "doctor":

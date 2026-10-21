@@ -48,7 +48,7 @@ run() { # run ARGS...: sets out, rc (stdin closed)
 # look_json: the contract the TUI parses
 run look --json
 assert_eq 0 "$rc" "look: exit 0 ($out)"
-assert_eq '["glass","levels","theme","themes","wallpaper","wallpaper_opacity","wallpapers"]' "$(jq -c 'keys' <<<"$out")" "look: keys"
+assert_eq '["glass","glass_levels","levels","theme","themes","wallpaper","wallpaper_opacity","wallpapers"]' "$(jq -c 'keys' <<<"$out")" "look: keys"
 assert_eq "$TESTS_REPO/home/dot_config/wallpapers/z.png" "$(jq -r .wallpapers.zeta <<<"$out")" "look: wallpaper image paths"
 assert_eq 0.15 "$(jq -r .wallpaper_opacity <<<"$out")" "look: wallpaper opacity"
 assert_eq on "$(jq -r .wallpaper <<<"$out")" "look: wallpaper mode"
@@ -93,8 +93,20 @@ if [ -n "$zsh_bin" ]; then
 	: >"$src/.chezmoidata/themes/rose-pine.toml"
 	printf '[data]\n    theme = "old"\n' >"$HOME/chezmoi.toml"
 	ln -s "$zsh_bin" "$HOME/rbin/zsh"
-	# status: one file edited here (kept), one waiting (applied by path)
-	printf '#!/bin/sh\ncase "$1" in source-path) echo "%s" ;; status) printf "MM .config/edited.lua\\n M .config/ghostty/config\\n" ;; apply) echo "$*" >>"%s" ;; esac\n' "$src" "$STUB_CALL" >"$HOME/rbin/chezmoi"
+	# two templates use the theme (one edited here: kept), one doesn't (never applied)
+	mkdir -p "$src/dot_config"
+	printf '{{ .theme }}\n' >"$src/dot_config/ghostty.tmpl"
+	printf '{{ .theme }}\n' >"$src/dot_config/edited.tmpl"
+	printf 'plain {{ .chezmoi.os }}\n' >"$src/dot_config/other.tmpl"
+	cat >"$HOME/rbin/chezmoi" <<STUB
+#!/bin/sh
+case "\$1" in
+source-path) echo "$src" ;;
+status) printf "MM .config/edited\\n M .config/other\\n M .config/ghostty\\n" ;;
+target-path) shift; for f in "\$@"; do n=\$(basename "\$f" .tmpl); echo "$HOME/.config/\$n"; done ;;
+apply) echo "\$*" >>"$STUB_CALL" ;;
+esac
+STUB
 	for t in cmux zellij pgrep pkill nvim; do printf '#!/bin/sh\nexit 0\n' >"$HOME/rbin/$t"; done
 	chmod +x "$HOME/rbin/"*
 	rm -f "$STUB_CALL"
@@ -104,8 +116,8 @@ if [ -n "$zsh_bin" ]; then
 	assert_eq 0 "$rc" "real zsh: theme exits 0 ($out)"
 	assert_contains "$out" "theme → rose-pine" "real zsh: theme ran"
 	assert_contains "$(cat "$HOME/chezmoi.toml")" 'theme = "rose-pine"' "real zsh: theme key written"
-	assert_eq "apply $HOME/.config/ghostty/config" "$(cat "$STUB_CALL" 2>/dev/null)" "real zsh: apply only the waiting file, by path"
-	assert_contains "$out" "kept your edits, not applied: .config/edited.lua" "real zsh: names the edited file it left alone"
+	assert_eq "apply $HOME/.config/ghostty" "$(cat "$STUB_CALL" 2>/dev/null)" "real zsh: applies only theme templates, never unrelated pending ones"
+	assert_contains "$out" "kept your edits, not applied: .config/edited" "real zsh: names the edited theme file it left alone"
 	out="$(env -i HOME="$HOME" PATH="$HOME/rbin:/usr/bin:/bin" CHEZMOI_CONFIG="$HOME/chezmoi.toml" \
 		DOTFILES_TEST=1 sh "$script" theme no-such 2>&1 </dev/null)"
 	assert_eq 1 "$?" "real zsh: unknown theme exits 1"

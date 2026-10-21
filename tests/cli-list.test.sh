@@ -66,7 +66,7 @@ run() { # run ARGS...: sets out, rc
 run list --json
 assert_eq 0 "$rc" "json_shape: exit 0 ($out)"
 keys="$(printf '%s' "$out" | jq -c '.[0] | keys')"
-assert_eq '["actual","bin","group","installed","name","pinned","selected","source"]' "$keys" "json_shape: keys"
+assert_eq '["about","actual","backend","bin","group","installed","name","pinned","selected","source"]' "$keys" "json_shape: keys"
 assert_eq "alpha,mise,zed,hx,nat" "$(printf '%s' "$out" | jq -r 'map(.name) | join(",")')" "json_shape: sorted by group order then name"
 assert_eq "false" "$(printf '%s' "$out" | jq -r '.[] | select(.name == "hx") | .selected')" "json_shape: deselected group tool not selected"
 assert_eq "true" "$(printf '%s' "$out" | jq -r '.[] | select(.name == "alpha") | .selected')" "json_shape: selected tool"
