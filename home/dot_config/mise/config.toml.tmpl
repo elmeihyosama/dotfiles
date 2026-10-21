@@ -1,5 +1,6 @@
 {{- /* Global mise config, no tool pins (per-project mise.toml drives them). A
 .tmpl so machine-specific settings can be added without a rename. */ -}}
 [settings]
-status.show_tools = true
-status.show_env = true
+# quiet: no "mise +tool / -tool" lines on every new shell or cd
+status.show_tools = false
+status.show_env = false
