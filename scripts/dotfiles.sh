@@ -666,13 +666,16 @@ dotfiles: deselected $n"
 
 	require_home_checkout "applying the selection"
 	if ! command -v ansible-playbook >/dev/null 2>&1; then
-		echo "dotfiles: ansible-playbook not on PATH; $local_yml is edited, apply later with:" >&2
-		echo "  (cd $repo_root/ansible && ansible-playbook site.yml --tags mise,chezmoi,packages)" >&2
+		echo "dotfiles: ansible-playbook not on PATH; $local_yml is edited, apply later with: dotfiles add (or remove) again" >&2
 		exit 1
 	fi
-	if ! (cd "$repo_root/ansible" && ansible-playbook site.yml --tags mise,chezmoi,packages); then
-		echo "dotfiles: apply failed; $local_yml stays edited. Re-running is safe:" >&2
-		echo "  (cd $repo_root/ansible && ansible-playbook site.yml --tags mise,chezmoi,packages)" >&2
+	# Never the playbook's forced chezmoi apply (it would overwrite files edited
+	# here): rewrite chezmoi's config (selected_tools), apply only the pins file
+	# that uses it, then install.
+	if ! (cd "$repo_root/ansible" && ansible-playbook site.yml --tags chezmoi --skip-tags packages,chezmoi_apply) ||
+		! cz apply "$HOME/.config/mise-dotfiles/config.toml" ||
+		! (cd "$repo_root/ansible" && ansible-playbook site.yml --tags packages); then
+		echo "dotfiles: apply failed; $local_yml stays edited. Re-running is safe." >&2
 		exit 1
 	fi
 
@@ -846,7 +849,8 @@ cmd_files() {
 		case "$sub" in
 		diff) cz diff "$@" ;;
 		# --force: the TUI confirms first that local edits are overwritten
-		apply) cz apply --force "$@" ;;
+		# not recursive: a directory entry must not drag the files under it
+		apply) cz apply --force --recursive=false "$@" ;;
 		keep) cz re-add "$@" ;;
 		esac
 		;;

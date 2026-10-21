@@ -26,9 +26,11 @@ for t in yq jq; do
 	ln -s "$p" "$HOME/bin/$t"
 done
 # stubs record their argv (and cwd for ansible-playbook)
-for s in ansible-playbook mise; do
+for s in ansible-playbook mise chezmoi; do
 	cat >"$HOME/bin/$s" <<'STUB'
 #!/bin/sh
+# the checkout guard's lookup: unanswered, unlogged
+[ "$(basename "$0") $1" = "chezmoi source-path" ] && exit 0
 printf '%s|%s|%s|%s\n' "$(basename "$0")" "$*" "$(pwd)" "${MISE_GLOBAL_CONFIG_FILE-unset}" >>"$STUB_CALLS"
 case "$(basename "$0")" in
 ansible-playbook) exit "${STUB_ANSIBLE_RC:-0}" ;;
@@ -241,7 +243,10 @@ fresh 'tool_groups: [core]
 tools_add: [fzf, devx]'
 run add git
 assert_eq 0 "$rc" "apply_add: exit 0 ($out)"
-assert_eq "ansible-playbook|site.yml --tags mise,chezmoi,packages|$TESTS_REPO/ansible|unset" "$(cat "$STUB_CALLS")" "apply_add: playbook call"
+apply_calls="ansible-playbook|site.yml --tags chezmoi --skip-tags packages,chezmoi_apply|$TESTS_REPO/ansible|unset
+chezmoi|--no-pager --no-tty apply $HOME/.config/mise-dotfiles/config.toml|/|unset
+ansible-playbook|site.yml --tags packages|$TESTS_REPO/ansible|unset"
+assert_eq "$apply_calls" "$(cat "$STUB_CALLS")" "apply_add: config, then only the pins file (never --force), then install"
 : >"$STUB_CALLS"
 run remove fzf --no-apply
 assert_eq "" "$(cat "$STUB_CALLS")" "no_apply: nothing run"
@@ -254,7 +259,7 @@ fresh 'tool_groups: [core]
 tools_add: [fzf, devx, nat]'
 run remove fzf nat
 assert_eq 0 "$rc" "apply_remove: exit 0 ($out)"
-assert_eq "ansible-playbook|site.yml --tags mise,chezmoi,packages|$TESTS_REPO/ansible|unset
+assert_eq "$apply_calls
 mise|-C / uninstall aqua:x/fzf@3.0.0|/|/nonexistent/mise-user.toml" "$(cat "$STUB_CALLS")" "apply_remove: playbook, then masked mise uninstall of the mise tool only"
 # remove group: every mise tool of it
 fresh

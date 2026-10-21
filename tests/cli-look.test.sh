@@ -104,6 +104,7 @@ case "\$1" in
 source-path) echo "$src" ;;
 status) printf "MM .config/edited\\n M .config/other\\n M .config/ghostty\\n" ;;
 target-path) shift; for f in "\$@"; do n=\$(basename "\$f" .tmpl); echo "$HOME/.config/\$n"; done ;;
+managed) printf "%s\\n" "$HOME/.config/ghostty" "$HOME/.config/edited" ;;
 apply) echo "\$*" >>"$STUB_CALL" ;;
 esac
 STUB

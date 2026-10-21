@@ -60,6 +60,9 @@ case "$1" in
 data) exec "$REAL_CHEZMOI" data --source "$STUB_SRC" --config "$STUB_CFG" --format json ;;
 source-path) echo "$STUB_SRC/home" ;;
 status) ;;
+managed)
+	for f in $(find "$STUB_SRC/home" -name '*.tmpl'); do echo "$HOME/t/$(basename "$f" .tmpl)"; done
+	;;
 target-path)
 	shift
 	for f in "$@"; do echo "$HOME/t/$(basename "$f" .tmpl)"; done

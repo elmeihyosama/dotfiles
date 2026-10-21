@@ -33,12 +33,15 @@ _THEME_DATA_RE='\.theme\b|\.themes\b|\.glass\b|glass_levels|wallpaper_mode|\.wal
 _theme_apply() {
   emulate -L zsh
   local src t
-  local -a tmpls targets edited kept
+  local -a tmpls targets edited kept managed
   src=$(chezmoi source-path) || return 1
   tmpls=(${(f)"$(command grep -rlE $_THEME_DATA_RE --include='*.tmpl' $src)"})
   (( ${#tmpls} )) || return 0
   edited=(${(f)"$(chezmoi status | command awk 'substr($0, 1, 1) != " " { print substr($0, 4) }')"})
+  # only targets managed here: one ignored on this OS fails the whole apply
+  managed=(${(f)"$(chezmoi managed --path-style absolute)"})
   for t in ${(f)"$(chezmoi target-path $tmpls)"}; do
+    (( ${managed[(Ie)$t]} )) || continue
     if (( ${edited[(Ie)${t#$HOME/}]} )); then kept+=(${t#$HOME/}); else targets+=($t); fi
   done
   (( ${#kept} )) && print -r -- "kept your edits, not applied: ${(j:, :)kept}"

@@ -51,7 +51,7 @@ run files diff "Library/Application Support/x/y.json" .config/a.toml
 assert_eq 0 "$rc" "files diff: exit 0 ($out)"
 assert_eq "diff|$HOME/Library/Application Support/x/y.json|$HOME/.config/a.toml" "$(paste -sd'|' "$STUB_CALL")" "files diff: one argument per path, spaces kept"
 run files apply .config/a.toml
-assert_eq "apply|--force|$HOME/.config/a.toml" "$(paste -sd'|' "$STUB_CALL")" "files apply: --force on just that path"
+assert_eq "apply|--force|--recursive=false|$HOME/.config/a.toml" "$(paste -sd'|' "$STUB_CALL")" "files apply: --force on just that path, never what's under it"
 run files keep .config/a.toml
 assert_eq "re-add|$HOME/.config/a.toml" "$(paste -sd'|' "$STUB_CALL")" "files keep: re-add"
 

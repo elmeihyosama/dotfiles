@@ -668,7 +668,7 @@ class StatusPane(Pane):
             self.doctor_rc, self.check_rc = int(state.get("doctor_rc", 0)), int(state.get("check_rc", 0))
             self.doctor_error = str(state.get("doctor_error") or "")
             self.checked_at = float(state["time"])
-        except (OSError, ValueError, KeyError, TypeError):
+        except Exception:  # a damaged state file is just no state
             return
 
     def age(self) -> str:
@@ -1183,6 +1183,8 @@ class MachinePane(Pane):
         self.data: dict[str, Any] = {}
         self.dirty = False
         self.saved: dict[str, str] = {}  # what local.yml holds, per field
+        self.save_lock = asyncio.Lock()
+        self.shared_changed = False  # tools must move: install after applying
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(id="machine-box", classes="box"):
@@ -1314,7 +1316,9 @@ class MachinePane(Pane):
 
     @work(group="machine-save")
     async def save(self, key: str, value: str) -> None:
-        rc, out, err = await capture("machine", "set", key, value, "--no-apply")
+        # one edit of local.yml at a time (a blur and a switch can overlap)
+        async with self.save_lock:
+            rc, out, err = await capture("machine", "set", key, value, "--no-apply")
         hint = self.query_one(f"#h-{key}", Label)
         if rc:
             msg = (err.strip() or out.strip() or f"exit {rc}").splitlines()[-1].removeprefix("dotfiles machine: ")
@@ -1322,6 +1326,7 @@ class MachinePane(Pane):
             return
         self.saved[key] = value
         self.dirty = True
+        self.shared_changed |= key == "shared_home"
         hint.update(Text("✓ saved", style=tone(self.app, "$success")))
         self.render_extras()
 
@@ -1341,6 +1346,10 @@ class MachinePane(Pane):
         self.action_refresh()
         if isinstance(self.app, DotfilesApp):
             self.app.reload_all()
+        if rc == 0 and self.shared_changed:
+            # new shells look for tools in the other place now: put them there
+            self.shared_changed = False
+            self.app.push_screen(Run("Install tools for the new layout", [["install"]]), lambda _rc: None)
 
 
 # ANSI colours 0-15 -> base16 slots (the standard base16 terminal mapping)
@@ -1683,7 +1692,7 @@ class LookPane(Pane):
                         im.thumbnail((640, 640))
                         img = im.convert("RGB")
                     self.images[path] = img
-                except OSError:
+                except Exception:  # any unreadable image: no wallpaper preview
                     img = None
         self.app.call_from_thread(self.set_image, slug, img)
 
