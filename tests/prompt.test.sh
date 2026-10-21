@@ -72,7 +72,7 @@ for sep in round angled slanted flat; do
 		render "rb-$sep-$lines" prompt_style=rainbow "prompt_separator=$sep" "prompt_lines=$lines"
 		loads "rb-$sep-$lines"
 		for t in 24h off; do
-			render "bar-$sep-$lines-$t" prompt_style=bar "prompt_separator=$sep" "prompt_lines=$lines" "prompt_time=$t"
+			render "bar-$sep-$lines-$t" prompt_style=bar "prompt_separator=$sep" "prompt_lines=$lines" "prompt_time=$t" prompt_bar_color=surface
 			loads "bar-$sep-$lines-$t"
 		done
 	done
@@ -111,9 +111,20 @@ assert_eq '"[](fg:muted bg:surface)[ $symbol$branch ]($style)"' \
 	"$(get "$scratch/bar-round-two-24h.toml" git_branch.format)" "bar: a thin divider before the branch"
 assert_contains "$(get "$scratch/bar-round-two-off.toml" cmd_duration.format)" '[](fg:surface)[ ' "bar, no clock: the duration caps itself"
 assert_contains "$(get "$scratch/bar-round-two-off.toml" format)" ' $fill$cmd_duration$time' "bar, no clock: no empty right bar"
-render arrow prompt_style=bar prompt_separator=angled prompt_start=round
+render arrow prompt_style=bar prompt_separator=angled prompt_start=round prompt_bar_color=surface
 assert_contains "$(get "$scratch/arrow.toml" format)" '[](fg:surface)$hostname' "left end: its own shape"
 assert_contains "$(get "$scratch/arrow.toml" format)" '$kubernetes[](fg:surface)' "left end: the right end keeps Ends"
+# bar, theme colours (the default): band A in the directory colour, dark
+# text, then band B on raised (base02); no divider where band B opens
+render bar-theme prompt_style=bar
+loads bar-theme
+assert_contains "$(get "$scratch/bar-theme.toml" format)" '[](fg:accent2)$hostname$directory$git_branch$git_status[](fg:accent2 bg:raised)$jobs' "theme bar: two bands"
+assert_contains "$(get "$scratch/bar-theme.toml" format)" '$kubernetes[](fg:raised) ' "theme bar: band B closes it"
+assert_eq '"bold fg:bg bg:accent2"' "$(get "$scratch/bar-theme.toml" directory.style)" "theme bar: dark text on band A"
+assert_eq '"[](fg:bg bg:accent2)[ $symbol$branch ]($style)"' "$(get "$scratch/bar-theme.toml" git_branch.format)" "theme bar: a dark divider in band A"
+assert_eq '"fg:green bg:raised"' "$(get "$scratch/bar-theme.toml" nodejs.style)" "theme bar: band B keeps segment colours"
+assert_eq '"[ $symbol($version) ]($style)"' "$(get "$scratch/bar-theme.toml" nodejs.format)" "theme bar: no divider opening band B"
+assert_eq '"bold fg:bg bg:magenta"' "$(render_tmpl "$starship_tmpl" prompt_style=bar prompt_dir_color=magenta >"$scratch/bt2.toml" && get "$scratch/bt2.toml" directory.style)" "theme bar: band A follows the directory colour"
 render arrow-rb prompt_style=rainbow prompt_separator=angled prompt_start=flat
 assert_contains "$(get "$scratch/arrow-rb.toml" directory.format)" '[](fg:accent2)[ ' "left end: rainbow blocks too"
 render bar-blue prompt_style=bar prompt_bar_color=blue

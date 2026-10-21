@@ -59,7 +59,7 @@ on the right, `❯`.
 | `style` | `lean` (coloured text), `rainbow` (coloured blocks), `bar` (one strip, segments split by thin dividers) |
 | `separator` | `round`, `angled`, `slanted`, `flat` — the blocks' or the bar's ends, and the bar's dividers |
 | `start` | `same` (as `separator`), `round`, `angled`, `slanted`, `flat` — the left end alone, e.g. `round` with `angled` ends for an arrow pointing right |
-| `bar_color` | `surface`, or any colour below — the bar (bar style); on `surface`/`muted` the text keeps each segment's colour, on a bright bar it is dark |
+| `bar_color` | `theme`, `surface`, `raised`, or any colour below — the bar (bar style). `theme` follows the active theme (`dotfiles theme …`): directory and git on the directory colour, the rest a shade above the background (base02). Any other is one strip of that colour; on `surface`/`raised`/`muted` the text keeps each segment's colour, on a bright one it is dark |
 | `lines` | `two`, `one` |
 | `frame` | `on`, `off` (two lines) |
 | `layout` | `split` (duration and time on the right), `left` |

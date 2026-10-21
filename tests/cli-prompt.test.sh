@@ -41,7 +41,7 @@ assert_eq "$n_options" "$(jq '.values | length' <<<"$out")" "json: a value per o
 want="$("$real_chezmoi" data --source "$TESTS_REPO" --format json | jq -r '.themes[.theme][.design.accent]')"
 assert_eq "$want" "$(jq -r .palette.accent <<<"$out")" "json: palette resolves design roles in the active theme"
 assert_eq "" "$(jq -r '[.options[] | .choices[]] as $c | .options[] | select(.key | endswith("_color")) | .choices[] | select(. as $x | ($c | index($x)) == null)' <<<"$out")" "json: colour choices exist"
-assert_eq "" "$(jq -r '.palette as $p | .options[] | select(.key | endswith("_color")) | .choices[] | select($p[.] == null)' <<<"$out")" "json: every colour choice has a swatch"
+assert_eq "" "$(jq -r '.palette as $p | .options[] | select(.key | endswith("_color")) | .choices[] | select(. != "theme" and $p[.] == null)' <<<"$out")" "json: every colour choice but theme (two bands) has a swatch"
 
 # preview: real starship output for the options asked for
 run prompt --preview --width 70 lines=two layout=split

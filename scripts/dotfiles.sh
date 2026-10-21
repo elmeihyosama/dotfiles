@@ -863,7 +863,7 @@ cmd_prompt() {
 					| ($d["prompt_" + .key]) as $v
 					| {key: .key, value: (if any(.choices[]; . == $v) then $v else .default end)}]
 					| from_entries),
-				palette: ({bg: $p.base00, surface: $p.base01, muted: $p.base03, text: $p.base05,
+				palette: ({bg: $p.base00, surface: $p.base01, raised: $p.base02, muted: $p.base03, text: $p.base05,
 					red: $p.base08, orange: $p.base09, yellow: $p.base0A, green: $p.base0B,
 					cyan: $p.base0C, blue: $p.base0D, magenta: $p.base0E}
 					+ ($d.design // {} | with_entries(select((.value | type) == "string"

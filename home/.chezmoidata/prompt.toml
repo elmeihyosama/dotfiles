@@ -28,9 +28,9 @@ choices = ["same", "round", "angled", "slanted", "flat"]
 [[prompt_options]]
 key = "bar_color"
 label = "Bar colour"
-about = "The bar's colour (bar style only). On surface or muted the text keeps each segment's colour; on a bright bar it is dark."
-default = "surface"
-choices = ["surface", "accent", "accent2", "link", "ok", "warn", "err", "rail", "muted", "text", "red", "orange", "yellow", "green", "cyan", "blue", "magenta"]
+about = "The bar's colour (bar style only). theme: from the active theme, so it changes with it — directory and git in the directory colour, the rest a shade above the background. Any other: one strip of that colour; on surface, raised or muted the text keeps each segment's colour, on a bright one it is dark."
+default = "theme"
+choices = ["theme", "surface", "raised", "accent", "accent2", "link", "ok", "warn", "err", "rail", "muted", "text", "red", "orange", "yellow", "green", "cyan", "blue", "magenta"]
 
 [[prompt_options]]
 key = "lines"
