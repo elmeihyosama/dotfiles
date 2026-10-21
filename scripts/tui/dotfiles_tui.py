@@ -714,19 +714,14 @@ class StatusPane(Pane):
         doctor = self.doctor or []
         fails = sum(1 for e in doctor if e[0] == "FAIL")
         warns = sum(1 for e in doctor if e[0] == "WARN")
+        # one health line: failures and warnings open the same report
         if self.doctor_error:
-            out.append(("health-fail", 1, "✗", "$error", "doctor didn't run", "enter shows why"))
-        if fails:
-            out.append(
-                (
-                    "health-fail",
-                    1,
-                    "✗",
-                    "$error",
-                    plural(fails, "health check failing", "health checks failing"),
-                    "enter",
-                )
-            )
+            out.append(("health", 1, "✗", "$error", "doctor didn't run", "enter shows why"))
+        elif fails or warns:
+            parts = [f"{fails} failing"] if fails else []
+            parts += [plural(warns, "warning", "warnings")] if warns else []
+            mark, style, rank = ("✗", "$error", 1) if fails else ("▲", "$warning", 4)
+            out.append(("health", rank, mark, style, "health checks: " + ", ".join(parts), "enter"))
         missing = [t for t in tools if t.get("selected") and not t.get("installed")]
         if missing:
             names = ", ".join(t["name"] for t in missing[:3]) + ("…" if len(missing) > 3 else "")
@@ -752,8 +747,6 @@ class StatusPane(Pane):
                     "→ Files",
                 )
             )
-        if warns:
-            out.append(("health-warn", 4, "▲", "$warning", plural(warns, "health warning", "health warnings"), "enter"))
         commits = [c for c in (self.check or {}).get("incoming commits", []) if not c.startswith("(")]
         if commits:
             out.append(
@@ -1748,14 +1741,9 @@ class DotfilesApp(App[None]):
     TabbedContent { height: 1fr; }
     TabPane { padding: 0; }
 
-    /* boxes: the three looks (F2) differ only here */
     .box { border: round $surface-lighten-2; border-title-color: $text-muted; border-title-style: bold;
       padding: 0 1; background: $background; }
     .box:focus-within { border: round $accent; border-title-color: $accent; }
-    .style-minimal .box { border: blank; padding: 1 3; }
-    .style-minimal .box:focus-within { border: blank; border-title-color: $accent; }
-    .style-classic .box { border: none; padding: 0 1; }
-    .style-classic .box.side, .style-classic #glass-box { border-left: tall $surface; }
 
     .filter { height: 1; border: none; padding: 0 1; background: $surface; }
     .filter:focus { border: none; background-tint: $accent 10%; }
@@ -1818,12 +1806,9 @@ class DotfilesApp(App[None]):
         Binding("3", "tab('files')", "files", show=False),
         Binding("4", "tab('look')", "look", show=False),
         Binding("5", "tab('machine')", "machine", show=False),
-        Binding("f2", "cycle_style", "look of the TUI"),
     ]
-    STYLES = ("boxes", "minimal", "classic")
 
     quit_armed = False
-    ui_style = "boxes"
     look_status: tuple[str, str] | None = None
     # shared with the Status tab and the bar; None until loaded (or on error)
     tools_data: list[dict[str, Any]] | None = None
@@ -1857,26 +1842,17 @@ class DotfilesApp(App[None]):
         base = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
         return Path(base) / "dotfiles" / "tui.json"
 
-    def set_style(self, style: str) -> None:
-        for name in self.STYLES:
-            self.screen.set_class(name == style, f"style-{name}")
-        self.ui_style = style
-
-    def action_cycle_style(self) -> None:
-        nxt = self.STYLES[(self.STYLES.index(self.ui_style) + 1) % len(self.STYLES)]
-        self.set_style(nxt)
-        with suppress(OSError):
-            f = self.prefs_file()
-            f.parent.mkdir(parents=True, exist_ok=True)
-            f.write_text(json.dumps({"style": nxt}))
-        self.notify(f"look: {nxt} · F2 for the next one")
+    def __init__(self) -> None:
+        super().__init__()
+        # the last palette, so the first frame is already in the active theme
+        # (look --json, which has the real one, takes a moment)
+        with suppress(OSError, ValueError, AttributeError, TypeError, KeyError):
+            colors = json.loads(self.prefs_file().read_text())["palette"]
+            if all(isinstance(colors.get(k), str) and HEX.fullmatch(colors[k]) for k in BASES):
+                self.register_theme(base16_theme(colors))
+                self.theme = "dotfiles"
 
     def on_mount(self) -> None:
-        style = "boxes"
-        with suppress(OSError, ValueError, AttributeError):
-            saved = json.loads(self.prefs_file().read_text()).get("style")
-            style = saved if saved in self.STYLES else style
-        self.set_style(style)
         self.render_bar()
         # the first tab opens without a TabActivated
         self.call_after_refresh(lambda: self.query_one(StatusPane).focus_main())
@@ -1927,6 +1903,10 @@ class DotfilesApp(App[None]):
             return
         self.register_theme(base16_theme(colors))
         self.theme = "dotfiles"
+        with suppress(OSError):
+            f = self.prefs_file()
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(json.dumps({"palette": colors}))
 
     def action_tab(self, tab: str) -> None:
         tabs = self.query_one(TabbedContent)

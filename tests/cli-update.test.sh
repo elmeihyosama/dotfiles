@@ -39,6 +39,8 @@ for s in ansible-playbook chezmoi sheldon nvim mise; do
 	cat >"$HOME/bin/$s" <<'STUB'
 #!/bin/sh
 n="$(basename "$0")"
+# the checkout guard's lookup: unanswered (no chezmoi source), unlogged
+[ "$n $*" = "chezmoi source-path" ] && exit 0
 printf '%s %s\n' "$n" "$*" >>"$LOG"
 case "$n $*" in
 "ansible-playbook "*)

@@ -121,8 +121,7 @@ saying so.
 - `dotfiles doctor` — read-only health check (also `doctor`).
 - `dotfiles tui`, or bare `dotfiles` in a terminal — a full-screen view, five
   tabs (`1`–`5`, or `←`/`→` on the tab bar; opening a tab never runs
-  anything, `q` quits, `F2` switches between three looks: boxes, minimal,
-  classic):
+  anything, `q` quits):
   - **Status**: a verdict and the few things worth doing, each opening where
     it's fixed; `r` checks health and updates (kept for the next launch),
     `u` updates.
@@ -141,7 +140,9 @@ saying so.
     without overwriting edited files.
 
   It runs with uv from a locked environment (`scripts/tui/`); its colours
-  follow the active theme. `theme`, `glass` and `wallpaper` (in the TUI or
+  follow the active theme. Run from a second checkout or worktree, it edits
+  this machine's `local.yml` but refuses anything that runs the playbook
+  (that would point chezmoi at that checkout). `theme`, `glass` and `wallpaper` (in the TUI or
   the shell) apply only the files that use them.
 - The commands behind it: `dotfiles look --json | --fetch`, `theme SLUG`, `glass LEVEL`,
   `wallpaper on|off|toggle`, `files --json | diff|apply|keep PATH...`,

@@ -178,11 +178,14 @@ async def test_status_r_checks_and_folds_the_rest(calls):
         assert ["doctor"] in calls() and ["update", "--check"] in calls()
         assert "2 things need fixing" in verdict(pilot) and "checked just now" in verdict(pilot)
         # top four, then the rest folded behind "more"
-        assert attention(pilot) == ["health-fail", "tools-missing", "files-local", "health-warn", "more"]
+        # one health line for failures and warnings; top four, then the rest folded
+        assert attention(pilot) == ["health", "tools-missing", "files-local", "updates", "more"]
+        lines = [item[4] for item in pilot.app.query_one(tui.StatusPane).items()]
+        assert "health checks: 1 failing, 1 warning" in lines
         pilot.app.query_one("#attention", OptionList).highlighted = 4
         await pilot.press("enter")
         await pilot.pause()
-        assert attention(pilot)[4:] == ["updates", "tools-drift", "files-pending"]
+        assert attention(pilot)[4:] == ["tools-drift", "files-pending"]
         meters = text(pilot.app.query_one("#meters"))
         assert "tools" in meters and "▲1" in meters and "✗1" in meters
 
@@ -435,7 +438,7 @@ async def test_status_check_persists_across_launches(calls):
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
         await settle(pilot)
         assert calls().count(["doctor"]) == 1, "the second launch runs nothing"
-        assert "health-fail" in attention(pilot) and "checked just now" in verdict(pilot)
+        assert "health" in attention(pilot) and "checked just now" in verdict(pilot)
 
 
 async def test_tui_colours_follow_the_active_theme(calls, monkeypatch):
@@ -490,7 +493,7 @@ async def test_missing_cli_shows_errors_instead_of_crashing(calls, monkeypatch):
         await settle(pilot)
         await pilot.press("r")
         await settle(pilot)
-        assert attention(pilot)[0] == "health-fail"
+        assert attention(pilot)[0] == "health"
         await pilot.press("enter")
         await pilot.pause()
         assert "cannot run the dotfiles CLI" in log_text(pilot.app.screen.query_one("#report", RichLog))
@@ -623,16 +626,12 @@ async def test_tab_bar_arrows_keep_focus_on_the_tab_bar(calls):
         assert pilot.app.focused is pilot.app.query_one("#m-git_name", Input), "number keys go into the tab"
 
 
-async def test_f2_cycles_the_look_and_remembers_it(calls):
+async def test_the_first_frame_uses_the_last_palette(calls):
     async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
-        await settle(pilot)
-        assert pilot.app.screen.has_class("style-boxes")
-        await pilot.press("f2")
-        await pilot.pause()
-        assert pilot.app.screen.has_class("style-minimal") and not pilot.app.screen.has_class("style-boxes")
-    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
-        await settle(pilot)
-        assert pilot.app.screen.has_class("style-minimal"), "the choice survives a restart"
+        await settle(pilot)  # look --json: dark-one, saved
+    app = tui.DotfilesApp()
+    assert app.theme == "dotfiles", "set before anything loads: no flash of the default theme"
+    assert app.get_theme("dotfiles").background == stub.PAL["base00"]
 
 
 def main() -> int:

@@ -64,6 +64,39 @@ set -eu
 
 repo_root="$(CDPATH='' cd "$(dirname "$0")/.." && pwd)"
 
+# chezmoi_repo: the checkout chezmoi applies from (its source dir's parent);
+# fails when chezmoi is absent or answers with no absolute path
+chezmoi_repo() {
+	command -v chezmoi >/dev/null 2>&1 || return 1
+	_s="$(cd / && chezmoi source-path 2>/dev/null)" || return 1
+	case "$_s" in /*) dirname "$_s" ;; *) return 1 ;; esac
+}
+
+# machine_local_yml: this checkout's ansible/local.yml; in a second checkout
+# or worktree without one, the machine's own, beside chezmoi's source
+machine_local_yml() {
+	if [ -n "${DOTFILES_LOCAL_YML:-}" ]; then
+		echo "$DOTFILES_LOCAL_YML"
+		return
+	fi
+	if [ ! -e "$repo_root/ansible/local.yml" ] && _cr="$(chezmoi_repo)" && [ -e "$_cr/ansible/local.yml" ]; then
+		echo "$_cr/ansible/local.yml"
+		return
+	fi
+	echo "$repo_root/ansible/local.yml"
+}
+
+# require_home_checkout WHAT: the playbook points chezmoi's sourceDir at the
+# checkout it runs from, so it only runs from the one chezmoi already uses
+require_home_checkout() {
+	_cr="$(chezmoi_repo)" || return 0
+	_a="$(CDPATH='' cd "$_cr" 2>/dev/null && pwd -P)" || return 0
+	_b="$(CDPATH='' cd "$repo_root" && pwd -P)"
+	[ "$_a" = "$_b" ] && return 0
+	echo "dotfiles: $1 runs the playbook, which would point chezmoi at this checkout ($repo_root); run it from $_cr" >&2
+	exit 1
+}
+
 usage() { # usage [FD]: to stderr by default, stdout with 1
 	{
 		echo "usage: dotfiles <subcommand> [args]"
@@ -101,7 +134,7 @@ cmd_list() {
 	done
 
 	tools_yaml="${DOTFILES_TOOLS_YAML:-$repo_root/home/.chezmoidata/tools.yaml}"
-	local_yml="${DOTFILES_LOCAL_YML:-$repo_root/ansible/local.yml}"
+	local_yml="$(machine_local_yml)"
 	detect_platform
 
 	# The dotfiles pins with the global config masked (scripts/mise-env.sh).
@@ -219,7 +252,7 @@ cmd_update() {
 	# ~/.local/bin, as in the shell
 	# shellcheck source=mise-env.sh
 	. "$repo_root/scripts/mise-env.sh"
-	_data="${MISE_DATA_DIR:-$HOME/.local/share$(mise_sfx "${DOTFILES_LOCAL_YML:-$repo_root/ansible/local.yml}")/mise}"
+	_data="${MISE_DATA_DIR:-$HOME/.local/share$(mise_sfx "$(machine_local_yml)")/mise}"
 	PATH="$PATH:$_data/shims:$HOME/.local/bin"
 	export PATH
 	cd / || exit 1
@@ -253,6 +286,7 @@ cmd_update() {
 		return 0
 	fi
 
+	require_home_checkout "dotfiles update"
 	echo "==> check working tree"
 	_st="$(git -C "$repo_root" status --porcelain)" || {
 		echo "dotfiles: cannot read the repo status of $repo_root" >&2
@@ -436,7 +470,7 @@ cmd_edit() {
 	}
 
 	tools_yaml="${DOTFILES_TOOLS_YAML:-$repo_root/home/.chezmoidata/tools.yaml}"
-	local_yml="${DOTFILES_LOCAL_YML:-$repo_root/ansible/local.yml}"
+	local_yml="$(machine_local_yml)"
 	detect_platform
 	for t in yq jq; do
 		command -v "$t" >/dev/null 2>&1 || {
@@ -628,6 +662,7 @@ dotfiles: deselected $n"
 	fi
 	[ "$apply" -eq 1 ] || return 0
 
+	require_home_checkout "applying the selection"
 	if ! command -v ansible-playbook >/dev/null 2>&1; then
 		echo "dotfiles: ansible-playbook not on PATH; $local_yml is edited, apply later with:" >&2
 		echo "  (cd $repo_root/ansible && ansible-playbook site.yml --tags mise,chezmoi,packages)" >&2
@@ -827,7 +862,7 @@ MACHINE_KEYS="git_name git_email personal_git_name personal_git_email personal_g
 
 # resolve_local_yml: set local_yml to the real file (a symlink's target)
 resolve_local_yml() {
-	local_yml="${DOTFILES_LOCAL_YML:-$repo_root/ansible/local.yml}"
+	local_yml="$(machine_local_yml)"
 	_n=0
 	while [ -L "$local_yml" ]; do
 		_n=$((_n + 1))
@@ -979,6 +1014,7 @@ cmd_machine() {
 			echo "dotfiles machine: ansible-playbook not on PATH" >&2
 			exit 1
 		}
+		require_home_checkout "dotfiles machine apply"
 		echo "==> rewrite chezmoi's config from local.yml"
 		# chezmoi_apply is skipped: the playbook applies with --force, which
 		# would overwrite files changed here

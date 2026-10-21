@@ -104,3 +104,28 @@ calls="$(cat "$STUB_CALL")"
 assert_contains "$calls" "ansible-playbook site.yml --tags chezmoi --skip-tags packages,chezmoi_apply" "apply: playbook skips its forced apply"
 assert_contains "$calls" "chezmoi --no-pager --no-tty apply" "apply: chezmoi apply without a tty"
 assert_not_contains "$calls" "--force" "apply: never --force"
+
+# other_checkout: a second checkout (no local.yml of its own) reads and edits
+# the machine's local.yml beside chezmoi's source, but never runs the playbook
+# (it would point chezmoi's sourceDir at itself).
+co="$HOME/co" main="$HOME/main"
+mkdir -p "$co/scripts" "$main/home" "$main/ansible" "$HOME/obin"
+cp "$script" "$TESTS_REPO/scripts/mise-env.sh" "$co/scripts/"
+reset_yml
+cp "$yml" "$main/ansible/local.yml"
+printf '#!/bin/sh\n[ "$1" = source-path ] && echo "%s/home"\necho "chezmoi $*" >>"$STUB_CALL"\n' "$main" >"$HOME/obin/chezmoi"
+printf '#!/bin/sh\necho "ansible-playbook $*" >>"$STUB_CALL"\n' >"$HOME/obin/ansible-playbook"
+chmod +x "$HOME/obin/"*
+orun() { # orun ARGS...: the copy in $co, chezmoi's source in $main
+	out="$(env -i HOME="$HOME" PATH="$HOME/obin:$HOME/bin:/usr/bin:/bin" STUB_CALL="$STUB_CALL" sh "$co/scripts/dotfiles.sh" "$@" 2>&1 </dev/null)"
+	rc=$?
+}
+orun machine --json
+assert_eq "$main/ansible/local.yml" "$(jq -r .path <<<"$out")" "other checkout: reads the machine's local.yml"
+orun machine set git_name Other --no-apply
+assert_eq '"Other"' "$(yq -o=json '.git_name' "$main/ansible/local.yml")" "other checkout: edits the machine's local.yml"
+rm -f "$STUB_CALL"
+orun machine apply
+assert_eq 1 "$rc" "other checkout: machine apply refused"
+assert_contains "$out" "run it from $main" "other checkout: says where to run it"
+assert_not_contains "$(cat "$STUB_CALL" 2>/dev/null)" "ansible-playbook" "other checkout: the playbook never ran"
