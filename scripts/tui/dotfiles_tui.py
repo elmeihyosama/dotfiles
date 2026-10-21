@@ -297,7 +297,8 @@ class ToolsPane(Pane):
 
     BINDINGS = [
         Binding("space", "toggle", "mark"),
-        Binding("a", "apply", "apply"),
+        Binding("a", "apply", "apply marks"),
+        Binding("i", "install", "install missing"),
         Binding("slash", "filter", "filter"),
         Binding("r", "refresh", "refresh"),
         Binding("escape", "clear_filter", "clear", show=False),
@@ -460,7 +461,7 @@ class ToolsPane(Pane):
         if t.get("installed"):
             state = Text("installed")
         elif t.get("selected"):
-            state = Text("missing · dotfiles update installs it", style=tone(self.app, "$error"))
+            state = Text("missing · i installs it", style=tone(self.app, "$error"))
         else:
             state = Text("not selected", style="dim")
         rows: list[tuple[str, Text | str]] = [
@@ -549,6 +550,21 @@ class ToolsPane(Pane):
         if rc == 0:
             self.pending.clear()
         self.action_refresh()
+
+    def action_install(self) -> None:
+        missing = [t["name"] for t in self.tools if t.get("selected") and not t.get("installed")]
+        if not missing:
+            self.notify("every selected tool is installed")
+            return
+        body = Text(f"Install {len(missing)} selected tool(s) at their pins:\n\n", style="bold")
+        body.append(", ".join(missing) + "\n\n")
+        body.append("Runs the playbook's packages step only: chezmoi and your files are not touched.", style="dim")
+
+        def confirmed(yes: bool | None) -> None:
+            if yes:
+                self.app.push_screen(Run("Install missing tools", [["install"]]), lambda _rc: self.action_refresh())
+
+        self.app.push_screen(Confirm("Install missing tools", body, yes="Install"), confirmed)
 
 
 DOCTOR_MARK = {"OK": ("✓", "$success"), "WARN": ("▲", "$warning"), "FAIL": ("✗", "$error")}
@@ -1137,7 +1153,9 @@ MACHINE_FIELDS = [
     ("personal_git_dirs", "Personal dirs", "comma-separated; a trailing / covers everything beneath"),
     ("signing_key", "Signing key", "SSH .pub that signs personal commits"),
     ("allow_sudo", "Allow sudo", "native package installs may use sudo"),
+    ("shared_home", "Shared home", "one $HOME used by several CPU architectures: tools go per-arch"),
 ]
+SWITCHES = ("allow_sudo", "shared_home")
 
 
 class MachinePane(Pane):
@@ -1161,7 +1179,7 @@ class MachinePane(Pane):
             for key, label, hint in MACHINE_FIELDS:
                 with Horizontal(classes="field"):
                     yield Label(label, classes="flabel")
-                    if key == "allow_sudo":
+                    if key in SWITCHES:
                         yield Switch(id=f"m-{key}")
                     else:
                         yield Input(id=f"m-{key}", placeholder="not set")
@@ -1192,7 +1210,7 @@ class MachinePane(Pane):
         values = data["values"]
         for key, _label, _hint in MACHINE_FIELDS:
             v = values.get(key)
-            if key == "allow_sudo":
+            if key in SWITCHES:
                 with self.prevent(Switch.Changed):
                     self.query_one(f"#m-{key}", Switch).value = bool(v)
                 self.saved[key] = "true" if v else "false"
@@ -1233,13 +1251,9 @@ class MachinePane(Pane):
         if values.get("tools_remove"):
             sel += f"  −{self.show(values['tools_remove'])}"
         ro = Text()
-        for label, value, about in (
-            ("Tools", sel, "change in the Tools tab"),
-            ("Shared home", self.show(values.get("shared_home")) or "no", "set at install: install.sh --reconfigure"),
-        ):
-            ro.append(f"{label:<16}", style="bold dim")
-            ro.append(f"{clip(value, 34):<36}")
-            ro.append(about + "\n", style="dim")
+        ro.append(f"{'Tools':<16}", style="bold dim")
+        ro.append(f"{clip(sel, 34):<36}")
+        ro.append("change in the Tools tab\n", style="dim")
         self.query_one("#machine-readonly", Static).update(ro)
         path = str(self.data.get("path", ""))
         home = os.path.expanduser("~")
@@ -1266,6 +1280,22 @@ class MachinePane(Pane):
     @on(Switch.Changed, "#m-allow_sudo")
     def sudo(self, event: Switch.Changed) -> None:
         self.save("allow_sudo", "true" if event.value else "false")
+
+    @on(Switch.Changed, "#m-shared_home")
+    def shared(self, event: Switch.Changed) -> None:
+        # it moves where tools live: confirm, and undo the switch on cancel
+        body = Text("Tools, uv and mise data move to per-architecture directories (~/.local/bin-<arch>, …)."
+                    if event.value else "Tools, uv and mise data move back to the plain directories.")  # fmt: skip
+        body.append("\n\nAfter applying (ctrl+s), reinstall with i in Tools.", style="dim")
+
+        def confirmed(yes: bool | None) -> None:
+            if yes:
+                self.save("shared_home", "true" if event.value else "false")
+            else:
+                with self.prevent(Switch.Changed):
+                    event.switch.value = not event.value
+
+        self.app.push_screen(Confirm("Change shared home?", body, yes="Change"), confirmed)
 
     def save_field(self, box: Input) -> None:
         key = (box.id or "")[2:]

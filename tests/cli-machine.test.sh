@@ -76,13 +76,15 @@ run machine set personal_git_dirs "~/workspace/dotfiles/, ~/personal/" --no-appl
 assert_eq '["~/workspace/dotfiles/","~/personal/"]' "$(val personal_git_dirs)" "set: personal_git_dirs from a comma list"
 run machine set allow_sudo false --no-apply
 assert_eq 'false' "$(val allow_sudo)" "set allow_sudo: a real boolean"
+run machine set shared_home true --no-apply
+assert_eq 'true' "$(val shared_home)" "set shared_home: a real boolean"
 run machine set personal_git_email "" --no-apply
 assert_eq 'null' "$(val personal_git_email)" "set: an empty value removes the key"
 
 # set_validation: nothing is written on a bad value
 reset_yml
 before="$(cat "$yml")"
-for args in "git_email|" "allow_sudo|maybe" "signing_key|~/.ssh/id_ed25519" "shared_home|true" "tool_groups|git" "nope|x"; do
+for args in "git_email|" "allow_sudo|maybe" "shared_home|yes" "signing_key|~/.ssh/id_ed25519" "tool_groups|git" "nope|x"; do
 	run machine set "${args%%|*}" "${args#*|}" --no-apply
 	assert_eq 2 "$rc" "set ${args%%|*}=${args#*|}: refused"
 done
@@ -129,3 +131,16 @@ orun machine apply
 assert_eq 1 "$rc" "other checkout: machine apply refused"
 assert_contains "$out" "run it from $main" "other checkout: says where to run it"
 assert_not_contains "$(cat "$STUB_CALL" 2>/dev/null)" "ansible-playbook" "other checkout: the playbook never ran"
+
+# install: only the packages step (never chezmoi), from a checkout with local.yml
+mkdir -p "$HOME/ico/scripts" "$HOME/ico/ansible"
+cp "$script" "$TESTS_REPO/scripts/mise-env.sh" "$HOME/ico/scripts/"
+cp "$yml" "$HOME/ico/ansible/local.yml"
+rm -f "$STUB_CALL"
+out="$(env -i HOME="$HOME" PATH="$HOME/bin:/usr/bin:/bin" STUB_CALL="$STUB_CALL" sh "$HOME/ico/scripts/dotfiles.sh" install 2>&1 </dev/null)"
+assert_eq 0 "$?" "install: exit 0 ($out)"
+assert_eq "ansible-playbook site.yml --tags packages" "$(cat "$STUB_CALL")" "install: the packages step only, no chezmoi"
+rm "$HOME/ico/ansible/local.yml"
+out="$(env -i HOME="$HOME" PATH="$HOME/bin:/usr/bin:/bin" STUB_CALL="$STUB_CALL" sh "$HOME/ico/scripts/dotfiles.sh" install 2>&1 </dev/null)"
+assert_eq 1 "$?" "install without local.yml: exit 1"
+assert_contains "$out" "local.yml not found" "install without local.yml: says why"

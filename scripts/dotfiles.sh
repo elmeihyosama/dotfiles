@@ -6,6 +6,8 @@
 #                       edit ansible/local.yml, then apply; remove uninstalls
 #                       mise tools and only prints how to remove native ones
 #   update [--check]    pull, playbook, chezmoi, sheldon, nvim, then doctor
+#   install             install the selected tools (the playbook's packages
+#                       step only: chezmoi and its config are not touched)
 #   doctor [args]       scripts/doctor.sh
 #   look --json         active theme, glass, wallpaper, levels, every palette
 #   look --fetch [--no-logo]
@@ -100,7 +102,7 @@ require_home_checkout() {
 usage() { # usage [FD]: to stderr by default, stdout with 1
 	{
 		echo "usage: dotfiles <subcommand> [args]"
-		echo "subcommands: list [--json] | add TOOL|GROUP... | remove TOOL|GROUP... | update [--check] | doctor [args] | look --json | theme SLUG | glass LEVEL | wallpaper on|off|toggle | files ... | machine ... | tui | help"
+		echo "subcommands: list [--json] | add TOOL|GROUP... | remove TOOL|GROUP... | update [--check] | install | doctor [args] | look --json | theme SLUG | glass LEVEL | wallpaper on|off|toggle | files ... | machine ... | tui | help"
 	} >&"${1:-2}"
 }
 
@@ -858,7 +860,7 @@ cmd_files() {
 # --- machine: local.yml answers --------------------------------------------
 
 # Scalars `machine set` edits; personal_git_dirs is a list (comma-separated).
-MACHINE_KEYS="git_name git_email personal_git_name personal_git_email personal_git_dirs signing_key allow_sudo"
+MACHINE_KEYS="git_name git_email personal_git_name personal_git_email personal_git_dirs signing_key allow_sudo shared_home"
 
 # resolve_local_yml: set local_yml to the real file (a symlink's target)
 resolve_local_yml() {
@@ -926,7 +928,7 @@ cmd_machine() {
 		case "$key" in "~/"*) kpath="$HOME/${key#\~/}" ;; *) kpath="$key" ;; esac
 		[ -n "$key" ] && [ -f "$kpath" ] && kexists=true
 		printf '%s' "$vals" | jq --arg path "$local_yml" --argjson exists "$exists" \
-			--arg keys "$MACHINE_KEYS shared_home tool_groups tools_add tools_remove" \
+			--arg keys "$MACHINE_KEYS tool_groups tools_add tools_remove" \
 			--argjson kexists "$kexists" '
 			. as $v
 			| {path: $path, exists: $exists,
@@ -958,9 +960,9 @@ cmd_machine() {
 				exit 2
 			}
 			;;
-		allow_sudo)
+		allow_sudo | shared_home)
 			case "$val" in true | false) ;; *)
-				echo "dotfiles machine: allow_sudo is true or false" >&2
+				echo "dotfiles machine: $key is true or false" >&2
 				exit 2
 				;;
 			esac
@@ -975,7 +977,7 @@ cmd_machine() {
 			;;
 		esac
 		case "$key" in
-		allow_sudo) line="$key: $val" want="$val" ;;
+		allow_sudo | shared_home) line="$key: $val" want="$val" ;;
 		personal_git_dirs)
 			want="$(printf '%s' "$val" | jq -R -c 'split(",") | map(gsub("^ +| +$"; "")) | map(select(length > 0))')"
 			line="$key: $want"
@@ -1032,6 +1034,22 @@ cmd_machine() {
 	esac
 }
 
+# cmd_install: the selected tools at their pins (mise, native packages and the
+# locked full selection), without the playbook's chezmoi step, which applies
+# with --force and rewrites chezmoi's config
+cmd_install() {
+	command -v ansible-playbook >/dev/null 2>&1 || {
+		echo "dotfiles install: ansible-playbook not on PATH" >&2
+		exit 1
+	}
+	[ -f "$repo_root/ansible/local.yml" ] || {
+		echo "dotfiles install: $repo_root/ansible/local.yml not found; run install.sh (or run this from $(chezmoi_repo 2>/dev/null || echo the checkout chezmoi uses))" >&2
+		exit 1
+	}
+	echo "==> ansible-playbook site.yml --tags packages"
+	(cd "$repo_root/ansible" && ansible-playbook site.yml --tags packages)
+}
+
 # cmd_tui [args]: the Textual app, run by uv from its locked script env
 cmd_tui() {
 	command -v uv >/dev/null 2>&1 || {
@@ -1057,6 +1075,7 @@ help | -h | --help) usage 1 ;;
 list) cmd_list "$@" ;;
 add | remove) cmd_edit "$sub" "$@" ;;
 update) cmd_update "$@" ;;
+install) cmd_install "$@" ;;
 doctor) exec sh "$repo_root/scripts/doctor.sh" "$@" ;;
 look) cmd_look "$@" ;;
 theme | glass | wallpaper) cmd_zsh "$sub" "$@" ;;

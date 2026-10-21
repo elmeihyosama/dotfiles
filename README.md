@@ -126,7 +126,9 @@ saying so.
     it's fixed; `r` checks health and updates (kept for the next launch),
     `u` updates.
   - **Tools**: the catalog, with the highlighted tool explained beside it;
-    `space` marks it to add or remove, `a` applies, `/` filters.
+    `space` marks it to add or remove, `a` applies, `i` installs every
+    selected tool that's missing (`dotfiles install`: the playbook's packages
+    step only), `/` filters.
   - **Files**: managed files edited here or waiting to apply, with a diff;
     `a` applies (asks before discarding your edits), `k` keeps yours
     (`chezmoi re-add`), `A` applies everything waiting.
@@ -136,14 +138,17 @@ saying so.
     (or the glass level), `w` previews the wallpaper on or off, `W` applies
     that, `g` jumps to glass.
   - **Machine**: the `install.sh` answers in `ansible/local.yml`, edited in
-    place (`enter` or leaving a field saves it); `ctrl+s` applies them
-    without overwriting edited files.
+    place (`enter` or leaving a field saves it; sudo and shared home are
+    switches, shared home asks first since it moves where tools live);
+    `ctrl+s` applies them without overwriting edited files.
 
   It runs with uv from a locked environment (`scripts/tui/`); its colours
   follow the active theme. Run from a second checkout or worktree, it edits
   this machine's `local.yml` but refuses anything that runs the playbook
   (that would point chezmoi at that checkout). `theme`, `glass` and `wallpaper` (in the TUI or
   the shell) apply only the files that use them.
+- `dotfiles install` — install the selected tools at their pins without the
+  playbook's chezmoi step (which applies with `--force`).
 - The commands behind it: `dotfiles look --json | --fetch`, `theme SLUG`, `glass LEVEL`,
   `wallpaper on|off|toggle`, `files --json | diff|apply|keep PATH...`,
   `machine --json | set KEY VALUE [--no-apply] | apply`.

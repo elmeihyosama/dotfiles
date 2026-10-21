@@ -634,6 +634,36 @@ async def test_the_first_frame_uses_the_last_palette(calls):
     assert app.get_theme("dotfiles").background == stub.PAL["base00"]
 
 
+async def test_i_installs_the_missing_tools_after_confirm(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        await tools(pilot)
+        await pilot.press("i")
+        await pilot.pause()
+        assert "zellij" in text(pilot.app.screen.query_one(".body"))
+        await pilot.press("y")
+        await settle(pilot)
+        assert ["install"] in calls()
+
+
+async def test_machine_shared_home_asks_first(calls):
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        await machine(pilot)
+        switch = pilot.app.query_one("#m-shared_home", tui.Switch)
+        assert switch.value is False
+        switch.value = True
+        await pilot.pause()
+        assert isinstance(pilot.app.screen, tui.Confirm)
+        await pilot.press("n")
+        await settle(pilot)
+        assert switch.value is False, "cancel puts the switch back"
+        assert not [c for c in calls() if c[:3] == ["machine", "set", "shared_home"]]
+        switch.value = True
+        await pilot.pause()
+        await pilot.press("y")
+        await settle(pilot)
+        assert ["machine", "set", "shared_home", "true", "--no-apply"] in calls()
+
+
 def main() -> int:
     paths = [str(REPO / "scripts" / "tui"), str(HERE)]
     for cmd in (["ruff", "check", *paths], ["ruff", "format", "--check", *paths]):
