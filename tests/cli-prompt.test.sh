@@ -106,8 +106,29 @@ assert_contains "$out" "unknown option 'colour'" "set: says which"
 set_run lines
 assert_eq 2 "$rc" "set: KEY without =VALUE exits 2"
 
+set_run lines=two
+assert_eq 0 "$rc" "set default: exit 0 ($out)"
+assert_not_contains "$(cat "$cfg")" "prompt_lines" "set default: the key goes (a later default change reaches this machine)"
+assert_contains "$(cat "$cfg")" 'prompt_fill = "dots"' "set default: other keys stay"
+set_run ""
+assert_eq 2 "$rc" "set: an empty argument exits 2"
 set_run reset
 assert_eq 0 "$rc" "reset: exit 0 ($out)"
-assert_contains "$(cat "$cfg")" 'prompt_lines = "two"' "reset: lines back to two"
-assert_contains "$(cat "$cfg")" 'prompt_fill = "space"' "reset: fill back to space"
-assert_eq "$n_options" "$(grep -c '^ *prompt_' "$cfg")" "reset: one key per option, none duplicated"
+assert_eq 0 "$(grep -c 'prompt_' "$cfg")" "reset: no prompt keys left"
+assert_contains "$(cat "$cfg")" 'theme = "nord"' "reset: keeps the other data"
+
+# from a checkout chezmoi doesn't apply from: refused, nothing written
+# shellcheck disable=SC2016 # matches the stub's own text
+sed -i.bak 's|^source-path) echo "$STUB_SRC/home" ;;|source-path) echo "/elsewhere/home" ;;|' "$HOME/bin/chezmoi"
+set_run lines=one
+assert_eq 1 "$rc" "other checkout: refused"
+assert_contains "$out" "chezmoi applies from /elsewhere" "other checkout: says where to run it"
+assert_eq 0 "$(grep -c 'prompt_' "$cfg")" "other checkout: nothing written"
+mv "$HOME/bin/chezmoi.bak" "$HOME/bin/chezmoi"
+
+# a starship failure fails the preview (the TUI shows why)
+printf '#!/bin/sh\nexit 3\n' >"$HOME/bin/starship"
+chmod +x "$HOME/bin/starship"
+out="$(PATH="$HOME/bin:$PATH" sh "$script" prompt --preview 2>&1 </dev/null)"
+assert_eq 1 "$?" "preview: starship failing exits 1"
+assert_contains "$out" "starship failed" "preview: says so"

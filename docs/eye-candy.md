@@ -80,12 +80,18 @@ dotfiles prompt reset                    # every option back to its default
 ```
 
 Choices are stored per machine as `prompt_<option>` in
-`~/.config/chezmoi/chezmoi.toml [data]` (no git diff); an unknown value reads
-as the default. Applying touches only `starship.toml` and the Ghostty config.
-Starship reads its config at every prompt, so open shells change on their next
-one. The colours follow the theme. A cursor other than `bar` turns off Ghostty
-shell integration's own prompt cursor, which would otherwise make it a bar at
-the prompt.
+`~/.config/chezmoi/chezmoi.toml [data]` (no git diff); picking a default
+removes the key, and an unknown value reads as the default. Applying touches
+only `starship.toml`, the Ghostty config and `~/.config/zsh/cursor`; it runs
+from the checkout chezmoi applies from (another checkout previews only). Open
+shells change on their next prompt: Starship reads its config every time, and
+so does the cursor hook. The colours follow the theme.
+
+The cursor: Ghostty's shell integration draws a blinking bar at the prompt
+(and a block in vi command mode). Any other choice turns that off
+(`shell-integration-features = no-cursor`) and `conf.d/70-prompt.zsh` draws
+the chosen shape instead, still a block in vi command mode; programs you run
+get the same shape from Ghostty's `cursor-style`.
 
 ## cava — audio visualizer
 

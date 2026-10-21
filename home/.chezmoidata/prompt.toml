@@ -112,7 +112,7 @@ choices = ["accent", "accent2", "link", "ok", "warn", "err", "rail", "muted", "t
 [[prompt_options]]
 key = "cursor"
 label = "Cursor"
-about = "The terminal cursor's shape (Ghostty). bar is Ghostty's own prompt cursor."
+about = "The cursor's shape at the prompt and in programs (Ghostty). vi command mode stays a block."
 default = "bar"
 choices = ["bar", "block", "underline"]
 

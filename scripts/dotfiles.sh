@@ -894,9 +894,14 @@ cmd_prompt() {
 			echo "dotfiles prompt: rendering starship.toml failed" >&2
 			exit 1
 		}
-		# a prompt after a command that worked, then after a slow one that failed
-		jq -n --arg okl "$(prompt_run 0 0 0)" --arg okr "$(prompt_run 0 0 0 --right)" \
-			--arg el "$(prompt_run 1 3200 1)" --arg er "$(prompt_run 1 3200 1 --right)" \
+		# a prompt after a command that worked, then after a slow one that
+		# failed; each run on its own line so a starship failure exits 1
+		if ! { okl="$(prompt_run 0 0 0)" && okr="$(prompt_run 0 0 0 --right)" &&
+			el="$(prompt_run 1 3200 1)" && er="$(prompt_run 1 3200 1 --right)"; }; then
+			echo "dotfiles prompt: starship failed" >&2
+			exit 1
+		fi
+		jq -n --arg okl "$okl" --arg okr "$okr" --arg el "$el" --arg er "$er" \
 			'{ok: {left: $okl, right: $okr}, err: {left: $el, right: $er}}'
 		;;
 	'')
@@ -908,6 +913,13 @@ cmd_prompt() {
 			echo "dotfiles prompt: zsh not on PATH" >&2
 			exit 1
 		}
+		# chezmoi applies from its own checkout: from another, the choices
+		# would be checked and applied against templates this one doesn't show
+		if _cr="$(chezmoi_repo)" &&
+			[ "$(CDPATH='' cd "$_cr" 2>/dev/null && pwd -P)" != "$(CDPATH='' cd "$repo_root" && pwd -P)" ]; then
+			echo "dotfiles prompt: chezmoi applies from $_cr; set prompt options from there (previews here show this checkout)" >&2
+			exit 1
+		fi
 		# prompt_set from the repo's 45-theme.zsh, headless as cmd_zsh runs theme
 		# shellcheck disable=SC2016 # expanded by zsh
 		exec zsh -fc '

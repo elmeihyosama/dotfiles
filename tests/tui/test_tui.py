@@ -45,7 +45,7 @@ def calls(tmp_path, monkeypatch):
     monkeypatch.setenv("DOTFILES_CMD", f"{sys.executable} {HERE / 'stub_dotfiles.py'}")
     # the saved Status check: never the real one
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
-    for var in ("STUB_FAIL", "STUB_LIST", "STUB_THEME", "STUB_PROC", "STUB_SLOW", "STUB_BIG"):
+    for var in ("STUB_FAIL", "STUB_LIST", "STUB_THEME", "STUB_PROC", "STUB_SLOW", "STUB_BIG", "STUB_PROMPT_JSON"):
         monkeypatch.delenv(var, raising=False)
     return lambda: [json.loads(x) for x in log.read_text().splitlines()]
 
@@ -448,10 +448,13 @@ async def test_prompt_lists_every_option_with_this_machines_values(calls):
         ol, preview = await prompt_tab(pilot)
         assert pilot.app.focused is ol
         rows = prompt_rows(ol)
-        assert list(rows) == ["style", "separator", "lines", "frame", "dir_color", "cursor", "blink"], "bad one dropped"
+        assert list(rows) == ["style", "separator", "lines", "frame", "frame_color", "dir_color", "cursor", "blink"], (
+            "bad one dropped"
+        )
         assert "one" in rows["lines"], "the machine's value"
         assert "accent2" in rows["dir_color"], "a value that is not a choice reads as the default"
         assert "rainbow only" in rows["separator"] and "two lines only" in rows["frame"], "what does nothing says why"
+        assert "no frame or fill" in rows["frame_color"]
         assert "lean · rainbow" in text(pilot.app.query_one("#prompt-about"))
         shown = preview.render().plain
         assert "style=lean" in shown and "lines=one" in shown, "the real prompt, for this machine's values"
@@ -514,6 +517,13 @@ async def test_prompt_cursor_shape_and_colour_swatch(calls):
         await pilot.pause(0.3)
         await settle(pilot)
         assert preview.cursor == "block" and "▏" not in preview.render().plain
+
+
+async def test_prompt_off_contract_options_do_not_crash(calls, monkeypatch):
+    monkeypatch.setenv("STUB_PROMPT_JSON", json.dumps({"options": 5, "values": [], "palette": "x"}))
+    async with tui.DotfilesApp().run_test(size=SIZE) as pilot:
+        ol, _ = await prompt_tab(pilot)
+        assert ol.option_count == 0
 
 
 async def test_prompt_failed_preview_says_so(calls, monkeypatch):

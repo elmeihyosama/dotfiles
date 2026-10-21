@@ -118,8 +118,32 @@ assert_eq '"took $duration"' "$(get "$scratch/icons-plain.toml" cmd_duration.for
 render bogus prompt_lines=three prompt_style=neon
 cmp -s "$scratch/default.toml" "$scratch/bogus.toml" || fail "unknown values render the defaults"
 
-# ghostty: the cursor lines only when picked
+# ghostty: the cursor lines only when picked; any choice but its own
+# blinking bar turns off shell integration's cursor (it would draw that bar)
 gh_lines() { render_tmpl "$ghostty_tmpl" "$@" | grep -E '^(cursor-style|shell-integration-features)' | paste -sd'|' -; }
 assert_eq "" "$(gh_lines)" "ghostty default: no cursor lines"
-assert_eq "cursor-style = block|shell-integration-features = no-cursor" "$(gh_lines prompt_cursor=block)" "ghostty block cursor"
-assert_eq "cursor-style-blink = false" "$(gh_lines prompt_blink=off)" "ghostty: blink off"
+assert_eq "cursor-style = block|cursor-style-blink = true|shell-integration-features = no-cursor" \
+	"$(gh_lines prompt_cursor=block)" "ghostty block cursor"
+assert_eq "cursor-style = bar|cursor-style-blink = false|shell-integration-features = no-cursor" \
+	"$(gh_lines prompt_blink=off)" "ghostty: blink off alone also takes the cursor from the integration"
+
+# the cursor code 70-prompt.zsh draws (none: Ghostty's own)
+cursor_tmpl="$TESTS_REPO/home/dot_config/zsh/cursor.tmpl"
+assert_eq "" "$(render_tmpl "$cursor_tmpl")" "cursor default: no file"
+assert_eq "1" "$(render_tmpl "$cursor_tmpl" prompt_cursor=block)" "cursor: blinking block"
+assert_eq "4" "$(render_tmpl "$cursor_tmpl" prompt_cursor=underline prompt_blink=off)" "cursor: steady underline"
+assert_eq "6" "$(render_tmpl "$cursor_tmpl" prompt_blink=off)" "cursor: steady bar"
+
+# 70-prompt.zsh's hooks (starship absent: its init is skipped)
+draw() { # draw CODE|- KEYMAP: what _cursor_draw prints, as visible text
+	if [ "$1" = - ]; then rm -f "$HOME/.config/zsh/cursor"; else
+		mkdir -p "$HOME/.config/zsh" && printf '%s\n' "$1" >"$HOME/.config/zsh/cursor"
+	fi
+	PATH=/usr/bin:/bin zsh -fc 'source "$1"; KEYMAP=$2; _cursor_draw; _cursor_reset' _ \
+		"$TESTS_REPO/home/dot_config/zsh/conf.d/70-prompt.zsh" "$2" 2>&1 | cat -v
+}
+assert_eq "^[[2 q^[[0 q" "$(draw 2 main)" "hook: draws the code, resets for commands"
+assert_eq "^[[1 q^[[0 q" "$(draw 3 vicmd)" "hook: vi command mode is a block, blinking like the choice"
+assert_eq "^[[2 q^[[0 q" "$(draw 6 vicmd)" "hook: a steady choice gives a steady block"
+assert_eq "" "$(draw - main)" "hook: no file, nothing drawn (Ghostty's integration does it)"
+assert_eq "" "$(draw 9 main | sed 's/\^\[\[0 q//')" "hook: an unknown code draws nothing"

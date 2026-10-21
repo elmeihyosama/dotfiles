@@ -9,6 +9,7 @@ STUB_BIG: a subcommand that prints 200 KB with no newline first.
 STUB_THEME: the active theme slug in `look --json`.
 STUB_WALL: an image path offered as dark-one's wallpaper.
 STUB_PROMPT_FAIL: `prompt --preview` exits 1.
+STUB_PROMPT_JSON: replaces the `prompt --json` output verbatim.
 STUB_WORST: worst realistic data everywhere (the WORST_* fixtures), for the
   break-the-UI pass and its screenshots.
 """
@@ -196,6 +197,7 @@ PROMPT_OPTIONS = [
     {"key": "separator", "label": "Block ends", "about": "ends", "default": "round", "choices": ["round", "flat"]},
     {"key": "lines", "label": "Lines", "about": "one or two", "default": "two", "choices": ["two", "one"]},
     {"key": "frame", "label": "Frame", "about": "the rail", "default": "on", "choices": ["on", "off"]},
+    {"key": "frame_color", "label": "Frame colour", "about": "colour", "default": "rail", "choices": ["rail", "red"]},
     {
         "key": "dir_color",
         "label": "Directory colour",
@@ -207,6 +209,9 @@ PROMPT_OPTIONS = [
     {"key": "blink", "label": "Cursor blink", "about": "blinks", "default": "on", "choices": ["on", "off"]},
     {"bad": "option"},
 ]
+if args == ["prompt", "--json"] and os.environ.get("STUB_PROMPT_JSON"):
+    print(os.environ["STUB_PROMPT_JSON"])
+    sys.exit(0)
 if args == ["prompt", "--json"]:
     print(
         json.dumps(

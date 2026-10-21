@@ -1903,7 +1903,8 @@ class PromptPane(Pane):
             preview.message = f"no prompt options: {e}"
             preview.refresh()
             return
-        self.options = [o for o in data.get("options") or [] if self.valid(o)]
+        options = data.get("options")
+        self.options = [o for o in options if self.valid(o)] if isinstance(options, list) else []
         values = data.get("values") if isinstance(data.get("values"), dict) else {}
         self.values = {
             o["key"]: v if (v := values.get(o["key"])) in o["choices"] else o["default"] for o in self.options
@@ -1924,8 +1925,12 @@ class PromptPane(Pane):
             return "rainbow only"
         if key == "frame" and eff.get("lines") != "two":
             return "two lines only"
-        if key == "fill" and (eff.get("lines") != "two" or eff.get("layout") != "split"):
+        split2 = eff.get("lines") == "two" and eff.get("layout") == "split"
+        if key == "fill" and not split2:
             return "two-line split only"
+        framed = eff.get("lines") == "two" and eff.get("frame") == "on"
+        if key == "frame_color" and not framed and not (split2 and eff.get("fill") != "space"):
+            return "no frame or fill"
         return ""
 
     def option(self, key: str | None) -> dict[str, Any] | None:
