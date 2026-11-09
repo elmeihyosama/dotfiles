@@ -59,5 +59,4 @@ macOS authorizes notifications **per app**, so each terminal that forwards these
 escapes must be allowed separately: **System Settings → Notifications → <your
 terminal> → Allow Notifications**. If a long command doesn't banner, this is
 almost always why — grant the permission (and check Focus/Do Not Disturb is off).
-Note cmux and a standalone Ghostty.app are *different apps* here, so enabling one
-does not enable the other.
+Each terminal app has its own entry there, so allow the one you use.

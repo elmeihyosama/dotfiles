@@ -19,12 +19,12 @@ _tests_cleanup() {
 }
 trap _tests_cleanup EXIT
 
-# Fail-safe: no test reaches the real cmux, zellij, pkill, pgrep or nvim
+# Fail-safe: no test reaches the real zellij, pkill, pgrep or nvim
 # sockets; the theme helper also checks DOTFILES_TEST. Tests opt back in.
 _tests_safe="$(mktemp -d)"
 _tests_tmpdirs+=("$_tests_safe")
 mkdir -p "$_tests_safe/stubbin"
-for _t in cmux zellij pkill pgrep ghostty; do
+for _t in zellij pkill pgrep ghostty; do
 	printf '#!/bin/sh\nexit 0\n' >"$_tests_safe/stubbin/$_t"
 	chmod +x "$_tests_safe/stubbin/$_t"
 done

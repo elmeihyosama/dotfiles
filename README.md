@@ -158,17 +158,13 @@ saying so.
   `wallpaper on|off|toggle`, `prompt --json | --preview | KEY=VALUE... | reset`, `files --json | diff|apply|keep PATH...`,
   `machine --json | set KEY VALUE [--no-apply] | apply`.
 
-On macOS, Raycast has *Dotfiles Update* and *Dotfiles Doctor* commands
-([Raycast](docs/raycast.md)).
-
 ## Usage
 
 - Apply changes: `chezmoi apply` — preview with `chezmoi diff`.
 - Add an editor language: `:LazyExtras` in Neovim.
 - Switch theme: run `theme` (fuzzy picker with live preview) or `theme <slug>`;
-  toggle the themed wallpaper with `wallpaper`. cmux repaints running sessions
-  immediately; new shells, Ghostty windows, zellij, and Neovim pick it up on
-  restart. The repo default lives in `home/.chezmoidata/theme.toml`.
+  toggle the themed wallpaper with `wallpaper`. Running Neovim and Ghostty
+  repaint live, zellij reloads its config; new shells pick it up. The repo default lives in `home/.chezmoidata/theme.toml`.
 - Command cheatsheets: run `navi` to browse the custom keybindings and workflow
   commands (theme, sessionizer, forgit, …).
 - Lint locally: `.github/scripts/lint.sh all`. `install.sh` also sets up a pre-commit hook

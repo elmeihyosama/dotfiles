@@ -52,10 +52,7 @@ mise_install_env: "{{ mise_env | combine({'MISE_GLOBAL_CONFIG_FILE': '/nonexiste
 # (`brew install --cask` won't overwrite an app it did not install).
 macos_casks:
   ghostty: Ghostty.app
-  cmux: cmux.app
   raycast: Raycast.app
-  # antigravity-ide is the editor; `antigravity` is Google's agent platform.
-  antigravity-ide: Antigravity IDE.app
 
 # macOS `defaults` writes (tasks/macos.yml), deliberately conservative. Revert
 # one locally with `defaults delete <domain> <key>`.

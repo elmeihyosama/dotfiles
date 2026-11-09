@@ -72,6 +72,6 @@ assert_contains "$(printf '%s\n' "$out" | sed -n 2p)" "aqua:junegunn/fzf" "no bl
 
 # MISE_SYSTEM_CONFIG_DIR is exported everywhere a mise shim can run
 # shellcheck disable=SC2016  # literal $HOME is what the files contain
-for f in home/dot_zshenv.tmpl home/dot_bashrc.tmpl home/dot_bash_profile.tmpl home/dot_config/raycast/scripts/executable_*.sh; do
+for f in home/dot_zshenv.tmpl home/dot_bashrc.tmpl home/dot_bash_profile.tmpl; do
 	assert_contains "$(cat "$TESTS_REPO/$f")" 'export MISE_SYSTEM_CONFIG_DIR="$HOME/.config/mise-dotfiles"' "env var set in $f"
 done

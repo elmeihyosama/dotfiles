@@ -108,7 +108,7 @@ managed) printf "%s\\n" "$HOME/.config/ghostty" "$HOME/.config/edited" ;;
 apply) echo "\$*" >>"$STUB_CALL" ;;
 esac
 STUB
-	for t in cmux zellij pgrep pkill nvim; do printf '#!/bin/sh\nexit 0\n' >"$HOME/rbin/$t"; done
+	for t in zellij pgrep pkill nvim; do printf '#!/bin/sh\nexit 0\n' >"$HOME/rbin/$t"; done
 	chmod +x "$HOME/rbin/"*
 	rm -f "$STUB_CALL"
 	out="$(env -i HOME="$HOME" PATH="$HOME/rbin:/usr/bin:/bin" CHEZMOI_CONFIG="$HOME/chezmoi.toml" \

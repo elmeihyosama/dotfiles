@@ -5,10 +5,9 @@
 # symlink into the repo so lockfile updates are tracked.
 .config/nvim/lazyvim.json
 
-# Antigravity settings: macOS only (the Linux config dir is unverified).
+# ~/Library is macOS only.
 {{ if ne .chezmoi.os "darwin" }}
 Library
-.config/raycast
 {{ end }}
 
 # Only with personal_git_email set.

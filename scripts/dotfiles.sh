@@ -36,7 +36,7 @@
 # nothing written. A failed apply leaves local.yml edited; re-running is safe.
 #
 # update never stashes, resets or force-pulls (a dirty repo is refused), stops
-# at the first failing step and never prompts: it runs from Raycast without a
+# at the first failing step and never prompts: it can run without a
 # tty. --check writes nothing.
 #
 # Tests: DOTFILES_LOCAL_YML and DOTFILES_TOOLS_YAML override the default paths.
@@ -257,7 +257,7 @@ cmd_update() {
 		echo "dotfiles update: git not on PATH" >&2
 		exit 1
 	}
-	# no tty (Raycast): nothing below may prompt
+	# maybe no tty: nothing below may prompt
 	export GIT_TERMINAL_PROMPT=0
 	[ -n "${GIT_SSH_COMMAND:-}" ] || export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=10"
 	export NO_COLOR=1
