@@ -16,7 +16,7 @@ runs:
     # mise pinned by version + sha256, tools from mise.lock only (--locked).
     # The action's own cache is off: the step above owns it.
     - name: Install mise and tools
-      uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+      uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
       with:
         version: 2026.10.11
         # sha256 of mise-v2026.10.11-linux-x64 (ubuntu-24.04 x64 only); bump

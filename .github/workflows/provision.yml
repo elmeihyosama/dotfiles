@@ -76,7 +76,7 @@ jobs:
       # ansible-core from the repo toolchain (mise.toml + mise.lock). Only mise
       # and ansible go on PATH: the playbook installs the home tools itself.
       - name: Install mise
-        uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
           version: 2026.10.11
           # sha256 of mise-v2026.10.11-macos-arm64 (bump with `version`; Renovate
