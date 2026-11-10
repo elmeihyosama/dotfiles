@@ -51,7 +51,7 @@ assert_contains "$key" ".github/actions/setup-lint/action.yml" "setup-lint cache
 # scheduled_and_dispatchable: ci.yml's weekly full run catches upstream
 # drift; each called workflow stays dispatchable on its own.
 assert_contains "$(cat .github/workflows/ci.yml)" '- cron: "17 5 * * 1"' "ci.yml has the weekly schedule"
-for w in ci lint provision bootstrap; do
+for w in ci lint bootstrap; do
 	assert_contains "$(cat ".github/workflows/$w.yml")" "workflow_dispatch:" "$w.yml has workflow_dispatch"
 done
 
@@ -78,44 +78,17 @@ assert_contains "$imgs" "image:" "workflows declare container images"
 unpinned="$(printf '%s\n' "$imgs" | grep -vE '^[0-9]+:[[:space:]]*#' | grep -vE '[a-z0-9./_-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}' || true)"
 assert_eq "" "$unpinned" "every container image is pinned by tag@sha256 digest"
 
-# image_pins_agree: bootstrap.yml's ubuntu/fedora images (tag@digest) are
-# copies of provision.yml's; a one-sided bump must fail here.
-img_of() { # FILE DISTRO -> the image: reference (no trailing comment)
-	awk -v d="$2" '$0 ~ "distro: "d"$" {f=1; next} f && /image:/ {sub(/^[^:]*image:[ ]*/, ""); sub(/[ ]+#.*$/, ""); print; exit}' "$1"
-}
-for d in ubuntu fedora; do
-	p_img="$(img_of .github/workflows/provision.yml "$d")"
-	b_img="$(img_of .github/workflows/bootstrap.yml "$d")"
-	assert_contains "$p_img" "@sha256:" "provision.yml has a pinned $d image"
-	assert_eq "$p_img" "$b_img" "$d image is identical in provision.yml and bootstrap.yml"
-done
-
-# mise_versions_agree: the CI mise binary pin in setup-lint and the macOS job.
-mise_ver() { grep -E '^[[:space:]]*version:[[:space:]]*[0-9]' "$1" | head -1 | sed -E 's/.*version:[[:space:]]*//'; }
-sl_ver="$(mise_ver .github/actions/setup-lint/action.yml)"
-mac_ver="$(mise_ver .github/workflows/provision.yml)"
-assert_contains "$sl_ver" "20" "setup-lint pins a mise version"
-assert_eq "$sl_ver" "$mac_ver" "setup-lint and the macOS job pin the same mise version"
-
-# bootstrap_covers_fedora: the bootstrap matrix exercises install.sh's dnf path.
+# bootstrap_job: install.sh end to end on Ubuntu, as a user without sudo.
 boot="$(cat .github/workflows/bootstrap.yml)"
 # shellcheck disable=SC2016 # literal GitHub expression, not shell
-assert_contains "$boot" 'name: bootstrap ${{ matrix.distro }} (${{ matrix.mode }})' "bootstrap job name is prefixed (no clash with provision checks)"
-assert_contains "$boot" "distro: [ubuntu, fedora]" "bootstrap matrix covers ubuntu and fedora"
-
-# macos_job: real playbook on a macOS runner, casks skipped, idempotence shared.
-prov="$(cat .github/workflows/provision.yml)"
-assert_contains "$prov" "runs-on: macos-26" "provision has a macOS job on a versioned runner"
-assert_contains "$prov" "ansible-playbook site.yml --skip-tags casks" "macOS job skips casks"
-assert_contains "$prov" "mise install --locked" "macOS job installs ansible from the locked repo toolchain"
-assert_contains "$prov" ".github/scripts/assert-idempotent.sh" "macOS job checks second-run idempotence"
-assert_contains "$prov" "scripts/doctor.sh" "macOS job runs the doctor health check"
-assert_contains "$prov" "timeout-minutes: 30" "macOS job has a timeout"
+assert_contains "$boot" 'name: bootstrap ${{ matrix.distro }} (${{ matrix.mode }})' "bootstrap job name"
+assert_contains "$boot" "distro: [ubuntu]" "bootstrap runs on ubuntu"
+assert_contains "$boot" "mode: [nosudo]" "bootstrap runs without sudo"
 
 # concurrency_cancels_superseded_runs: ci.yml only (a callee group would
 # collide with its caller's, both being named after ci.yml).
 assert_contains "$(cat .github/workflows/ci.yml)" "cancel-in-progress: true" "ci.yml cancels superseded runs"
-for w in lint provision bootstrap; do
+for w in lint bootstrap; do
 	assert_not_contains "$(cat ".github/workflows/$w.yml")" "concurrency:" "$w.yml leaves concurrency to ci.yml"
 done
 

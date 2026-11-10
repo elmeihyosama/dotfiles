@@ -169,7 +169,7 @@ the exceptions follow it.
 | Home CLI tools | `home/.chezmoidata/tools.yaml` | `home/dot_config/mise-dotfiles/mise.lock`, except the platforms in a tool's `no_checksum_on` |
 | Repo lint toolchain | `mise.toml` | `mise.lock`, plus `.mise/locks/pipx-*/<ver>/uv.lock` (hash-pinned, dependencies included) |
 | mise itself (bootstrap) | `mise_version` in `ansible/group_vars/all.yml` | `mise_sha256` beside it |
-| CI's mise binary | `version:` in `.github/actions/setup-lint/action.yml` and the macOS job in `.github/workflows/provision.yml` | the `sha256:` input below it |
+| CI's mise binary | `version:` in `.github/actions/setup-lint/action.yml` | the `sha256:` input below it |
 | uv (install.sh) | `uv_version` in `ansible/group_vars/all.yml` | `uv_installer_sha256` beside it (the installer script; it checks the uv archive against the sha256 embedded in it) |
 | ansible-core, pre-commit (install.sh, `tasks/python.yml`) | `ansible_core_version`, `pre_commit_version` in `ansible/group_vars/all.yml` | none: version-equal to the repo `mise.toml` (`tests/python-pins.test.sh`), not hash-locked |
 | Python (uv-managed, under ansible-core and as the default `python3`) | `python_version` in `ansible/group_vars/all.yml` (equal to the repo `mise.toml` python) | the sha256 the pinned uv carries for that build |
@@ -218,7 +218,7 @@ across files move together:
   group_vars pins (`mise_version`, `uv_version`, `nerd_font_version` via
   GitHub releases; `ansible_core_version`, `pre_commit_version` via PyPI),
   CI's mise `version:` inputs, the workflow container images (tag and
-  digest, provision.yml and bootstrap.yml together), and the sheldon pins;
+  digest, in bootstrap.yml), and the sheldon pins;
 - sheldon `rev` pins use the git-refs datasource with no branch, so they
   follow each plugin's **default branch** (its `HEAD`): a bump is "the
   latest commit there". forgit is pinned by release tag (`github-tags`).

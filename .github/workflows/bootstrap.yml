@@ -10,30 +10,29 @@ permissions:
 
 jobs:
   bootstrap:
-    # The entry point itself (install.sh end-to-end) on an apt and a dnf host.
+    # The entry point itself (install.sh end-to-end, curl | sh), as a user
+    # without sudo on Ubuntu: the user-local path every Linux can take.
     name: bootstrap ${{ matrix.distro }} (${{ matrix.mode }})
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        distro: [ubuntu, fedora]
-        mode: [sudo, nosudo]
-        # Digest-pinned like provision.yml (tests/ci-pins.test.sh keeps them equal).
+        distro: [ubuntu]
+        mode: [nosudo]
+        # Digest-pinned (tests/ci-pins.test.sh); Renovate bumps tag and digest.
         include:
           - distro: ubuntu
             image: mirror.gcr.io/library/ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac # 24.04
-          - distro: fedora
-            image: mirror.gcr.io/library/fedora:44@sha256:43b29f65a41eb9c35e1cd5323e3bdf3b655c2357a9f4f1ff2f9c2798e5045d80 # 44
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Bootstrap (${{ matrix.image }} / ${{ matrix.mode }})
         run: |
-          # Same retry loop as provision.yml.
+          # Retried: the network (GitHub, mirrors) flakes.
           for attempt in 1 2 3; do
             echo "::group::bootstrap attempt $attempt"
-            # Higher ceiling than provision: the full playbook runs twice.
+            # The full playbook runs twice (idempotence).
             if timeout 1500 docker run --rm \
               -e MODE='${{ matrix.mode }}' \
               -e GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \

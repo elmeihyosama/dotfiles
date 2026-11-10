@@ -27,7 +27,6 @@ jobs:
   changes:
     runs-on: ubuntu-24.04
     outputs:
-      provision: ${{ steps.filter.outputs.provision }}
       bootstrap: ${{ steps.filter.outputs.bootstrap }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -63,11 +62,6 @@ jobs:
   lint:
     uses: ./.github/workflows/lint.yml # zizmor: ignore[self-repository]
 
-  provision:
-    needs: changes
-    if: needs.changes.outputs.provision == 'true'
-    uses: ./.github/workflows/provision.yml # zizmor: ignore[self-repository]
-
   bootstrap:
     needs: changes
     if: needs.changes.outputs.bootstrap == 'true'
@@ -76,7 +70,7 @@ jobs:
   ci-gate:
     name: ci-gate
     if: always()
-    needs: [changes, lint, provision, bootstrap]
+    needs: [changes, lint, bootstrap]
     runs-on: ubuntu-24.04
     steps:
       - name: Every job passed or was skipped

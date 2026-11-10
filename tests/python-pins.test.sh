@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # group_vars' bootstrap Python pins equal the repo mise.toml's, and install.sh
-# and CI's provision matrix install exactly those.
+# installs exactly those.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -39,10 +39,3 @@ assert_contains "$(cat ansible/tasks/python.yml)" 'pre-commit=={{ pre_commit_ver
 eval "$(sed -n '/^gv_pin() {/,/^}/p' install.sh)"
 declare -F gv_pin >/dev/null || fail "install.sh defines gv_pin()"
 assert_eq "$(sed -nE 's/^uv_version:[[:space:]]*"([^"]*)".*/\1/p' "$gv")" "$(gv_pin uv_version "$gv")" "install.sh gv_pin reads uv_version"
-
-# CI's provision matrix pins the same ansible-core (Arch: pacman's).
-ci="$(cat .github/scripts/provision-ci.sh)"
-# shellcheck disable=SC2016
-assert_contains "$ci" 'ANSIBLE_CORE="$(gv_pin ansible_core_version)"' "provision-ci.sh reads ansible_core_version"
-unpinned="$(grep -vE '^[[:space:]]*#' .github/scripts/provision-ci.sh | grep -E 'install[^#]*ansible-core([^=]|$)' | grep -v pacman || true)"
-assert_eq "" "$unpinned" "provision-ci.sh installs no unpinned ansible-core outside pacman"

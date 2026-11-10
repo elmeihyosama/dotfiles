@@ -104,12 +104,9 @@
       "datasourceTemplate": "github-releases"
     },
     {
-      "description": "CI mise binary: the jdx/mise-action `version:` input in setup-lint and the macOS job (its sha256: scripts/relock.sh).",
+      "description": "CI mise binary: the jdx/mise-action `version:` input in setup-lint (its sha256: scripts/relock.sh).",
       "customType": "regex",
-      "managerFilePatterns": [
-        "/^\\.github/actions/setup-lint/action\\.yml$/",
-        "/^\\.github/workflows/provision\\.yml$/"
-      ],
+      "managerFilePatterns": ["/^\\.github/actions/setup-lint/action\\.yml$/"],
       "matchStrings": [
         "uses: jdx/mise-action@[0-9a-f]{40}[^\\n]*\\n\\s+with:\\n\\s+version: (?<currentValue>[0-9][^\\s]*)"
       ],
@@ -118,7 +115,7 @@
       "extractVersionTemplate": "^v(?<version>.+)$"
     },
     {
-      "description": "CI container images: `image: <name>:<tag>@sha256:<digest>` (provision.yml and bootstrap.yml copies bump in the same PR; tests/ci-pins.test.sh asserts they agree).",
+      "description": "CI container images: `image: <name>:<tag>@sha256:<digest>` (bootstrap.yml).",
       "customType": "regex",
       "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
       "matchStrings": [

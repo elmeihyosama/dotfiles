@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
-# Smoke-test install.sh end-to-end in a clean Ubuntu or Fedora container: the
+# Smoke-test install.sh end-to-end in a clean Debian/Ubuntu container: the
 # curl | sh self-clone, promptless local.yml, the full playbook, idempotence.
-# MODE=sudo|nosudo, as in provision-ci.sh.
+# MODE=sudo|nosudo (CI runs nosudo).
 set -eu
 
 MODE="${MODE:?set MODE=sudo|nosudo}"
@@ -20,10 +20,8 @@ if command -v apt-get >/dev/null 2>&1; then
 	export DEBIAN_FRONTEND=noninteractive
 	apt-get update -qq
 	apt-get install -y -qq git curl ca-certificates sudo >/dev/null
-elif command -v dnf >/dev/null 2>&1; then
-	dnf install -y -q git curl ca-certificates sudo >/dev/null
 else
-	echo "no supported package manager (need apt-get or dnf)"
+	echo "needs apt-get (a Debian/Ubuntu image)"
 	exit 1
 fi
 
@@ -54,7 +52,7 @@ if [ "$MODE" = "sudo" ]; then
 	cat /tmp/run1.log
 	assert_no_command_not_found /tmp/run1.log
 	export PATH="$HOME/.local/bin:$PATH"
-	# Strip btop's cap_perfmon (container-only EPERM), as in provision-ci.sh.
+	# Strip btop's cap_perfmon (container-only EPERM).
 	if command -v setcap >/dev/null 2>&1 && command -v btop >/dev/null 2>&1; then
 		setcap -r "$(command -v btop)" 2>/dev/null || true
 	fi

@@ -49,7 +49,7 @@ images): Renovate proposes the bumps in one weekly PR and
 `scripts/relock.sh` on its branch, commit, push. One-time setup: install the
 Renovate GitHub App for this repo. Details: [docs/mise.md](docs/mise.md#pins-and-renovate).
 
-Every distro × both paths (sudo-native and no-sudo) is provisioned for real in CI.
+CI runs the one-line install end to end on Ubuntu as a user without sudo.
 WSL is supported and treated as Linux. Supported CPUs: Apple Silicon on macOS,
 x86_64 and arm64 on Linux. Intel Macs are not supported (the pinned tools are
 locked for those three platforms only); the playbook stops with a message
@@ -69,7 +69,7 @@ saying so.
 | --- | --- |
 | `home/` | chezmoi source tree (`.chezmoiroot` → `home`) |
 | `ansible/` | Provisioning: tools, GUI apps (macOS casks), fonts, plugins, then `chezmoi apply` |
-| `.github/` | CI: `ci.yml` runs lint and, when the change needs them, provision and bootstrap; `ci-gate` is the one required check. Label a PR `ci:full` to run everything. Plus the shared lint/provision scripts (used by CI and pre-commit) |
+| `.github/` | CI: `ci.yml` runs lint and, when the change touches the install, the bootstrap smoke test; `ci-gate` is the one required check. Label a PR `ci:full` to run everything. Plus the shared lint/provision scripts (used by CI and pre-commit) |
 | `install.sh` | Fresh-machine entry point (clone + provision) |
 
 ## The stack

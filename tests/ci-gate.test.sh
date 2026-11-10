@@ -6,25 +6,20 @@ cd "$TESTS_REPO" || exit 1
 filter=.github/scripts/ci-changes.sh
 wf=.github/workflows
 
-# gate PATH... -> "provision=X bootstrap=Y" for that change set
+# gate PATH... -> "bootstrap=X" for that change set
 gate() { printf '%s\n' "$@" | sh "$filter" | paste -sd' ' -; }
 
 # path_cases
-assert_eq "provision=false bootstrap=false" "$(gate README.md docs/mise.md docs/themes.md)" "docs only: nothing gated runs"
-assert_eq "provision=false bootstrap=false" "$(gate tests/prompt.test.sh .github/scripts/lint.sh)" "lint-only paths: nothing gated runs"
-assert_eq "provision=true bootstrap=true" "$(gate home/dot_zshrc.tmpl)" "home/: both"
-assert_eq "provision=true bootstrap=true" "$(gate ansible/site.yml)" "ansible/: both"
-assert_eq "provision=true bootstrap=true" "$(gate scripts/doctor.sh)" "scripts/: both"
+assert_eq "bootstrap=false" "$(gate README.md docs/mise.md docs/themes.md)" "docs only: nothing gated runs"
+assert_eq "bootstrap=false" "$(gate tests/prompt.test.sh .github/scripts/lint.sh)" "lint-only paths: nothing gated runs"
 for p in mise.toml mise.lock .mise/locks/pipx-ansible-core/x/uv.lock; do
-	assert_eq "provision=true bootstrap=false" "$(gate "$p")" "repo toolchain $p: provision (macOS job)"
+	assert_eq "bootstrap=false" "$(gate "$p")" "repo toolchain $p: lint only"
 done
-assert_eq "provision=true bootstrap=false" "$(gate $wf/provision.yml)" "provision.yml: provision only"
-assert_eq "provision=false bootstrap=true" "$(gate install.sh)" "install.sh: bootstrap only"
-assert_eq "provision=false bootstrap=true" "$(gate $wf/bootstrap.yml)" "bootstrap.yml: bootstrap only"
-assert_eq "provision=true bootstrap=true" "$(gate README.md $wf/ci.yml)" "ci.yml: everything"
-assert_eq "provision=true bootstrap=true" "$(gate $filter)" "the filter itself: everything"
-assert_eq "provision=true bootstrap=true" "$(sh "$filter" --full </dev/null | paste -sd' ' -)" "--full: everything"
-assert_eq "provision=false bootstrap=false" "$(sh "$filter" </dev/null | paste -sd' ' -)" "no changes: nothing gated runs"
+for p in home/dot_zshrc.tmpl ansible/site.yml scripts/doctor.sh install.sh $wf/bootstrap.yml $wf/ci.yml "$filter"; do
+	assert_eq "bootstrap=true" "$(gate README.md "$p")" "$p: bootstrap"
+done
+assert_eq "bootstrap=true" "$(sh "$filter" --full </dev/null)" "--full: everything"
+assert_eq "bootstrap=false" "$(sh "$filter" </dev/null)" "no changes: nothing gated runs"
 
 # filter_paths_exist: a renamed file must not silently drop out of the filter
 n=0
@@ -33,7 +28,7 @@ while IFS= read -r p; do
 	[ -e "$p" ] || fail "filter names a missing path: $p"
 done < <(grep -v '^[[:space:]]*#' "$filter" | grep -oE '(\.github/[a-z/-]+|[a-z]+)\.(sh|yml|toml|lock)|\.chezmoiroot')
 # a reformat that hides every path from the grep must not pass vacuously
-[ "$n" -ge 12 ] || fail "filter path check saw only $n paths (want >= 12)"
+[ "$n" -ge 8 ] || fail "filter path check saw only $n paths (want >= 8)"
 
 # closure ROOT...: repo scripts transitively referenced from ROOTs
 closure() {
@@ -58,16 +53,13 @@ closure() {
 # reaches must trigger that workflow.
 deployed=()
 while IFS= read -r f; do deployed+=("$f"); done < <(git ls-files ansible home)
-for s in $(closure $wf/provision.yml "${deployed[@]}"); do
-	assert_contains "$(gate "$s")" "provision=true" "$s (reached from provision) triggers provision"
-done
 for s in $(closure $wf/bootstrap.yml install.sh "${deployed[@]}"); do
 	assert_contains "$(gate "$s")" "bootstrap=true" "$s (reached from bootstrap) triggers bootstrap"
 done
 
 # ci_yml_wiring: callees are reusable, only ci.yml runs on PRs, the gate
 # needs every other job.
-for w in lint provision bootstrap; do
+for w in lint bootstrap; do
 	assert_eq "true" "$(yq '.on | has("workflow_call")' "$wf/$w.yml")" "$w.yml is reusable"
 	assert_eq "./$wf/$w.yml" "$(yq ".jobs.$w.uses" "$wf/ci.yml")" "ci.yml calls $w.yml"
 done

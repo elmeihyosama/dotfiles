@@ -27,13 +27,11 @@ assert_eq "$ver" "$(yq '.tools.mise.version' home/.chezmoidata/tools.yaml)" "too
 # CI pins must equal group_vars.
 mise_ver() { grep -E '^[[:space:]]*version:[[:space:]]*[0-9]' "$1" | head -1 | sed -E 's/.*version:[[:space:]]*//'; }
 assert_eq "$ver" "$(mise_ver .github/actions/setup-lint/action.yml)" "setup-lint version equals group_vars mise_version"
-assert_eq "$ver" "$(mise_ver .github/workflows/provision.yml)" "macOS job version equals group_vars mise_version"
 
 # setup-lint pins the linux-x64 glibc asset, which group_vars (musl) lacks, so
 # only its shape is checked.
 grep -Eq '^[[:space:]]*sha256:[[:space:]]*[0-9a-f]{64}$' .github/actions/setup-lint/action.yml || fail "setup-lint sha256 is 64 lowercase hex"
 sha_of() { printf '%s\n' "$block" | sed -nE "s/^[[:space:]]+$1:[[:space:]]*\"([0-9a-f]{64})\".*/\1/p"; }
-assert_eq "$(sha_of macos-arm64)" "$(grep -E '^[[:space:]]*sha256:' .github/workflows/provision.yml | head -1 | sed -E 's/.*sha256:[[:space:]]*//')" "macOS job sha256 equals mise_sha256.macos-arm64"
 
 # Playbook wiring.
 assert_contains "$(cat ansible/tasks/mise.yml 2>/dev/null)" "mise_sha256" "tasks/mise.yml uses mise_sha256"

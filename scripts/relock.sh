@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The one way to refresh pins. From mise_version (and nerd_font_version,
 # uv_version) in ansible/group_vars/all.yml it rewrites: mise_sha256, CI's mise
-# pins (setup-lint, provision.yml's macos job), the repo mise.lock (pruning
+# pin (setup-lint), the repo mise.lock (pruning
 # orphaned .mise/locks uv.lock dirs), the dotfiles lock, the nerd font sha256,
 # uv_installer_sha256 and tools.yaml's bootstrap mise version.
 # Idempotent; prints what changed. Every rewrite is re-read, so layout drift
@@ -13,7 +13,6 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 GV=ansible/group_vars/all.yml
 SETUP_LINT=.github/actions/setup-lint/action.yml
-PROVISION=.github/workflows/provision.yml
 REPO_LOCK=mise.lock
 HOME_LOCK=home/dot_config/mise-dotfiles/mise.lock
 PINS_TMPL=home/dot_config/mise-dotfiles/config.toml.tmpl
@@ -117,11 +116,9 @@ set_ci_pin() {
 }
 
 relock_ci() {
-	local lx mac
+	local lx
 	lx="$(asset_sha "mise-v$MISE_VERSION-linux-x64")"
-	mac="$(asset_sha "mise-v$MISE_VERSION-macos-arm64")"
 	set_ci_pin "$SETUP_LINT" "$lx" "mise-v$MISE_VERSION-linux-x64"
-	set_ci_pin "$PROVISION" "$mac" "mise-v$MISE_VERSION-macos-arm64"
 }
 
 lock_changed() {

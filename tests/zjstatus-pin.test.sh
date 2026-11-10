@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The pinned zellij minor has a zjstatus entry, so a Renovate minor bump fails
-# here in seconds, not in the macOS provision job.
+# here in seconds, not on a machine.
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

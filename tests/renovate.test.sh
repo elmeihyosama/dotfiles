@@ -89,16 +89,16 @@ want="$(printf '%s\n' \
 	"ryanoasis/nerd-fonts	$(gv nerd_font_version)	github-releases" | sort)"
 assert_eq "$want" "$(rows '^ansible/group_vars/all\.yml$' | cut -f2,3,5)" "group_vars pins: mise, uv, ansible-core, pre-commit, nerd-fonts"
 
-# CI mise binary pins (setup-lint and the macOS job), equal to mise_version.
-want="$(printf '%s\n' ".github/actions/setup-lint/action.yml	jdx/mise	$mv" ".github/workflows/provision.yml	jdx/mise	$mv")"
+# CI mise binary pin (setup-lint), equal to mise_version.
+want="$(printf '%s\n' ".github/actions/setup-lint/action.yml	jdx/mise	$mv")"
 assert_eq "$want" "$(rows '^\.github/' | awk -F'\t' '$2 == "jdx/mise"' | cut -f1-3)" "CI mise version inputs are tracked"
 
 # Container images: every image:<name>:<tag>@sha256 line in the workflows,
-# per file (provision.yml and bootstrap.yml copies bump in the same PR).
+# per file.
 want="$(grep -HoE 'image: [a-z0-9./_-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}' .github/workflows/*.yml |
 	awk '{f = $0; sub(/:image: .*/, "", f); r = $0; sub(/^[^:]+:image: /, "", r)
 		split(r, a, "@"); n = index(a[1], ":"); print f "\t" substr(a[1], 1, n - 1) "\t" substr(a[1], n + 1) "\t" a[2] "\tdocker"}' | sort -u)"
-assert_eq "8" "$(printf '%s\n' "$want" | wc -l | tr -d ' ')" "workflows pin 8 container image lines"
+assert_eq "1" "$(printf '%s\n' "$want" | wc -l | tr -d ' ')" "workflows pin 1 container image line"
 assert_eq "$want" "$(rows '^\.github/workflows/' | awk -F'\t' '$5 == "docker"')" "every workflow container image (tag + digest) is tracked"
 
 # sheldon: rev pins via git-refs (default branch HEAD), forgit by tag.
