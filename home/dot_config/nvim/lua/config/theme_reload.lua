@@ -1,4 +1,4 @@
--- Live theme reload, called over RPC by `theme`/`glass`/`wallpaper` after
+-- Live theme reload, called over RPC by `theme` after
 -- chezmoi re-renders the theme modules.
 local M = {}
 

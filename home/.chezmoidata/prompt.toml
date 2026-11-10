@@ -1,4 +1,4 @@
-# Prompt (Starship) and cursor options, in the order docs/eye-candy.md
+# Prompt (Starship) and cursor options, in the order docs/prompt.md
 # lists them. A machine picks with `prompt_<key> = "<choice>"` in
 # ~/.config/chezmoi/chezmoi.toml [data] (`prompt_set KEY=VALUE` writes
 # it); unset or unknown = the default, which is the prompt as it always was.

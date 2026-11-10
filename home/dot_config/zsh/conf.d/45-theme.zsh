@@ -40,11 +40,11 @@ _chezmoi_unset_data() {
 }
 
 # _theme_apply [RE]: `chezmoi apply` for the targets whose templates use the
-# theme, glass or wallpaper data only (or match RE: prompt_set passes the
+# theme data only (or match RE: prompt_set passes the
 # prompt templates' marker). A full apply would also roll out every other
 # pending change (and run its scripts); a file edited here is left alone and
 # named (without a tty chezmoi can't ask about it).
-_THEME_DATA_RE='\.theme\b|\.themes\b|\.glass\b|glass_levels|wallpaper_mode|\.wallpaper\b|base0[0-9A-F]'
+_THEME_DATA_RE='\.theme\b|\.themes\b|base0[0-9A-F]'
 _theme_apply() {
   emulate -L zsh
   local src t re=${1:-$_THEME_DATA_RE}
@@ -101,7 +101,7 @@ theme() {
   fi
 }
 
-# `theme <Tab>` lists the slugs, `wallpaper <Tab>` its verbs.
+# `theme <Tab>` lists the slugs.
 _theme_slugs() {
   local src
   src=$(chezmoi source-path 2>/dev/null) || return
@@ -110,39 +110,6 @@ _theme_slugs() {
   _describe 'theme' themes
 }
 compdef _theme_slugs theme
-
-_wallpaper_verbs() {
-  local -a actions
-  actions=(on off toggle)
-  _describe 'action' actions
-}
-compdef _wallpaper_verbs wallpaper
-
-# wallpaper: toggle the themed terminal background (machine-local; no git diff).
-#   wallpaper on | off | toggle   (bare `wallpaper` = toggle)
-wallpaper() {
-  emulate -L zsh
-  local cfg action cur next
-  command -v chezmoi >/dev/null 2>&1 || { echo "wallpaper: chezmoi not found" >&2; return 1; }
-  cfg=${CHEZMOI_CONFIG:-$HOME/.config/chezmoi/chezmoi.toml}
-  [[ -f $cfg ]] || { echo "wallpaper: missing $cfg" >&2; return 1; }
-  action=${1:-toggle}
-  case $action in
-    on|off) next=$action ;;
-    toggle)
-      cur=$(awk -F'"' '
-        /^[[:space:]]*\[/ { indata = ($0 ~ /^[[:space:]]*\[data\][[:space:]]*$/); next }
-        indata && /^[[:space:]]*wallpaper_mode[[:space:]]*=/ { print $2; exit }
-      ' "$cfg")
-      [[ $cur == off ]] && next=on || next=off
-      ;;
-    *) echo "usage: wallpaper on|off|toggle" >&2; return 1 ;;
-  esac
-  _chezmoi_set_data wallpaper_mode "$next" "$cfg" || return 1
-  _theme_apply || return 1
-  echo "wallpaper → ${next}"
-  _theme_live_reload
-}
 
 # _ghostty_usr2_ok: true when Ghostty is 1.2+, which reloads config on SIGUSR2.
 _ghostty_usr2_ok() {
@@ -206,46 +173,6 @@ _theme_live_reload() {
   fi
   return 0
 }
-
-# glass: set the Ghostty translucency level (machine-local; no git diff).
-#   glass clear|frosted|tinted|solid|default|off   (off = default)
-#   glass            fzf-pick, else usage
-# Levels come from .chezmoidata/glass.toml.
-glass() {
-  emulate -L zsh
-  local cfg level lv
-  command -v chezmoi >/dev/null 2>&1 || { echo "glass: chezmoi not found" >&2; return 1; }
-  command -v jq >/dev/null 2>&1 || { echo "glass: jq not found" >&2; return 1; }
-  cfg=${CHEZMOI_CONFIG:-$HOME/.config/chezmoi/chezmoi.toml}
-  [[ -f $cfg ]] || { echo "glass: missing $cfg" >&2; return 1; }
-  local -a levels
-  levels=(${(f)"$(chezmoi data --format json 2>/dev/null | jq -r '.glass_levels // {} | keys_unsorted[]')"})
-  (( ${#levels} )) || { echo "glass: no levels in chezmoi data" >&2; return 1; }
-  if (( $# )); then
-    level=$1
-  elif command -v fzf >/dev/null 2>&1; then
-    level=$(print -l -- $levels off | fzf --prompt='glass ❯ ' --height 40% --reverse) || return 0
-  else
-    echo "usage: glass ${(j:|:)levels}|off" >&2; print -l -- $levels off >&2; return 1
-  fi
-  [[ -z $level ]] && return 0
-  [[ $level == off ]] && level=default
-  if (( ! ${levels[(Ie)$level]} )); then
-    echo "glass: unknown level '${level}'" >&2
-    echo "usage: glass ${(j:|:)levels}|off" >&2; print -l -- $levels off >&2; return 1
-  fi
-  _chezmoi_set_data glass "$level" "$cfg" || return 1
-  _theme_apply || return 1
-  echo "glass → ${level}"
-  _theme_live_reload
-}
-
-_glass_levels() {
-  local -a levels
-  levels=(${(f)"$(chezmoi data --format json 2>/dev/null | jq -r '.glass_levels // {} | keys_unsorted[]')"} off)
-  _describe 'level' levels
-}
-compdef _glass_levels glass
 
 # prompt_set: set prompt (starship) and cursor options (machine-local; no git
 # diff), then apply. Starship reads its config at every prompt, and

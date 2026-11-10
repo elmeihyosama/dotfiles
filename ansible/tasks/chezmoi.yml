@@ -18,7 +18,7 @@
     state: directory
     mode: "0755"
 
-# [data] also holds `theme`, `wallpaper` and hand-set overrides; Ansible
+# [data] also holds `theme` and hand-set overrides; Ansible
 # rewrites the file from a fixed key set, so read them back first.
 - name: Read existing chezmoi.toml (to preserve machine-local [data] overrides)
   ansible.builtin.slurp:

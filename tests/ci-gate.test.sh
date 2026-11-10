@@ -11,7 +11,7 @@ gate() { printf '%s\n' "$@" | sh "$filter" | paste -sd' ' -; }
 
 # path_cases
 assert_eq "provision=false bootstrap=false" "$(gate README.md docs/mise.md docs/themes.md)" "docs only: nothing gated runs"
-assert_eq "provision=false bootstrap=false" "$(gate tests/glass.test.sh .github/scripts/lint.sh)" "lint-only paths: nothing gated runs"
+assert_eq "provision=false bootstrap=false" "$(gate tests/prompt.test.sh .github/scripts/lint.sh)" "lint-only paths: nothing gated runs"
 assert_eq "provision=true bootstrap=true" "$(gate home/dot_zshrc.tmpl)" "home/: both"
 assert_eq "provision=true bootstrap=true" "$(gate ansible/site.yml)" "ansible/: both"
 assert_eq "provision=true bootstrap=true" "$(gate scripts/doctor.sh)" "scripts/: both"

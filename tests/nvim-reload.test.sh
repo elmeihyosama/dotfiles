@@ -3,7 +3,7 @@
 # private headless nvim (colorscheme + lualine) over RPC, skips stale/hung
 # sockets within the 2s bound, finds sockets in the default macOS/Linux
 # layouts, signals Ghostty, notes zellij, leaves no jobs, and runs from
-# theme/glass/wallpaper without exec'ing a shell. Only temp sockets and stub
+# `theme` without exec'ing a shell. Only temp sockets and stub
 # zellij/pgrep/pkill/chezmoi are used.
 # shellcheck disable=SC2016 # stub and zsh bodies expand later
 set -uo pipefail
@@ -221,12 +221,11 @@ zellij: applied" "$(reload "$sockdir/none/*.0" ZJ_LIST='main [Created 1m ago] (c
 assert_eq "reloaded 0 nvim" "$(reload "$sockdir/none/*.0" ZJ_LIST='old [Created 2d ago] (EXITED - attach to resurrect)')" \
 	"zellij: exited only"
 
-# callers: theme, glass and wallpaper reload live and return (headless: no
+# caller: theme reloads live and returns (headless: no
 # exec zsh); the old restart message is gone.
 ccfg="$HOME/chezmoi.toml"
 printf '[data]\n    theme = "nord"\n' >"$ccfg"
-calls=("theme $b" "wallpaper on")
-command -v jq >/dev/null 2>&1 && calls+=("glass clear")
+calls=("theme $b")
 for call in "${calls[@]}"; do
 	: >"$STUB_LOG"
 	# shellcheck disable=SC2086  # $call is "fn arg"

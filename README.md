@@ -116,9 +116,9 @@ saying so.
 
 - Apply changes: `chezmoi apply` — preview with `chezmoi diff`.
 - Add an editor language: `:LazyExtras` in Neovim.
-- Switch theme: run `theme` (fuzzy picker with live preview) or `theme <slug>`;
-  toggle the themed wallpaper with `wallpaper`. Running Neovim and Ghostty
-  repaint live, zellij reloads its config; new shells pick it up. The repo default lives in `home/.chezmoidata/theme.toml`.
+- Switch theme: run `theme` (fuzzy picker with live preview) or `theme <slug>`.
+  Running Neovim and Ghostty repaint live, zellij reloads its config; new
+  shells pick it up. The repo default lives in `home/.chezmoidata/theme.toml`.
 - Lint locally: `.github/scripts/lint.sh all`. `install.sh` also sets up a pre-commit hook
   that runs these checks on each commit. The lint tools are pinned in the repo's
   `mise.toml` (checksums in `mise.lock`): run `mise trust` once, then `mise install`
@@ -135,7 +135,7 @@ Deeper guides for the non-obvious pieces:
 
 - [Theming](docs/themes.md) — the base16 pipeline, semantic design tokens, and the switcher.
 - [mise](docs/mise.md) — per-project runtimes, environment, and tasks.
-- [Eye-candy](docs/eye-candy.md) — wallpaper↔theme pairing, glass and the prompt.
+- [Prompt](docs/prompt.md) — the Starship prompt and cursor options.
 - [Clipboard & notifications](docs/clipboard-notify.md) — OSC escape sequences that work over SSH.
 - [Commit signing](docs/signing.md) — SSH-signed commits for your GitHub identity.
 

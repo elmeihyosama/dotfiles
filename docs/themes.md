@@ -25,7 +25,7 @@ restyles everything at once.
 - **Manual:** set the slug in one of the places above, then `chezmoi apply`.
 
 New shells and new ghostty windows pick the theme up automatically. After
-applying, `theme`, `glass` and `wallpaper` reload what they can live: every
+applying, `theme` reloads what it can live: every
 running nvim (over its RPC socket, 2s limit each), Ghostty (SIGUSR2 to
 your own `ghostty` processes; if that fails, press `⌘⇧,`, or `ctrl+shift+,` on
 Linux), and zellij (live sessions reload `config.kdl` on change). **Running
@@ -68,6 +68,5 @@ role layer exists so chrome can route around them.
 
 `iglass-dark` and `iglass-light` are the iglass "frosted" palettes
 (`github.com/vukkt/iglass` v1.5.0, MIT), hand-mapped to base16, so the audit
-skips their missing-upstream DRIFT. Pair them with `glass frosted`. Avoid
-`iglass-light` over a dark wallpaper: the wallpaper darkens the translucent
-background and its dark text loses contrast.
+skips their missing-upstream DRIFT. They were tuned for a translucent Ghostty
+(see `background-opacity` in the Ghostty config).
