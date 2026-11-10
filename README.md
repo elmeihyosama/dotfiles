@@ -3,8 +3,8 @@
 [![CI](https://github.com/elmeihyosama/dotfiles/actions/workflows/ci.yml/badge.svg)](https://github.com/elmeihyosama/dotfiles/actions/workflows/ci.yml)
 
 A cross-platform (macOS and Linux) terminal environment — managed with
-[chezmoi], provisioned with [Ansible], and themed with [base16] (300+ palettes,
-switchable with one command; [Rosé Pine Moon] by default). It bootstraps a fresh
+[chezmoi], provisioned with [Ansible], and themed with [base16] ([Catppuccin], one line
+to switch flavour). It bootstraps a fresh
 machine with a single command and works even without `sudo`.
 
 ## Quick start
@@ -59,7 +59,7 @@ saying so.
 
 - **One-command bootstrap** on a new machine via `install.sh`.
 - **Declarative everywhere** — Ansible provisions, chezmoi configures.
-- **Centralised theming** — 300+ base16 palettes; switch the whole stack with the `theme` command.
+- **Centralised theming** — the four Catppuccin flavours; `theme = "…"` in one file switches the whole stack.
 - **No-sudo friendly** — user-local installs; works on locked-down machines.
 - **Linted** — shell, Ansible, Lua, and config checked in CI + pre-commit.
 
@@ -81,7 +81,7 @@ saying so.
 | Editor | Neovim ([LazyVim]) |
 | Files & CLI | yazi, bat, ripgrep, fzf, git-delta, lazygit |
 | Claude Code | Themed statusline (cwd · git · model · context · usage + reset countdown / cost) · account profiles (`claude-profile work`, `claude-work`) · every profile gets the shared plugins and a read-only allow-list merged in on apply (additive; entries you delete by hand come back) |
-| Theme | base16 — 300+ palettes, `theme` switcher (Rosé Pine Moon default) |
+| Theme | base16 Catppuccin (mocha by default); `home/.chezmoidata/theme.toml` or `theme <slug>` |
 
 ## How it works
 
@@ -112,9 +112,9 @@ saying so.
 
 - Apply changes: `chezmoi apply` — preview with `chezmoi diff`.
 - Add an editor language: `:LazyExtras` in Neovim.
-- Switch theme: run `theme` (fuzzy picker with live preview) or `theme <slug>`.
-  Running Neovim and Ghostty repaint live, zellij reloads its config; new
-  shells pick it up. The repo default lives in `home/.chezmoidata/theme.toml`.
+- Switch theme: edit `theme = "…"` in `home/.chezmoidata/theme.toml` and
+  `chezmoi apply`, or run `theme <slug>` (`theme` lists them). Running Neovim
+  and Ghostty repaint live, zellij reloads its config; new shells pick it up.
 - Lint locally: `.github/scripts/lint.sh all`. `install.sh` also sets up a pre-commit hook
   that runs these checks on each commit. The lint tools are pinned in the repo's
   `mise.toml` (checksums in `mise.lock`): run `mise trust` once, then `mise install`
@@ -142,7 +142,7 @@ Released under the [MIT License](LICENSE).
 [chezmoi]: https://www.chezmoi.io/
 [Ansible]: https://www.ansible.com/
 [base16]: https://github.com/tinted-theming/home
-[Rosé Pine Moon]: https://rosepinetheme.com/
+[Catppuccin]: https://catppuccin.com/
 [uv]: https://docs.astral.sh/uv/
 [sheldon]: https://sheldon.cli.rs/
 [LazyVim]: https://www.lazyvim.org/

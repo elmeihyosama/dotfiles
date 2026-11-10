@@ -1,44 +1,3 @@
-# _chezmoi_set_data KEY VALUE CFG: set `KEY = "VALUE"` in the chezmoi config's
-# [data] table (replacing it, inserting it, or adding [data]). Writes in place
-# to keep mode/inode/symlink. KEY must be literal: it goes into an awk regex.
-_chezmoi_set_data() {
-  local key=$1 val=$2 cfg=$3 tmp
-  # A double-quote in VAL would emit malformed TOML.
-  [[ $val == *'"'* ]] && { print -u2 "_chezmoi_set_data: value may not contain a double-quote"; return 1; }
-  tmp=$(mktemp) || return 1
-  awk -v key="$key" -v val="$val" '
-    /^[[:space:]]*\[/ {
-      if (indata && !done) { print "    " key " = \"" val "\""; done=1 }
-      indata = ($0 ~ /^[[:space:]]*\[data\][[:space:]]*$/)
-      print; next
-    }
-    indata && $0 ~ ("^[[:space:]]*#?[[:space:]]*" key "[[:space:]]*=") && !done {
-      print "    " key " = \"" val "\""; done=1; next
-    }
-    { print }
-    END {
-      if (indata && !done) { print "    " key " = \"" val "\""; done=1 }
-      if (!done) { print "[data]"; print "    " key " = \"" val "\"" }
-    }
-  ' "$cfg" > "$tmp" || { rm -f "$tmp"; return 1; }
-  cat "$tmp" > "$cfg"
-  rm -f "$tmp"
-}
-
-# _chezmoi_unset_data KEY CFG: drop `KEY = ...` from the chezmoi config's
-# [data] table, in place as _chezmoi_set_data. KEY must be literal.
-_chezmoi_unset_data() {
-  local key=$1 cfg=$2 tmp
-  tmp=$(mktemp) || return 1
-  awk -v key="$key" '
-    /^[[:space:]]*\[/ { indata = ($0 ~ /^[[:space:]]*\[data\][[:space:]]*$/); print; next }
-    indata && $0 ~ ("^[[:space:]]*" key "[[:space:]]*=") { next }
-    { print }
-  ' "$cfg" > "$tmp" || { rm -f "$tmp"; return 1; }
-  cat "$tmp" > "$cfg"
-  rm -f "$tmp"
-}
-
 # _theme_apply [RE]: `chezmoi apply` for the targets whose templates use the
 # theme data only (or match RE). A full apply would also roll out every other
 # pending change (and run its scripts); a file edited here is left alone and
@@ -63,33 +22,31 @@ _theme_apply() {
   chezmoi apply $targets
 }
 
-# theme: switch the active base16 theme (per-machine; no git diff).
-#   theme            fzf-pick from available themes
-#   theme <slug>     set directly
+# theme: switch the theme. It lives in one place, the repo's
+# home/.chezmoidata/theme.toml (`theme = "<slug>"`); this rewrites that line,
+# applies the themed files and repaints what it can live.
+#   theme            list the themes
+#   theme <slug>     switch (e.g. catppuccin-latte)
 theme() {
   emulate -L zsh
-  local src cfg slug
+  local src slug f tmp
   src=$(chezmoi source-path 2>/dev/null) || { echo "theme: chezmoi not found" >&2; return 1; }
-  cfg=${CHEZMOI_CONFIG:-$HOME/.config/chezmoi/chezmoi.toml}
-  [[ -f $cfg ]] || { echo "theme: missing $cfg" >&2; return 1; }
   local -a themes
-  themes=(${src}/.chezmoidata/themes/*.toml(:t:r))
-  if (( $# )); then
-    slug=$1
-  elif command -v fzf >/dev/null 2>&1; then
-    slug=$(print -l -- $themes | fzf --prompt='theme ❯ ' --height 40% --reverse \
-      --preview="${src:h}/scripts/theme-preview.sh ${src}/.chezmoidata/themes/{}.toml") || return 0
-  else
-    echo "usage: theme <slug>" >&2; print -l -- $themes; return 1
+  themes=(${src}/.chezmoidata/themes/*.toml(N:t:r))
+  if (( ! $# )); then
+    print -l -- $themes
+    return 0
   fi
-  [[ -z $slug ]] && return 0
-  if [[ ! $slug =~ '^[A-Za-z0-9._-]+$' ]]; then
-    echo "theme: invalid slug '${slug}'" >&2; return 1
+  slug=$1
+  if [[ ! $slug =~ '^[A-Za-z0-9._-]+$' || ! -f ${src}/.chezmoidata/themes/${slug}.toml ]]; then
+    echo "theme: unknown theme '${slug}' (one of: ${themes})" >&2; return 1
   fi
-  if [[ ! -f ${src}/.chezmoidata/themes/${slug}.toml ]]; then
-    echo "theme: unknown theme '${slug}'" >&2; return 1
-  fi
-  _chezmoi_set_data theme "$slug" "$cfg" || return 1
+  f=${src}/.chezmoidata/theme.toml
+  tmp=$(mktemp) || return 1
+  # In place (cat >), so the file keeps its mode and inode.
+  awk -v s="$slug" '/^theme[[:space:]]*=/ { print "theme = \"" s "\""; done = 1; next } { print }
+    END { if (!done) print "theme = \"" s "\"" }' "$f" >"$tmp" && cat "$tmp" >"$f"
+  rm -f "$tmp"
   _theme_apply || return 1
   echo "theme → ${slug}"
   _theme_live_reload

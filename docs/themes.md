@@ -1,72 +1,43 @@
 # Themes
 
-This repo ships a vendored snapshot of every [base16](https://github.com/tinted-theming/home)
-scheme from [`tinted-theming/schemes`](https://github.com/tinted-theming/schemes)
-(~326 palettes). Each lives in `home/.chezmoidata/themes/<slug>.toml` as a
-`[themes.<slug>]` table of `base00`–`base0F`. Every themed app config
+The palettes are base16 schemes in `home/.chezmoidata/themes/<slug>.toml`
+(a `[themes.<slug>]` table of `base00`–`base0F`); the repo ships the four
+Catppuccin flavours: `catppuccin-mocha` (default), `catppuccin-macchiato`,
+`catppuccin-frappe` and `catppuccin-latte` (light). Every themed config
 (ghostty, starship, zellij, yazi, bat, lazygit, btop, fzf, git-delta, nvim,
-vivid/LS_COLORS) renders from those 16 colors, so switching the active theme
-restyles everything at once.
+vivid/LS_COLORS) renders from those 16 colours, so switching restyles
+everything at once.
 
 > **Note:** documentation lives here under `docs/`, not inside
 > `home/.chezmoidata/themes/`. chezmoi parses *every* file in a `.chezmoidata`
 > directory as data, so a `.md` file there is a fatal error.
 
-## Choosing the active theme
-
-- **Repo default:** `home/.chezmoidata/theme.toml` → `theme = "<slug>"`.
-- **Per-machine override (no git diff):** `~/.config/chezmoi/chezmoi.toml`
-  `[data] theme = "<slug>"`. This wins over the repo default, so each machine
-  can run its own theme without touching the repo.
-
 ## Switching
 
-- **Interactive:** run `theme` (fzf picker over all schemes) or `theme <slug>`.
-- **Manual:** set the slug in one of the places above, then `chezmoi apply`.
+The active theme lives in one place: `theme = "<slug>"` in
+`home/.chezmoidata/theme.toml`. Change it and run `chezmoi apply`, or run
+`theme <slug>` (`theme` alone lists them), which edits that line, applies only
+the themed files and reloads what it can live: every running nvim (over its
+RPC socket, 2s limit each), Ghostty (SIGUSR2 to your own `ghostty` processes;
+if that fails, press `⌘⇧,`, or `ctrl+shift+,` on Linux) and zellij (live
+sessions reload `config.kdl` on change). **Running TUIs (btop, lazygit,
+yazi)** need a restart.
 
-New shells and new ghostty windows pick the theme up automatically. After
-applying, `theme` reloads what it can live: every
-running nvim (over its RPC socket, 2s limit each), Ghostty (SIGUSR2 to
-your own `ghostty` processes; if that fails, press `⌘⇧,`, or `ctrl+shift+,` on
-Linux), and zellij (live sessions reload `config.kdl` on change). **Running
-TUIs (btop, lazygit, yazi)** need a restart.
+## Adding a theme
 
-## Recommended
+Any base16 scheme from [tinted-theming/schemes](https://github.com/tinted-theming/schemes):
 
-rose-pine-moon · rose-pine · rose-pine-dawn · catppuccin-mocha ·
-catppuccin-macchiato · gruvbox-dark-medium · nord · tomorrow-night · dracula ·
-solarized-dark · solarized-light · everforest · kanagawa · onedark · ayu-mirage
+```sh
+sh scripts/base16-to-theme.sh path/to/scheme.yaml   # writes themes/<slug>.toml
+sh scripts/gen-on-colors.sh                          # regenerates on_colors.toml
+```
 
-(Any of the ~326 slugs in `home/.chezmoidata/themes/` is selectable — these are
-just popular starting points.)
+`on_colors.toml` holds, per theme, a readable text colour for each accent slot
+(base00 or base05, whichever contrasts more), for chips drawn on an accent.
 
-## Re-syncing / adding themes
+## Design roles
 
-The theme TOMLs are generated from upstream by `scripts/base16-to-theme.sh`.
-To refresh the snapshot or pull in new schemes:
-
-    git clone --depth 1 https://github.com/tinted-theming/schemes /tmp/schemes
-    sh scripts/base16-to-theme.sh -d /tmp/schemes/base16
-
-The converter is idempotent — re-running regenerates the files in place.
-
-## Canonical mappings
-
-- **ANSI (terminals):** 0=base00 1=base08 2=base0B 3=base0A 4=base0D 5=base0E
-  6=base0C 7=base05 8=base03 9–14=repeat 1–6, 15=base07.
-- **Design roles (UI chrome):** defined in `home/.chezmoidata/design.toml`;
-  chrome templates must use roles, content colouring uses raw slots.
-
-## Auditing
-
-`scripts/theme-audit.sh` re-fetches tinted-theming/schemes, regenerates all
-TOMLs, and reports DRIFT / COLLISION / LOWCONTRAST. Collisions are upstream
-facts (e.g. rose-pine-moon's gold appears as both base09 and base0E) — the
-role layer exists so chrome can route around them.
-
-## iglass themes
-
-`iglass-dark` and `iglass-light` are the iglass "frosted" palettes
-(`github.com/vukkt/iglass` v1.5.0, MIT), hand-mapped to base16, so the audit
-skips their missing-upstream DRIFT. They were tuned for a translucent Ghostty
-(see `background-opacity` in the Ghostty config).
+Chrome (the prompt, tab pills, borders) uses semantic roles from
+`home/.chezmoidata/design.toml` (`accent`, `accent2`, `link`, `ok`, `warn`,
+`err`, `rail`), each mapped to a base16 slot; content colouring (syntax, diffs,
+file types) uses the raw slots.

@@ -1,7 +1,5 @@
-# Active base16 theme. Override per machine in ~/.config/chezmoi/chezmoi.toml
-# ([data] theme = "..."), or use the `theme` command. Full list: docs/themes.md.
-#
-# Recommended: rose-pine-moon, rose-pine, rose-pine-dawn, catppuccin-mocha,
-# catppuccin-macchiato, gruvbox-dark-medium, nord, tomorrow-night, dracula,
-# solarized-dark, solarized-light, everforest, kanagawa, onedark, ayu-mirage
-theme = "rose-pine-moon"
+# The active theme: one of home/.chezmoidata/themes/ (catppuccin-mocha,
+# catppuccin-macchiato, catppuccin-frappe, catppuccin-latte). Change it here and
+# `chezmoi apply`, or run `theme <slug>`, which edits this line and repaints
+# Neovim and Ghostty live. More themes: scripts/base16-to-theme.sh.
+theme = "catppuccin-mocha"

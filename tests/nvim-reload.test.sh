@@ -119,7 +119,7 @@ reload() {
 		source "$1"; _theme_live_reload' _ "$zsh_fn" 2>&1 </dev/null
 }
 
-a=nord b=catppuccin-mocha
+a=catppuccin-latte b=catppuccin-mocha
 [ "$(base00 $a)" != "$(base00 $b)" ] || fail "themes $a and $b need distinct base00"
 
 # live_reload: render A, reload; re-render B, reload; Normal and the lualine
@@ -221,18 +221,24 @@ zellij: applied" "$(reload "$sockdir/none/*.0" ZJ_LIST='main [Created 1m ago] (c
 assert_eq "reloaded 0 nvim" "$(reload "$sockdir/none/*.0" ZJ_LIST='old [Created 2d ago] (EXITED - attach to resurrect)')" \
 	"zellij: exited only"
 
-# caller: theme reloads live and returns (headless: no
-# exec zsh); the old restart message is gone.
-ccfg="$HOME/chezmoi.toml"
-printf '[data]\n    theme = "nord"\n' >"$ccfg"
-calls=("theme $b")
-for call in "${calls[@]}"; do
-	: >"$STUB_LOG"
-	# shellcheck disable=SC2086  # $call is "fn arg"
-	out="$(PATH="$stubpath" THEME_NVIM_GLOB="$live/*/nvim.*.0" CHEZMOI_CONFIG="$ccfg" zsh -f -c '
+# caller: `theme` rewrites theme.toml (in a copy of the source dir, never the
+# repo's), reloads live and returns (headless: no exec zsh).
+tsrc="$HOME/tsrc"
+mkdir -p "$tsrc/home/.chezmoidata/themes"
+cp "$TESTS_REPO/home/.chezmoidata/themes/"*.toml "$tsrc/home/.chezmoidata/themes/"
+printf '# keep me\ntheme = "%s"\n' "$a" >"$tsrc/home/.chezmoidata/theme.toml"
+call() {
+	PATH="$stubpath" STUB_SRC="$tsrc" THEME_NVIM_GLOB="$live/*/nvim.*.0" zsh -f -c '
 		compdef() { :; }
-		source "$1"; shift; "$@"; echo "rc=$? still-here"' _ "$zsh_fn" $call 2>&1 </dev/null)"
-	assert_contains "$out" "reloaded 1 nvim" "$call: live reload"
-	assert_contains "$out" "rc=0 still-here" "$call: returns, no exec"
-	assert_not_contains "$out" "need a restart" "$call: no restart message"
-done
+		source "$1"; shift; "$@"; echo "rc=$? still-here"' _ "$zsh_fn" "$@" 2>&1 </dev/null
+}
+: >"$STUB_LOG"
+out="$(call theme "$b")"
+assert_contains "$out" "reloaded 1 nvim" "theme: live reload"
+assert_contains "$out" "rc=0 still-here" "theme: returns, no exec"
+assert_eq "# keep me
+theme = \"$b\"" "$(cat "$tsrc/home/.chezmoidata/theme.toml")" "theme: rewrites only the theme line"
+out="$(call theme nosuch)"
+assert_contains "$out" "unknown theme 'nosuch'" "theme: unknown slug refused"
+assert_contains "$out" "rc=1 still-here" "theme: unknown slug exits 1"
+assert_contains "$(call theme)" "catppuccin-latte" "theme: no argument lists the themes"
