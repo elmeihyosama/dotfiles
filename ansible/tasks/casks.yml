@@ -29,20 +29,3 @@
 # Shim the editor CLI into the user bin dir so the extensions script works
 # headless whatever the install method (a manual .dmg links nothing). A moved
 # CLI removes the shim rather than leave it dangling.
-- name: Check for the Antigravity IDE CLI inside the app bundle
-  ansible.builtin.stat:
-    path: "/Applications/Antigravity IDE.app/Contents/Resources/app/bin/antigravity-ide"
-  register: _antigravity_cli
-
-- name: Shim the Antigravity IDE CLI into the user bin dir
-  ansible.builtin.file:
-    src: "/Applications/Antigravity IDE.app/Contents/Resources/app/bin/antigravity-ide"
-    dest: "{{ local_bin }}/antigravity-ide"
-    state: link
-  when: _antigravity_cli.stat.exists
-
-- name: Remove a stale Antigravity IDE CLI shim
-  ansible.builtin.file:
-    path: "{{ local_bin }}/antigravity-ide"
-    state: absent
-  when: not _antigravity_cli.stat.exists

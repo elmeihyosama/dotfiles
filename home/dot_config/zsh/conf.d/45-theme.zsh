@@ -94,7 +94,7 @@ theme() {
   _theme_apply || return 1
   echo "theme → ${slug}"
   _theme_live_reload
-  # Only interactive terminals: a headless caller (Raycast, cron) exec'ing an
+  # Only interactive terminals: a headless caller (a script, cron) exec'ing an
   # interactive zsh would strand a shell waiting on stdin.
   if [[ -t 0 && -t 1 ]]; then
     exec zsh
@@ -155,7 +155,7 @@ _ghostty_usr2_ok() {
 }
 
 # _theme_live_reload: repaint running apps after `chezmoi apply`: nvim over RPC
-# (THEME_NVIM_GLOB overrides the socket glob), cmux, Ghostty via SIGUSR2;
+# (THEME_NVIM_GLOB overrides the socket glob), Ghostty via SIGUSR2;
 # zellij reloads config.kdl itself. Under DOTFILES_TEST the default globs and
 # the signal need THEME_TEST_DEFAULT_GLOB / THEME_TEST_SIGNAL.
 _theme_live_reload() {
@@ -188,8 +188,6 @@ _theme_live_reload() {
       print $c
     )
   fi
-  # cmux reads ~/.config/ghostty/config directly.
-  command -v cmux >/dev/null 2>&1 && cmux reload-config >/dev/null 2>&1
   line="reloaded $n nvim"
   if [[ -z ${DOTFILES_TEST-} || -n ${THEME_TEST_SIGNAL-} ]] &&
     pgrep -u "$USER" -x ghostty >/dev/null 2>&1; then

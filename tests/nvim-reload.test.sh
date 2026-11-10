@@ -4,7 +4,7 @@
 # sockets within the 2s bound, finds sockets in the default macOS/Linux
 # layouts, signals Ghostty, notes zellij, leaves no jobs, and runs from
 # theme/glass/wallpaper without exec'ing a shell. Only temp sockets and stub
-# cmux/zellij/pgrep/pkill/chezmoi are used.
+# zellij/pgrep/pkill/chezmoi are used.
 # shellcheck disable=SC2016 # stub and zsh bodies expand later
 set -uo pipefail
 # shellcheck source=lib.sh
@@ -51,7 +51,6 @@ stub() {
 	printf '#!/bin/sh\n%s\n' "$2" >"$HOME/bin/$1"
 	chmod +x "$HOME/bin/$1"
 }
-stub cmux 'echo "cmux $*" >>"$STUB_LOG"'
 stub pgrep 'echo "pgrep $*" >>"$STUB_LOG"; [ "${GH_RUNNING:-0}" = 1 ]'
 stub pkill 'echo "pkill $*" >>"$STUB_LOG"; exit "${GH_PKILL_RC:-0}"'
 stub ghostty 'echo "Ghostty ${GH_VERSION:-1.2.3}"'
@@ -141,7 +140,6 @@ assert_eq "reloaded 1 nvim" "$out" "live_reload: counts 1 nvim after re-render"
 assert_eq "$(base00 $b)" "$(normal_bg "$live/x/nvim.1.0")" "live_reload: theme B applied"
 assert_eq "$accent_b" "$(remote "$live/x/nvim.1.0" 'require("lualine").last.options.theme.normal.a.bg')" \
 	"live_reload: lualine theme rebuilt"
-assert_contains "$(cat "$STUB_LOG")" "cmux reload-config" "live_reload: cmux reloaded"
 
 # no_jobs: an interactive shell's job table stays empty afterwards.
 out="$(PATH="$stubpath" THEME_NVIM_GLOB="$live/*/nvim.*.0" zsh -f -i -c '
@@ -238,5 +236,4 @@ for call in "${calls[@]}"; do
 	assert_contains "$out" "reloaded 1 nvim" "$call: live reload"
 	assert_contains "$out" "rc=0 still-here" "$call: returns, no exec"
 	assert_not_contains "$out" "need a restart" "$call: no restart message"
-	assert_contains "$(cat "$STUB_LOG")" "cmux reload-config" "$call: cmux reloaded"
 done
