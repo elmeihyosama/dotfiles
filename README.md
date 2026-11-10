@@ -131,7 +131,7 @@ Deeper guides for the non-obvious pieces:
 
 - [Theming](docs/themes.md) — the base16 pipeline, semantic design tokens, and the switcher.
 - [mise](docs/mise.md) — per-project runtimes, environment, and tasks.
-- [Prompt](docs/prompt.md) — the Starship prompt and cursor options.
+- [Prompt](docs/prompt.md) — the Starship prompt, and how to change it.
 - [Clipboard & notifications](docs/clipboard-notify.md) — OSC escape sequences that work over SSH.
 - [Commit signing](docs/signing.md) — SSH-signed commits for your GitHub identity.
 

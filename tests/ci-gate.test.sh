@@ -11,7 +11,7 @@ gate() { printf '%s\n' "$@" | sh "$filter" | paste -sd' ' -; }
 
 # path_cases
 assert_eq "bootstrap=false" "$(gate README.md docs/mise.md docs/themes.md)" "docs only: nothing gated runs"
-assert_eq "bootstrap=false" "$(gate tests/prompt.test.sh .github/scripts/lint.sh)" "lint-only paths: nothing gated runs"
+assert_eq "bootstrap=false" "$(gate tests/run.sh .github/scripts/lint.sh)" "lint-only paths: nothing gated runs"
 for p in mise.toml mise.lock .mise/locks/pipx-ansible-core/x/uv.lock; do
 	assert_eq "bootstrap=false" "$(gate "$p")" "repo toolchain $p: lint only"
 done

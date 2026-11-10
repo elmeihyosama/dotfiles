@@ -7,15 +7,9 @@ background-opacity = 1.0
 background-blur = false
 clipboard-write = allow
 copy-on-select = clipboard
-{{- /* Cursor from the prompt options (prompt.toml). Shell integration
-  draws a blinking bar at the prompt; any other choice turns that off and
-  70-prompt.zsh draws the chosen one (~/.config/zsh/cursor). */ -}}
-{{- $o := includeTemplate "prompt-settings" . | fromJson -}}
-{{- if or (ne $o.cursor "bar") (eq $o.blink "off") }}
-cursor-style = {{ $o.cursor }}
-cursor-style-blink = {{ eq $o.blink "on" }}
-shell-integration-features = no-cursor
-{{- end }}
+# Cursor: Ghostty's shell integration draws a blinking bar at the prompt.
+# For another shape: cursor-style = block|underline, cursor-style-blink =
+# false, and shell-integration-features = no-cursor.
 
 # Colors from the active base16 palette ({{ .theme }})
 background = {{ $p.base00 }}
