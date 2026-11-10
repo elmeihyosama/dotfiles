@@ -39,7 +39,7 @@ Interactive/expected-long commands are skipped via `NOTIFY_EXCLUDE`. The shipped
 default list is:
 
 ```zsh
-NOTIFY_EXCLUDE=(ssh nvim vim less man watch top htop btop tig lazygit lazydocker fzf yazi ff sz)
+NOTIFY_EXCLUDE=(ssh nvim vim less man watch top htop btop tig lazygit fzf yazi ff sz)
 ```
 
 To customize, reassign the array in `~/.config/zsh/local.zsh`; note that
@@ -48,7 +48,7 @@ reassignment **replaces** the defaults, so include the commands you want to skip
 ```zsh
 NOTIFY_THRESHOLD=60
 # keep the defaults you want, plus your own
-NOTIFY_EXCLUDE=(ssh nvim vim less man watch top htop btop tig lazygit lazydocker fzf yazi ff sz my-repl)
+NOTIFY_EXCLUDE=(ssh nvim vim less man watch top htop btop tig lazygit fzf yazi ff sz my-repl)
 ```
 
 To effectively disable, set `NOTIFY_THRESHOLD=999999`.

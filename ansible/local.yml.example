@@ -20,6 +20,6 @@ git_email: "you@example.com"
 # installed; with none of these keys, every group is. Only `dotfiles remove`
 # uninstalls (mise tools; native ones get a command).
 # tool_groups: [git, dev]          # core + these groups (valid: git, files,
-#                                  #   containers, system, media, dev)
-# tools_add: [lazydocker]          # extra tools on top of the groups
-# tools_remove: [gh-dash]          # tools to skip (core tools cannot be removed)
+#                                  #   system, dev)
+# tools_add: [btop]                # extra tools on top of the groups
+# tools_remove: [dust]          # tools to skip (core tools cannot be removed)

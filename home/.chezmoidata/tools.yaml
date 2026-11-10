@@ -24,7 +24,7 @@
 # github: backend where aqua has no entry or for matching_regex (musl);
 # otherwise aqua:. Tools also in the repo mise.toml take its version
 # (tests/select-tools.test.sh).
-tool_groups: [core, git, files, containers, system, media, dev]
+tool_groups: [core, git, files, system, dev]
 
 tools:
   chezmoi:
@@ -125,23 +125,6 @@ tools:
     about: "GitHub from the terminal: PRs, issues, actions"
     backend: aqua:cli/cli
     version: "2.87.3"
-  gh-dash:
-    group: git
-    about: "Dashboard of your GitHub PRs and issues"
-    backend: github:dlvhdr/gh-dash
-    version: "4.26.2"
-  git-absorb:
-    group: git
-    about: "Folds staged fixes into the right earlier commits"
-    backend: github:tummychow/git-absorb
-    version: "0.9.0"
-    native_on: [darwin] # macOS asset is x86_64 only (the github: backend picks the man page on arm64); brew has it
-    missing_on: [linux-arm64] # only a 32-bit arm (gnueabihf) Linux asset
-  gitleaks:
-    group: git
-    about: "Scans git history for leaked secrets"
-    backend: aqua:gitleaks/gitleaks
-    version: "8.30.1"
   yazi:
     group: files
     about: "Fast terminal file manager with previews"
@@ -169,11 +152,6 @@ tools:
     group: files
     about: "Creates age keys (ships with age)"
     provided_by: age
-  lazydocker:
-    group: containers
-    about: "Terminal UI for Docker containers and logs"
-    backend: aqua:jesseduffield/lazydocker
-    version: "0.24.2"
   btop:
     group: system
     about: "Resource monitor: CPU, memory, disks, processes"
@@ -190,17 +168,6 @@ tools:
     about: "Terminal workspace: panes, tabs and sessions"
     backend: aqua:zellij-org/zellij
     version: "0.44.3"
-  navi:
-    group: system
-    about: "Interactive cheatsheets for shell commands"
-    backend: aqua:denisidoro/navi
-    version: "2.24.0"
-    no_checksum_on: [linux-x64, linux-arm64] # 2.24.0 assets: no checksum file or GitHub digest
-    native_on: [darwin]
-  cava:
-    group: media
-    about: "Audio visualizer in the terminal"
-    native_only: true  # karlstav/cava ships only source tarballs
   neovim:
     group: dev
     about: "The editor"
@@ -216,25 +183,3 @@ tools:
     version: "4.0.2"
     # 4.x names its binary editorconfig-checker; rename_exe keeps `ec`.
     mise_options: {rename_exe: ec}
-  hyperfine:
-    group: dev
-    about: "Command-line benchmarking"
-    backend: aqua:sharkdp/hyperfine
-    version: "1.20.0"
-  xh:
-    group: dev
-    about: "Friendly HTTP client, like HTTPie"
-    backend: aqua:ducaale/xh
-    version: "0.26.2"
-  jless:
-    group: dev
-    about: "Viewer for exploring JSON and YAML"
-    backend: aqua:PaulJuliusMartinez/jless
-    version: "0.9.0"
-    no_checksum_on: [macos-arm64] # 0.9.0 assets: no checksum file or GitHub digest
-    native_on: [linux] # the Linux binary links libxcb (clipboard): unusable on minimal/no-sudo hosts; distro package where there is one (no linux-arm64 asset either)
-  watchexec:
-    group: dev
-    about: "Re-runs a command when files change"
-    backend: aqua:watchexec/watchexec
-    version: "2.5.1"

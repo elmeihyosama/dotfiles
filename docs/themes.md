@@ -4,8 +4,8 @@ This repo ships a vendored snapshot of every [base16](https://github.com/tinted-
 scheme from [`tinted-theming/schemes`](https://github.com/tinted-theming/schemes)
 (~326 palettes). Each lives in `home/.chezmoidata/themes/<slug>.toml` as a
 `[themes.<slug>]` table of `base00`–`base0F`. Every themed app config
-(ghostty, alacritty, starship, zellij, yazi, bat, lazygit, lazydocker,
-btop, fzf, git-delta, gh-dash, cava, nvim, vivid/LS_COLORS) renders from those
+(ghostty, alacritty, starship, zellij, yazi, bat, lazygit, btop, fzf,
+git-delta, nvim, vivid/LS_COLORS) renders from those
 16 colors, so switching the active theme restyles everything at once.
 
 > **Note:** documentation lives here under `docs/`, not inside
@@ -29,7 +29,7 @@ applying, `theme`, `glass` and `wallpaper` reload what they can live: every
 running nvim (over its RPC socket, 2s limit each), Ghostty (SIGUSR2 to
 your own `ghostty` processes; if that fails, press `⌘⇧,`, or `ctrl+shift+,` on
 Linux), and zellij (live sessions reload `config.kdl` on change). **Running
-TUIs (btop, lazydocker, lazygit, yazi)** need a restart.
+TUIs (btop, lazygit, yazi)** need a restart.
 
 ### Alacritty on Windows (WSL)
 

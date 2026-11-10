@@ -99,7 +99,7 @@
     <div class="body">
       <div class="line"><span class="c b">~</span> <span class="g b">❯</span> curl -fsSL …/install.sh | sh</div>
       <div class="line"><span class="su">Install [a]ll groups, [c]ore only, or [p]ick</span> <span class="mu">[a]</span>: <span class="y">p</span></div>
-      <div class="line"><span class="su">  git (git-delta lazygit gh gh-dash git-absorb gitleaks)? (yes/no)</span> <span class="mu">[yes]</span>:</div>
+      <div class="line"><span class="su">  git (git-delta lazygit gh)? (yes/no)</span> <span class="mu">[yes]</span>:</div>
       <div class="line"><span class="g">✓</span> <span class="su">tools installed at their pins · chezmoi applied · doctor: healthy</span></div>
       <div class="line"><span class="c b">~</span> <span class="g b">❯</span> dotfiles</div>
       <div class="tui">
@@ -121,7 +121,7 @@
     <div class="card"><div class="h"><span class="nm">dotfiles</span><span class="role">one command</span></div>
       <p>Status, Tools, Files, Look and Machine in one terminal UI. Every action is a plain <code>dotfiles</code> subcommand too.</p></div>
     <div class="card"><div class="h"><span class="nm">pinned</span><span class="role">mise</span></div>
-      <p><span data-count="tools">37</span> tools at exact versions with locked checksums, the same on every machine. Renovate keeps them current.</p></div>
+      <p><span data-count="tools">27</span> tools at exact versions with locked checksums, the same on every machine. Renovate keeps them current.</p></div>
     <div class="card"><div class="h"><span class="nm">themed</span><span class="role">base16</span></div>
       <p><span data-count="themes">328</span> palettes across the terminal, Neovim, bat, lazygit, btop and more. <code>theme</code>, <code>glass</code> and <code>wallpaper</code> switch live.</p></div>
     <div class="card"><div class="h"><span class="nm">your pick</span><span class="role">install</span></div>
@@ -135,12 +135,10 @@
   <h2>the tools</h2>
   <div class="tools">
     <div class="grp"><div class="gname">core</div><div class="chips"><span class="chip" title="Manages these dotfiles: renders templates into your home directory">chezmoi</span><span class="chip" title="Installs and pins every CLI tool (and runtimes) to exact versions">mise</span><span class="chip" title="Fast zsh plugin manager, pinned per plugin">sheldon</span><span class="chip" title="The shell prompt: directory, git state, languages">starship</span><span class="chip" title="Fuzzy finder for files, history and anything piped in">fzf</span><span class="chip" title="Query and reshape JSON on the command line">jq</span><span class="chip" title="jq for YAML, TOML and XML">yq</span><span class="chip" title="Smarter cd: jump to frequent directories with z">zoxide</span><span class="chip" title="Searchable shell history with context (ctrl-r)">atuin</span><span class="chip" title="cat with syntax highlighting and git marks">bat</span><span class="chip" title="Modern ls with icons, git status and tree view">eza</span><span class="chip" title="Very fast recursive search (rg)">ripgrep</span><span class="chip" title="Simple, fast find replacement">fd</span><span class="chip" title="Generates LS_COLORS from the active theme">vivid</span><span class="chip" title="Fast Python installer and runner (also runs this TUI)">uv</span></div></div>
-    <div class="grp"><div class="gname">git</div><div class="chips"><span class="chip" title="Readable, syntax-highlighted git diffs">git-delta</span><span class="chip" title="Terminal UI for git: stage, commit, rebase">lazygit</span><span class="chip" title="GitHub from the terminal: PRs, issues, actions">gh</span><span class="chip" title="Dashboard of your GitHub PRs and issues">gh-dash</span><span class="chip" title="Folds staged fixes into the right earlier commits">git-absorb</span><span class="chip" title="Scans git history for leaked secrets">gitleaks</span></div></div>
+    <div class="grp"><div class="gname">git</div><div class="chips"><span class="chip" title="Readable, syntax-highlighted git diffs">git-delta</span><span class="chip" title="Terminal UI for git: stage, commit, rebase">lazygit</span><span class="chip" title="GitHub from the terminal: PRs, issues, actions">gh</span></div></div>
     <div class="grp"><div class="gname">files</div><div class="chips"><span class="chip" title="Fast terminal file manager with previews">yazi</span><span class="chip" title="Shows what&#x27;s using disk space, as a tree">dust</span><span class="chip" title="Friendly disk usage and free space overview">duf</span><span class="chip" title="Simple file encryption (chezmoi secrets)">age</span></div></div>
-    <div class="grp"><div class="gname">containers</div><div class="chips"><span class="chip" title="Terminal UI for Docker containers and logs">lazydocker</span></div></div>
-    <div class="grp"><div class="gname">system</div><div class="chips"><span class="chip" title="Resource monitor: CPU, memory, disks, processes">btop</span><span class="chip" title="System info splash shown when a shell opens">fastfetch</span><span class="chip" title="Terminal workspace: panes, tabs and sessions">zellij</span><span class="chip" title="Interactive cheatsheets for shell commands">navi</span></div></div>
-    <div class="grp"><div class="gname">media</div><div class="chips"><span class="chip" title="Audio visualizer in the terminal">cava</span></div></div>
-    <div class="grp"><div class="gname">dev</div><div class="chips"><span class="chip" title="The editor">neovim</span><span class="chip" title="Checks files follow .editorconfig rules (ec)">editorconfig-checker</span><span class="chip" title="Command-line benchmarking">hyperfine</span><span class="chip" title="Friendly HTTP client, like HTTPie">xh</span><span class="chip" title="Viewer for exploring JSON and YAML">jless</span><span class="chip" title="Re-runs a command when files change">watchexec</span></div></div>
+    <div class="grp"><div class="gname">system</div><div class="chips"><span class="chip" title="Resource monitor: CPU, memory, disks, processes">btop</span><span class="chip" title="System info splash shown when a shell opens">fastfetch</span><span class="chip" title="Terminal workspace: panes, tabs and sessions">zellij</span></div></div>
+    <div class="grp"><div class="gname">dev</div><div class="chips"><span class="chip" title="The editor">neovim</span><span class="chip" title="Checks files follow .editorconfig rules (ec)">editorconfig-checker</span></div></div>
   </div>
   <div class="note">hover a tool for what it does · core is always installed, the rest you choose</div>
 

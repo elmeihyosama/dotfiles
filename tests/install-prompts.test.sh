@@ -64,10 +64,10 @@ assert_eq "" "$(choose a)" "choose_tools all: no keys (every group)"
 assert_eq "" "$(choose "")" "choose_tools default (enter): every group"
 assert_eq "tool_groups: []" "$(choose c)" "choose_tools core only: an empty group list"
 # pick: git and dev yes, the rest no, no per-tool tweaks
-assert_eq "tool_groups: [git, dev]" "$(choose p yes no no no no yes no)" "choose_tools pick groups"
+assert_eq "tool_groups: [git, dev]" "$(choose p yes no no yes no)" "choose_tools pick groups"
 # pick git only, then toggle tool 1 (git-delta, off) and the first files tool (on)
-out="$(choose p yes no no no no no yes "1 7" "")"
+out="$(choose p yes no no no yes "1 4" "")"
 assert_contains "$out" "tool_groups: [git]" "choose_tools tweak: groups"
 assert_contains "$out" "tools_add: [yazi]" "choose_tools tweak: a tool from an unpicked group"
 assert_contains "$out" "tools_remove: [git-delta]" "choose_tools tweak: a tool from a picked group"
-assert_not_contains "$(choose p yes yes yes yes yes yes yes "1" "")" "age-keygen" "choose_tools: bundled tools are not offered"
+assert_not_contains "$(choose p yes yes yes yes yes "1" "")" "age-keygen" "choose_tools: bundled tools are not offered"

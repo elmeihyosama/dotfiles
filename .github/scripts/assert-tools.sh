@@ -166,7 +166,7 @@ $(copies "$bin")
 C
 	fi
 
-	# Native packages are best effort and not all take --version (cava -v).
+	# Native packages are best effort and not all take --version.
 	if [ "$source" != native ] && ! out="$("$bin" --version 2>&1)"; then
 		echo "FAIL: $tool -> '$bin' did not run '--version': $(printf '%s' "$out" | head -n1)"
 		fail=1

@@ -28,17 +28,17 @@ run linux 'tool_groups: [git]'
 assert_eq 0 "$rc" "groups_subset: exit 0"
 assert_contains "$(names)" "lazygit" "groups_subset: git tool present"
 assert_contains "$(names)" "ripgrep" "groups_subset: core present"
-assert_not_contains "$(names)" "lazydocker" "groups_subset: containers absent"
-assert_not_contains "$(names)" "cava" "groups_subset: media absent"
+assert_not_contains "$(names)" "btop" "groups_subset: system absent"
+assert_not_contains "$(names)" "neovim" "groups_subset: dev absent"
 run linux 'tool_groups: []'
 assert_not_contains "$(names)" "lazygit" "groups_subset: empty list is core only"
 assert_contains "$(names)" "jq" "groups_subset: empty list keeps core"
 
 # add_remove
-run linux $'tool_groups: [git]\ntools_add: [lazydocker]\ntools_remove: [gh-dash]'
+run linux $'tool_groups: [git]\ntools_add: [btop]\ntools_remove: [lazygit]'
 assert_eq 0 "$rc" "add_remove: exit 0"
-assert_contains "$(names)" "lazydocker" "add_remove: added"
-assert_not_contains "$(names)" "gh-dash" "add_remove: removed"
+assert_contains "$(names)" "btop" "add_remove: added"
+assert_not_contains "$(names)" "lazygit" "add_remove: removed"
 run linux $'tool_groups: [files]\ntools_remove: [age]'
 assert_not_contains "$(names)" "age" "add_remove: removing provider drops age-keygen too"
 
@@ -71,12 +71,17 @@ run linux ''
 assert_eq mise "$(field btop source)" "btop linux: mise"
 assert_eq aqua:aristocratos/btop "$(field btop backend)" "btop linux: backend"
 
-# cava_native_only
+# native_only and missing_on, on a small catalog (no real tool uses them now)
+printf '%s\n' 'tool_groups: [core]' 'tools:' \
+	'  nat: {group: core, native_only: true}' \
+	'  gap: {group: core, backend: aqua:x/gap, version: "1.0.0", missing_on: [linux-arm64]}' >"$d/fixture.yaml"
+fx() { "$sel" --os "$1" --arch "$2" --local /nonexistent --tools "$d/fixture.yaml" | jq -r --arg n "$3" --arg f "$4" '.[] | select(.name == $n) | .[$f] // "null"'; }
 for os in darwin linux; do
-	run "$os" ''
-	assert_eq native "$(field cava source)" "cava_native_only: $os"
-	assert_eq null "$(field cava backend)" "cava_native_only: $os no backend"
+	assert_eq native "$(fx "$os" arm64 nat source)" "native_only: $os"
+	assert_eq null "$(fx "$os" arm64 nat backend)" "native_only: $os no backend"
 done
+assert_eq native "$(fx linux arm64 gap source)" "missing_on: native on linux-arm64"
+assert_eq mise "$(fx linux x64 gap source)" "missing_on: mise on linux-x64"
 
 # bin defaults and overrides; bootstrap
 run linux ''
@@ -90,10 +95,9 @@ out="$("$sel" --os linux --local "$d/absent.yml")"
 assert_eq "$all" "$(names)" "missing local.yml: default selection"
 
 # yaml_has_every_legacy_tool: the pre-mise group_vars `tools` list
-for t in chezmoi atuin sheldon zellij navi starship zoxide eza bat fd ripgrep fzf \
-	git-delta lazygit lazydocker yazi jq yq gh dust duf btop neovim gitleaks \
-	editorconfig-checker fastfetch git-absorb gh-dash mise cava vivid hyperfine xh \
-	jless watchexec age age-keygen; do
+for t in chezmoi atuin sheldon zellij starship zoxide eza bat fd ripgrep fzf \
+	git-delta lazygit yazi jq yq gh dust duf btop neovim \
+	editorconfig-checker fastfetch mise vivid age age-keygen; do
 	if [ "$(yq ".tools | has(\"$t\")" "$tools_yaml")" != true ]; then
 		fail "yaml_has_every_legacy_tool: $t missing from tools.yaml"
 	fi
@@ -147,17 +151,13 @@ assert_contains "$(cat "$d/err")" "age-keygen comes with age; add age instead" "
 run linux $'tool_groups: [git]\ntools_add: [age, age-keygen]'
 assert_eq 0 "$rc" "age-keygen with age: ok"
 
-# missing_on: a tool with no asset for <os>-<arch> is native there, mise elsewhere
+# native_on: native on that OS, mise elsewhere
 src_of() { "$sel" --os "$1" --arch "$2" --local /nonexistent | jq -r --arg n "$3" '.[] | select(.name == $n) | .source'; }
-assert_eq native "$(src_of linux arm64 git-absorb)" "missing_on: git-absorb native on linux-arm64"
-assert_eq mise "$(src_of linux x64 git-absorb)" "missing_on: git-absorb mise on linux-x64"
-assert_eq native "$(src_of linux x64 jless)" "native_on: jless native on linux"
-assert_eq mise "$(src_of darwin arm64 jless)" "native_on: jless mise on macos-arm64"
-assert_eq native "$(src_of darwin arm64 navi)" "native_on: navi native on darwin"
-assert_eq mise "$(src_of linux arm64 navi)" "native_on: navi mise on linux"
+assert_eq native "$(src_of darwin arm64 btop)" "native_on: btop native on darwin"
+assert_eq mise "$(src_of linux arm64 btop)" "native_on: btop mise on linux"
 if "$sel" --os linux --arch riscv --local /nonexistent >/dev/null 2>&1; then fail "bad --arch is rejected"; fi
 # --platform <os>-<arch> is the same as --os/--arch
 plat_src() { "$sel" --platform "$1" --local /nonexistent | jq -r --arg n "$2" '.[] | select(.name == $n) | .source'; }
-assert_eq native "$(plat_src linux-arm64 git-absorb)" "--platform linux-arm64 maps to linux/arm64"
-assert_eq mise "$(plat_src macos-arm64 jless)" "--platform macos-arm64 maps to darwin/arm64"
+assert_eq mise "$(plat_src linux-arm64 btop)" "--platform linux-arm64 maps to linux/arm64"
+assert_eq native "$(plat_src macos-arm64 btop)" "--platform macos-arm64 maps to darwin/arm64"
 if "$sel" --platform windows-x64 --local /nonexistent >/dev/null 2>&1; then fail "bad --platform is rejected"; fi

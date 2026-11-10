@@ -72,7 +72,7 @@ rows() { printf '%s' "$all" | awk -F'\t' -v r="$1" '$1 ~ r' | sort -u; }
 
 # tools.yaml: every backend tool, depName OWNER/REPO and its pinned version.
 want="$(yq -r '.tools[] | select(has("backend")) | (.backend | sub("^[a-z]+:"; "")) + "\t" + .version + "\tgithub-releases"' home/.chezmoidata/tools.yaml | sort -u)"
-assert_eq "35" "$(printf '%s\n' "$want" | wc -l | tr -d ' ')" "tools.yaml has the expected 35 backend tools"
+assert_eq "26" "$(printf '%s\n' "$want" | wc -l | tr -d ' ')" "tools.yaml has the expected 26 backend tools"
 got="$(rows '^home/\.chezmoidata/tools\.yaml$' | awk -F'\t' '$2 != "jdx/mise" {print $2 "\t" $3 "\t" $5}')"
 assert_eq "$want" "$got" "tools.yaml regex captures every backend tool's OWNER/REPO and version"
 # tools.yaml's bootstrap mise entry moves with mise_version.

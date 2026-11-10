@@ -29,10 +29,6 @@ alias gd="git diff" gds="git diff --staged" gb="git branch" gsw="git switch" \
       gst="git stash" gf="git fetch" gpl="git pull" grs="git restore" \
       glg="git log --graph --all --oneline --decorate"
 
-# git-absorb: `gab` folds staged changes into the commits that introduced
-# those lines (pairs with rebase.autosquash).
-command -v git-absorb >/dev/null 2>&1 && alias gab="git absorb --and-rebase"
-
 # System info, non-shadowing names (do NOT override df/du/top)
 command -v duf  >/dev/null 2>&1 && alias dfh="duf"
 command -v dust >/dev/null 2>&1 && alias duh="dust"
@@ -40,12 +36,6 @@ command -v btop >/dev/null 2>&1 && alias bt="btop"
 
 # Zoxide interactive (guarded)
 command -v zoxide >/dev/null 2>&1 && alias zz="zoxide query --interactive"
-
-# gh-dash GitHub PR/issue dashboard (guarded)
-command -v gh-dash >/dev/null 2>&1 && alias ghd="gh-dash"
-
-# lazydocker container TUI (guarded)
-command -v lazydocker >/dev/null 2>&1 && alias lzd="lazydocker"
 
 # sz: fuzzy project → zellij session (resolves the repo script like `theme`).
 sz() {

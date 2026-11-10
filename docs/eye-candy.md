@@ -95,33 +95,3 @@ The cursor: Ghostty's shell integration draws a blinking bar at the prompt
 (`shell-integration-features = no-cursor`) and `conf.d/70-prompt.zsh` draws
 the chosen shape instead, still a block in vi command mode; programs you run
 get the same shape from Ghostty's `cursor-style`.
-
-## cava — audio visualizer
-
-`cava` renders an audio spectrum whose gradient bars are drawn from the active
-base16 palette (`home/dot_config/cava/config.tmpl`), so it re-themes with the
-switcher. Config re-renders on `chezmoi apply`; a **running** cava needs a
-restart (or its `r` reload key) to repaint.
-
-By default cava visualizes the **default input device (the mic)** out of the
-box, with the input method auto-selected per-OS: CoreAudio on macOS, PulseAudio
-on Linux. No extra driver installation needed.
-
-Provisioning: installed via Homebrew on macOS and the native package manager on
-sudo-capable Linux. Upstream ships source-only releases, so cava is **skipped on
-no-sudo Linux** (`native_only` in tools.yaml) — install it manually there if wanted.
-
-### Visualizing system audio (optional, not automated)
-
-To make cava react to *playback* instead of the mic, route system audio through
-a virtual loopback device:
-
-1. Install [BlackHole](https://github.com/ExistentialAudio/BlackHole)
-  (`brew install blackhole-2ch`) — this is an audio driver (admin install).
-2. In **Audio MIDI Setup**, create a Multi-Output Device combining your
-  speakers + BlackHole, and set it as the system output.
-3. Point cava at BlackHole: in `~/.config/cava/config` set `[input] source =
-  BlackHole` (keep `method = coreaudio` on macOS).
-
-This is a manual, machine-specific setup and is intentionally not part of the
-dotfiles.

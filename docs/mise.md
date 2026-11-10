@@ -64,7 +64,7 @@ gitignored per-project (add `mise.local.toml` to that project's
 3. `mise use <tool>@<version>` — pin/add a tool to the project config (add `-g` to write to the global config instead).
 4. `mise run <task>` (or `mise <task>`) — run a defined task.
 5. `mise tasks` — list available tasks.
-6. `mise watch <task>` — rerun a task on file changes. Delegates to `watchexec`, which the ansible toolchain provisions, so this works out of the box.
+6. `mise watch <task>` — rerun a task on file changes. Needs `watchexec`, which isn't provisioned: `mise use -g watchexec` first.
 
 ## Activation model
 
@@ -103,11 +103,10 @@ apply renders only the selection.
 
 On a `shared_home` host with both linux-x64 and linux-arm64 machines,
 `~/.config/mise-dotfiles/config.toml` is one shared file, but it renders
-per arch: a tool `missing_on` one arch (git-absorb on linux-arm64) is
-pinned on the other only. Each arch's `chezmoi apply` rewrites the file for
+per arch: a tool `missing_on` one arch (none today) is pinned on the
+other only. Each arch's `chezmoi apply` rewrites the file for
 itself, so `chezmoi status` / doctor show drift on the other arch, and
-git-absorb drops out of the x64 pins after an arm64 apply until the next
-x64 apply. The installs themselves are per arch (`MISE_DATA_DIR` under
+that tool drops out of the other arch's pins until it applies again. The installs themselves are per arch (`MISE_DATA_DIR` under
 `~/.local/share-<arch>`) and unaffected.
 
 PATH precedence: mise wins over `~/.local/bin` and Homebrew in every shell
@@ -190,8 +189,7 @@ the exceptions follow it.
 Not checksum-verified:
 
 - **Home tools whose upstream publishes no checksum**, listed per tool in
-  tools.yaml as `no_checksum_on: [<platform>...]  # reason`: jless on macOS
-  and navi on Linux. Their lock entries hold the release asset url and id
+  tools.yaml as `no_checksum_on: [<platform>...]  # reason` (none today). Their lock entries hold the release asset url and id
   only; `mise install --locked` still installs exactly that asset.
   `.github/scripts/check-lock.sh` fails once such a checksum appears, so the
   entry gets removed. Platforms where mise does not install a tool

@@ -292,7 +292,7 @@ sed -i.bak -e 's/^# tool_groups: /tool_groups: /' -e 's/^# tools_add: /tools_add
 rm -f "$LOCAL.bak"
 cp "$LOCAL" "$HOME/ex.yml"
 : >"$STUB_CALLS"
-TOOLS=$TESTS_REPO/home/.chezmoidata/tools.yaml run remove lazydocker --no-apply
+TOOLS=$TESTS_REPO/home/.chezmoidata/tools.yaml run remove btop --no-apply
 assert_eq 0 "$rc" "example_remove: exit 0 ($out)"
 got="$(diff "$HOME/ex.yml" "$LOCAL")"
 case "$got" in
@@ -300,8 +300,8 @@ case "$got" in
 *) fail "example_remove: tools_add emptied in place, comment kept ($got)" ;;
 esac
 assert_eq "2" "$(diff "$HOME/ex.yml" "$LOCAL" | grep -c '^[<>]')" "example_remove: exactly one line changed"
-assert_contains "$(cat "$LOCAL")" "#   containers, system, media, dev)" "example_remove: continuation comment kept"
-assert_contains "$(cat "$LOCAL")" "# tools_remove: [gh-dash]" "example_remove: commented example kept"
+assert_contains "$(cat "$LOCAL")" "#   system, dev)" "example_remove: continuation comment kept"
+assert_contains "$(cat "$LOCAL")" "# tools_remove: [dust]" "example_remove: commented example kept"
 # untouched keys keep spacing and indentation byte-for-byte
 printf '%s\n' 'git_name:   "A"   # who' 'personal_git_dirs:' '    - "~/a/"' '    - "~/b/"' '' 'tool_groups:' '- core' '- git' >"$LOCAL"
 cp "$LOCAL" "$HOME/before.yml"

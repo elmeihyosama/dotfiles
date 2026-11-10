@@ -16,9 +16,11 @@ bin="$d/bin"
 opt="$d/opt"
 mkdir -p "$bin" "$opt/neovim/bin" "$d/brew"
 
-# This host: Linux x64 without lazydocker (deselected); jless is native there.
-printf 'tools_remove: [lazydocker]\n' >"$d/local.yml"
+# This host: Linux x64 without btop (deselected), plus a native tool (no real
+# tool is native on Linux now, so one is added to the selection).
+printf 'tools_remove: [btop]\n' >"$d/local.yml"
 selection="$("$sel" --os linux --arch x64 --local "$d/local.yml")" || fail "select-tools runs"
+selection="$(jq -c '. + [{name: "natool", bin: "natool", group: "dev", source: "native", backend: null, version: null}]' <<<"$selection")"
 
 exe() { # exe PATH [BODY]: an executable regular file
 	printf '#!/bin/sh\n%s\n' "${2:-echo legacy}" >"$1"
@@ -38,7 +40,7 @@ ln -s "$d/brew/batcat" "$bin/bat"
 exe "$d/brew/fdfind"
 ln -s "$d/brew/fdfind" "$bin/fd"
 # Kept: user script, pinned mise, shims, uv's install, a foreign symlink, a
-# native (jless) and a deselected tool (lazydocker).
+# native (natool) and a deselected tool (btop).
 exe "$bin/my-tool" "echo mine"
 exe "$bin/mise" "echo mise"
 ln -s "$bin/mise" "$bin/jq"
@@ -46,8 +48,8 @@ exe "$bin/yq" 'exec mise x -- yq "$@"'
 exe "$bin/uv" "echo uv"
 exe "$d/brew/gh"
 ln -s "$d/brew/gh" "$bin/gh"
-exe "$bin/jless" "echo user-jless"
-exe "$bin/lazydocker" "echo user-lazydocker"
+exe "$bin/natool" "echo user-natool"
+exe "$bin/btop" "echo user-btop"
 
 out="$("$script" "$bin" "$opt" "$tools_yaml" "$selection")" || fail "cleanup exits 0"
 
@@ -57,7 +59,7 @@ for f in ubi rg delta fzf age-keygen nvim ec bat fd; do
 done
 [ -e "$opt/neovim" ] && fail "removed: $opt/neovim"
 assert_contains "$out" "$opt/neovim" "reports the neovim tree"
-for f in my-tool mise jq yq uv gh jless lazydocker; do
+for f in my-tool mise jq yq uv gh natool btop; do
 	[ -e "$bin/$f" ] || fail "kept: $f"
 	assert_not_contains "$out" "$bin/$f"$'\n' "does not report $f"
 done

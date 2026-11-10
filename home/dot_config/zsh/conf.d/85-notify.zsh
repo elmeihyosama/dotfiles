@@ -7,7 +7,7 @@ zmodload zsh/datetime 2>/dev/null
 : ${NOTIFY_THRESHOLD:=30}
 typeset -ga NOTIFY_EXCLUDE
 (( ${#NOTIFY_EXCLUDE} )) || NOTIFY_EXCLUDE=(
-  ssh nvim vim less man watch top htop btop tig lazygit lazydocker fzf yazi ff sz
+  ssh nvim vim less man watch top htop btop tig lazygit fzf yazi ff sz
 )
 
 # _notify TITLE BODY: OSC 777 + bell to the tty; no-op without one.
