@@ -1,7 +1,7 @@
 #!/bin/sh
 # One-command bootstrap for a fresh machine:
 #
-#   curl -fsSL https://elmeihyosama.github.io/dotfiles/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/elmeihyosama/dotfiles/main/install.sh | sh
 #
 # Clones or fast-forwards the repo, installs Ansible, prompts once for
 # ansible/local.yml (reused unless --reconfigure), then runs the playbook.

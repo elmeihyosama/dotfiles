@@ -10,10 +10,10 @@ machine with a single command and works even without `sudo`.
 ## Quick start
 
 ```bash
-curl -fsSL https://elmeihyosama.github.io/dotfiles/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/elmeihyosama/dotfiles/main/install.sh | sh
 ```
 
-One command — clones to `~/workspace/dotfiles`, prompts for your details, and provisions. Served from the project's [landing page](https://elmeihyosama.github.io/dotfiles/).
+One command — clones to `~/workspace/dotfiles`, prompts for your details, and provisions.
 
 It installs Ansible (a pinned [uv], then the pinned ansible-core, on every
 OS), prompts once for `git_name`, `git_email`, whether to use sudo and which

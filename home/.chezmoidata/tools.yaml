@@ -3,7 +3,7 @@
 #
 # Per-tool fields:
 #   group         one of tool_groups
-#   about         one line on what it is (the Pages site shows it)
+#   about         one line on what it is
 #   bin           command name (default: the tool name)
 #   backend       mise backend string (omitted for native_only / bootstrap)
 #   version       exact pinned version, never "latest" (omitted for native_only)

@@ -119,8 +119,7 @@ for w in lint provision bootstrap; do
 	assert_not_contains "$(cat ".github/workflows/$w.yml")" "concurrency:" "$w.yml leaves concurrency to ci.yml"
 done
 
-# pages_dispatchable, zizmor hook and online audits
-assert_contains "$(cat .github/workflows/pages.yml)" "workflow_dispatch:" "pages.yml has workflow_dispatch"
+# zizmor hook and online audits
 assert_contains "$(grep -A6 'id: lint-zizmor' .pre-commit-config.yaml)" "files: '^\\.github/'" "zizmor hook covers all of .github/"
 assert_contains "$(cat .github/workflows/lint.yml)" "ZIZMOR_ONLINE" "lint.yml runs zizmor online"
 assert_contains "$(cat .github/scripts/bootstrap-smoke.sh)" "assert-idempotent.sh" "bootstrap-smoke uses the shared idempotence check"
