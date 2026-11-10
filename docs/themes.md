@@ -4,9 +4,9 @@ This repo ships a vendored snapshot of every [base16](https://github.com/tinted-
 scheme from [`tinted-theming/schemes`](https://github.com/tinted-theming/schemes)
 (~326 palettes). Each lives in `home/.chezmoidata/themes/<slug>.toml` as a
 `[themes.<slug>]` table of `base00`–`base0F`. Every themed app config
-(ghostty, alacritty, starship, zellij, yazi, bat, lazygit, btop, fzf,
-git-delta, nvim, vivid/LS_COLORS) renders from those
-16 colors, so switching the active theme restyles everything at once.
+(ghostty, starship, zellij, yazi, bat, lazygit, btop, fzf, git-delta, nvim,
+vivid/LS_COLORS) renders from those 16 colors, so switching the active theme
+restyles everything at once.
 
 > **Note:** documentation lives here under `docs/`, not inside
 > `home/.chezmoidata/themes/`. chezmoi parses *every* file in a `.chezmoidata`
@@ -30,24 +30,6 @@ running nvim (over its RPC socket, 2s limit each), Ghostty (SIGUSR2 to
 your own `ghostty` processes; if that fails, press `⌘⇧,`, or `ctrl+shift+,` on
 Linux), and zellij (live sessions reload `config.kdl` on change). **Running
 TUIs (btop, lazygit, yazi)** need a restart.
-
-### Alacritty on Windows (WSL)
-
-Alacritty can run as a *Windows* app against a WSL distro, and then it reads
-its config from `%APPDATA%\alacritty\` — outside chezmoi's tree, which is
-`$HOME` on the Linux side. `.chezmoiscripts/run_onchange_after_60-alacritty-wsl.sh`
-copies `~/.config/alacritty/colors.toml` across after every palette change, so
-`theme` repaints it like everything else.
-
-It no-ops off WSL and when `%APPDATA%\alacritty\` doesn't exist (create it to
-opt in). It is `run_onchange`, so it fires on the *next palette change*: an
-install after the last switch is picked up by re-running `theme <current>`.
-
-Alacritty never loads `colors.toml` by itself. The Linux-side
-`~/.config/alacritty/alacritty.toml` (managed) imports it; on the Windows side
-the script writes a minimal `alacritty.toml` (absolute import + this distro as
-the shell) only if none exists, and otherwise just warns when yours lacks the
-import.
 
 ## Recommended
 
