@@ -87,7 +87,6 @@ assert_eq mise "$(fx linux x64 gap source)" "missing_on: mise on linux-x64"
 run linux ''
 assert_eq rg "$(field ripgrep bin)" "bin override"
 assert_eq fzf "$(field fzf bin)" "bin defaults to name"
-assert_eq ec "$(field editorconfig-checker bin)" "ec bin"
 assert_eq bootstrap "$(field mise source)" "mise is bootstrap"
 
 # missing local file is the default selection
@@ -97,7 +96,7 @@ assert_eq "$all" "$(names)" "missing local.yml: default selection"
 # yaml_has_every_legacy_tool: the pre-mise group_vars `tools` list
 for t in chezmoi atuin sheldon zellij starship zoxide eza bat fd ripgrep fzf \
 	git-delta lazygit yazi jq yq gh dust duf btop neovim \
-	editorconfig-checker fastfetch mise vivid age age-keygen; do
+	fastfetch mise vivid age age-keygen; do
 	if [ "$(yq ".tools | has(\"$t\")" "$tools_yaml")" != true ]; then
 		fail "yaml_has_every_legacy_tool: $t missing from tools.yaml"
 	fi

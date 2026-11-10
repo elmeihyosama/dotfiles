@@ -175,11 +175,3 @@ tools:
     backend: aqua:neovim/neovim
     version: "0.11.5"
     smoke: "nvim --clean --headless -c qa"
-  editorconfig-checker:
-    group: dev
-    about: "Checks files follow .editorconfig rules (ec)"
-    bin: ec
-    backend: github:editorconfig-checker/editorconfig-checker
-    version: "4.0.2"
-    # 4.x names its binary editorconfig-checker; rename_exe keeps `ec`.
-    mise_options: {rename_exe: ec}

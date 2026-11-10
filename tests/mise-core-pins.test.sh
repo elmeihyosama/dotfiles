@@ -49,13 +49,13 @@ for combo in darwin:arm64:arm64:macos-arm64 linux:amd64:x64:linux-x64; do
 	assert_not_contains "$(cat "$d/ansible-$plat.toml")" 'lazygit' "core pins: no non-core tool ($plat)"
 done
 
-# mise_options (rename_exe) render the same way in both templates.
+# mise_options (matching_regex) render the same way in both templates.
 jq -n --argjson cat "$(yq -o=json '.' "$tools_yaml")" \
-	'{tool_catalog: $cat, mise_pin_names: ["editorconfig-checker", "fzf"], mise_pin_os: "linux", mise_pin_plat: "linux-x64"}' >"$d/vars.json"
+	'{tool_catalog: $cat, mise_pin_names: ["atuin", "fzf"], mise_pin_os: "linux", mise_pin_plat: "linux-x64"}' >"$d/vars.json"
 (cd "$d" && ANSIBLE_LOCALHOST_WARNING=false ANSIBLE_PYTHON_INTERPRETER=auto_silent \
 	ansible localhost -c local -i localhost, -m ansible.builtin.template \
 	-a "src=$j2 dest=$d/opts.toml" -e "@$d/vars.json" >/dev/null 2>&1) || fail "ansible render (options)"
-TESTS_CHEZMOI_OS=linux TESTS_CHEZMOI_ARCH=amd64 render_tmpl "$tmpl" 'selected_tools=["editorconfig-checker","fzf"]' >"$d/opts-cz.toml"
+TESTS_CHEZMOI_OS=linux TESTS_CHEZMOI_ARCH=amd64 render_tmpl "$tmpl" 'selected_tools=["atuin","fzf"]' >"$d/opts-cz.toml"
 cmp "$d/opts-cz.toml" "$d/opts.toml" >/dev/null || {
 	fail "mise_options render identically"
 	diff "$d/opts-cz.toml" "$d/opts.toml" >&2

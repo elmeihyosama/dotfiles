@@ -20,8 +20,8 @@ out="$(TESTS_CHEZMOI_OS=linux render 'selected_tools=["fzf","btop"]')"
 assert_contains "$out" '"aqua:aristocratos/btop" = "1.4.7"' "selected: btop rendered on linux"
 
 # mise_options render as mise's inline-table form
-out="$(TESTS_CHEZMOI_OS=linux render 'selected_tools=["editorconfig-checker"]')"
-assert_contains "$out" '"github:editorconfig-checker/editorconfig-checker" = { version = "4.0.2", rename_exe = "ec" }' "options: inline table"
+out="$(TESTS_CHEZMOI_OS=linux render 'selected_tools=["atuin"]')"
+assert_contains "$out" '"github:atuinsh/atuin" = { version = "18.17.1", matching_regex = ' "options: inline table"
 
 # core-only selection (bootstrap order): renders, valid TOML, no non-core tool
 core="$(yq '.tools | to_entries | .[] | select(.value.group == "core") | .key' "$tools_yaml" | paste -sd, - | sed 's/\([^,]*\)/"\1"/g')"

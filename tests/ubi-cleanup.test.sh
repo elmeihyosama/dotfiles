@@ -33,8 +33,6 @@ exe "$bin/fzf"
 exe "$bin/age-keygen"
 exe "$opt/neovim/bin/nvim"
 ln -s "$opt/neovim/bin/nvim" "$bin/nvim"
-exe "$d/brew/editorconfig-checker"
-ln -s "$d/brew/editorconfig-checker" "$bin/ec"
 exe "$d/brew/batcat"
 ln -s "$d/brew/batcat" "$bin/bat"
 exe "$d/brew/fdfind"
@@ -53,7 +51,7 @@ exe "$bin/btop" "echo user-btop"
 
 out="$("$script" "$bin" "$opt" "$tools_yaml" "$selection")" || fail "cleanup exits 0"
 
-for f in ubi rg delta fzf age-keygen nvim ec bat fd; do
+for f in ubi rg delta fzf age-keygen nvim bat fd; do
 	[ -e "$bin/$f" ] || [ -L "$bin/$f" ] && fail "removed: $f"
 	assert_contains "$out" "$bin/$f" "reports $f"
 done
