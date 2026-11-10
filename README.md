@@ -38,11 +38,8 @@ cd ~/workspace/dotfiles
 | Platform | Install strategy |
 | --- | --- |
 | ![macOS][badge-macos] (Apple Silicon) | mise-pinned CLI tools; Homebrew for the few native ones |
-| ![Debian][badge-debian] ![Ubuntu][badge-ubuntu] | mise-pinned CLI tools; apt for essentials + native ones |
-| ![Arch Linux][badge-arch] | mise-pinned CLI tools; pacman for essentials + native ones |
-| ![Fedora][badge-fedora] | mise-pinned CLI tools; dnf for essentials + native ones |
-| ![Rocky Linux][badge-rocky] ![AlmaLinux][badge-alma] | mise-pinned CLI tools; dnf for essentials + native ones |
-| ![Any Linux][badge-linux] | mise-pinned CLI tools, user-local — works without `sudo` |
+| ![Debian][badge-debian] ![Ubuntu][badge-ubuntu] with sudo | mise-pinned CLI tools; apt for essentials (zsh, git, curl) |
+| ![Any Linux][badge-linux] | mise-pinned CLI tools, user-local, no sudo needed; zsh and git must already be installed |
 
 CLI tools and their versions live in `home/.chezmoidata/tools.yaml`; mise
 installs them from a checksum-verified lock (`--locked`). Everything else is
@@ -153,8 +150,4 @@ Released under the [MIT License](LICENSE).
 [badge-macos]: https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white
 [badge-debian]: https://img.shields.io/badge/Debian-A81D33?logo=debian&logoColor=white
 [badge-ubuntu]: https://img.shields.io/badge/Ubuntu-E95420?logo=ubuntu&logoColor=white
-[badge-arch]: https://img.shields.io/badge/Arch_Linux-1793D1?logo=archlinux&logoColor=white
-[badge-fedora]: https://img.shields.io/badge/Fedora-51A2DA?logo=fedora&logoColor=white
-[badge-rocky]: https://img.shields.io/badge/Rocky_Linux-10B981?logo=rockylinux&logoColor=white
-[badge-alma]: https://img.shields.io/badge/AlmaLinux-0B6938?logo=almalinux&logoColor=white
 [badge-linux]: https://img.shields.io/badge/Any_Linux-FCC624?logo=linux&logoColor=black

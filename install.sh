@@ -165,6 +165,13 @@ EOF
 	echo "Wrote ansible/local.yml."
 }
 
+# --- Up-front check: zsh is only installed on macOS (ships it) and with apt +
+# sudo; anywhere else it has to be there already, or the shell stays bash.
+if [ "$(uname -s)" = Linux ] && ! have zsh && ! { have apt-get && sudo -n true >/dev/null 2>&1; }; then
+	echo "Note: zsh is not installed and can't be installed here (only apt + sudo does)." >&2
+	echo "  Everything else installs; install zsh yourself to switch to it (the .bashrc hand-off picks it up)." >&2
+fi
+
 # --- Acquire the repo (skipped when run from inside a checkout) ---
 # Under `curl | sh` $0 is "sh"; only trust $0 when it names this script.
 case "$0" in

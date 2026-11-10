@@ -1,13 +1,14 @@
 ---
-# zsh has no static upstream build: no-sudo hosts get the .bashrc shim, macOS
-# ships it, sudo Linux needs the package or the login-shell block skips.
-- name: Install zsh (sudo Linux only; macOS ships it, no-sudo hosts use the shim)
+# zsh has no static upstream build: macOS ships it, apt + sudo installs it,
+# anywhere else it must already be there (install.sh says so up front).
+- name: Install zsh (Debian/Ubuntu with sudo)
   become: true
-  ansible.builtin.package:
+  ansible.builtin.apt:
     name: zsh
     state: present
   when:
-    - ansible_facts.os_family != 'Darwin'
+    - ansible_facts.system == 'Linux'
+    - ansible_facts.pkg_mgr == 'apt'
     - allow_sudo | default(false)
 
 # shell, not command: `command -v` is a builtin (see chezmoi.yml).

@@ -82,7 +82,7 @@ tools:
     about: "Simple, fast find replacement"
     backend: aqua:sharkdp/fd
     version: "10.3.0"
-    native_pkg: {apt: fd-find, dnf: fd-find}
+    native_pkg: {apt: fd-find}
     native_bin: {apt: fdfind}
   vivid:
     about: "Generates LS_COLORS from the active theme"

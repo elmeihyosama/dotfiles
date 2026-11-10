@@ -29,12 +29,6 @@ remove_hint() {
 			_k="$(dpkg -S "$2" 2>/dev/null || dpkg -S "$_real" 2>/dev/null)" || _k=""
 			_k="${_k%%:*}"
 			echo "sudo apt remove ${_k:-$(pkg_name "$1" apt)}"
-		elif command -v rpm >/dev/null 2>&1; then
-			_k="$(rpm -qf --qf '%{NAME}\n' "$2" 2>/dev/null | head -n1)" || _k=""
-			echo "sudo dnf remove ${_k:-$(pkg_name "$1" dnf)}"
-		elif command -v pacman >/dev/null 2>&1; then
-			_k="$(pacman -Qoq "$2" 2>/dev/null)" || _k=""
-			echo "sudo pacman -R ${_k:-$(pkg_name "$1" pacman)}"
 		else
 			echo "your package manager"
 		fi
