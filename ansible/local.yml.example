@@ -17,9 +17,9 @@ git_email: "you@example.com"
 #                       # binaries then go to ~/.local/bin-<arch> etc.
 
 # Tool selection (catalog: home/.chezmoidata/tools.yaml). `core` is always
-# installed; with none of these keys, every group is. Only `dotfiles remove`
-# uninstalls (mise tools; native ones get a command).
+# installed; with none of these keys, every group is. Deselecting a tool
+# doesn't uninstall it (`mise uninstall` / your package manager does).
 # tool_groups: [git, dev]          # core + these groups (valid: git, files,
 #                                  #   system, dev)
 # tools_add: [btop]                # extra tools on top of the groups
-# tools_remove: [dust]          # tools to skip (core tools cannot be removed)
+# tools_remove: [dust]            # tools to skip (core tools cannot be removed)

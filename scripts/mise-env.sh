@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# mise-env.sh: sourced by assert-tools.sh, doctor.sh and dotfiles.sh; the mise
+# mise-env.sh: sourced by assert-tools.sh and doctor.sh; the mise
 # env the dotfiles pins are read with (as group_vars mise_env). One place on
 # purpose: drift would let a project mise.toml or `mise use -g` answer.
 

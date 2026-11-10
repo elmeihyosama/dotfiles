@@ -68,7 +68,7 @@ diff_before="$(git -C "$dest" diff)"
 run_install
 assert_eq 0 "$rc" "dirty_conflicting: exit 0 ($out)"
 assert_contains "$out" "local changes in: a.txt, new.txt" "dirty_conflicting: names the dirty files"
-assert_contains "$out" "dotfiles update" "dirty_conflicting: points to dotfiles update"
+assert_contains "$out" "re-run install.sh" "dirty_conflicting: says how to update"
 assert_eq "$head_before" "$(git -C "$dest" rev-parse HEAD)" "dirty_conflicting: not pulled"
 assert_eq "" "$(git -C "$dest" stash list)" "dirty_conflicting: no stash"
 assert_eq "$diff_before" "$(git -C "$dest" diff)" "dirty_conflicting: edit untouched"

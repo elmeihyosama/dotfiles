@@ -104,59 +104,13 @@ saying so.
 
 ## Day to day
 
-`dotfiles <subcommand>` manages the repo and this machine. Exit codes: 0 ok,
-1 an operation failed, 2 usage or validation error.
-
-- `dotfiles list [--json]` — catalog tools, whether this machine selects them,
-  and what is installed.
-- `dotfiles add TOOL|GROUP... [--no-apply]` / `dotfiles remove ...` — select or
-  deselect tools and groups, then apply (`--no-apply` only edits). They edit
-  only `tool_groups`, `tools_add` and `tools_remove` in `ansible/local.yml`.
-  Removed mise tools are uninstalled; native ones get the command to run.
-- `dotfiles update [--check]` — refuses a dirty repo, then runs `git pull
-  --ff-only`, the ansible playbook, `chezmoi apply`, `sheldon lock`, nvim plugin
-  restore and `doctor`, stopping at the first failure. `--check` only fetches
-  (no file changes) and reports incoming commits, chezmoi drift and missing
-  tools.
-- `dotfiles doctor` — read-only health check (also `doctor`).
-- `dotfiles tui`, or bare `dotfiles` in a terminal — a full-screen view, six
-  tabs (`1`–`6`, or `←`/`→` on the tab bar; opening a tab never runs
-  anything, `q` quits):
-  - **Status**: a verdict and the few things worth doing, each opening where
-    it's fixed; `r` checks health and updates (kept for the next launch),
-    `u` updates.
-  - **Tools**: the catalog, with the highlighted tool explained beside it;
-    `space` marks it to add or remove, `a` applies, `i` installs every
-    selected tool that's missing (`dotfiles install`: the playbook's packages
-    step only), `/` filters.
-  - **Files**: managed files edited here or waiting to apply, with a diff;
-    `a` applies (asks before discarding your edits), `k` keeps yours
-    (`chezmoi re-add`), `A` applies everything waiting.
-  - **Look**: your real start screen (fastfetch and the prompt) painted in
-    each theme as you move through the list, with its wallpaper and the
-    glass level composed as Ghostty draws them; `enter` applies the theme
-    (or the glass level), `w` previews the wallpaper on or off, `W` applies
-    that, `g` jumps to glass.
-  - **Prompt**: every prompt option (one or two lines, frame, left or split,
-    the fill between them, block style, symbol, clock, icons, colours, the
-    cursor), shown as the real prompt as you change them with `←`/`→`;
-    `enter` applies, `esc` reverts, `d` picks the defaults
-    ([Prompt](docs/eye-candy.md#prompt-starship-and-cursor)).
-  - **Machine**: the `install.sh` answers in `ansible/local.yml`, edited in
-    place (`enter` or leaving a field saves it; sudo and shared home are
-    switches, shared home asks first since it moves where tools live);
-    `ctrl+s` applies them without overwriting edited files.
-
-  It runs with uv from a locked environment (`scripts/tui/`); its colours
-  follow the active theme. Run from a second checkout or worktree, it edits
-  this machine's `local.yml` but refuses anything that runs the playbook
-  (that would point chezmoi at that checkout). `theme`, `glass`, `wallpaper` and `prompt` (in the TUI or
-  the shell) apply only the files that use them.
-- `dotfiles install` — install the selected tools at their pins without the
-  playbook's chezmoi step (which applies with `--force`).
-- The commands behind it: `dotfiles look --json | --fetch`, `theme SLUG`, `glass LEVEL`,
-  `wallpaper on|off|toggle`, `prompt --json | --preview | KEY=VALUE... | reset`, `files --json | diff|apply|keep PATH...`,
-  `machine --json | set KEY VALUE [--no-apply] | apply`.
+- **Update this machine:** `git -C ~/workspace/dotfiles pull --ff-only`, then
+  `~/workspace/dotfiles/install.sh`. It reuses your saved answers, installs the
+  pinned tools, refreshes the zsh plugins and runs `chezmoi apply`; re-running
+  is safe. `--reconfigure` asks the questions again.
+- **Health check:** `doctor` (read-only): missing tools, drift, signing.
+- **Pick tools:** `tool_groups`, `tools_add` and `tools_remove` in
+  `ansible/local.yml`, then re-run `install.sh`.
 
 ## Usage
 

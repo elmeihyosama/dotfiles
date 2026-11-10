@@ -74,12 +74,11 @@ on the right, `❯`.
 | `cursor` | `bar`, `block`, `underline` — Ghostty's cursor shape |
 | `blink` | `on`, `off` |
 
-The TUI's **Prompt** tab shows the real prompt (Starship's own output) for
-the highlighted choice before anything changes; `enter` applies. From a shell:
+Set them from a shell:
 
 ```sh
-dotfiles prompt lines=one char=lambda   # several at once; each is checked first
-dotfiles prompt reset                    # every option back to its default
+prompt_set lines=one char=lambda   # several at once; each is checked first
+prompt_set reset                   # every option back to its default
 ```
 
 Choices are stored per machine as `prompt_<option>` in

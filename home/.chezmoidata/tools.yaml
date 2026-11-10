@@ -3,7 +3,7 @@
 #
 # Per-tool fields:
 #   group         one of tool_groups
-#   about         one line on what it is (the TUI shows it)
+#   about         one line on what it is (the Pages site shows it)
 #   bin           command name (default: the tool name)
 #   backend       mise backend string (omitted for native_only / bootstrap)
 #   version       exact pinned version, never "latest" (omitted for native_only)
@@ -106,7 +106,7 @@ tools:
     version: "0.11.1"
   uv:
     group: core
-    about: "Fast Python installer and runner (also runs this TUI)"
+    about: "Fast Python installer and runner"
     backend: aqua:astral-sh/uv
     version: "0.13.1"
   git-delta:

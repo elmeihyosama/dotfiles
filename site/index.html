@@ -50,14 +50,7 @@
   .r{color:var(--b08)} .o{color:var(--b09)} .y{color:var(--b0A)} .g{color:var(--b0B)}
   .c{color:var(--b0C)} .bl{color:var(--b0D)} .m{color:var(--b0E)} .mu{color:var(--b03)} .su{color:var(--b04)}
   .b{font-weight:700} .line{white-space:pre}
-  .tui{border:1px solid var(--b02);border-radius:8px;margin:8px 0 6px;max-width:560px}
-  .tui .tabs{display:flex;gap:14px;padding:5px 10px;border-bottom:1px solid var(--b02);font-size:12px;color:var(--b03)}
-  .tui .tabs .on{color:var(--b05);border-bottom:2px solid var(--b0D)}
-  .tui .box{margin:8px 10px 10px;border:1px solid var(--b0C);border-radius:8px;padding:6px 12px 8px;position:relative}
-  .tui .box .t{position:absolute;top:-10px;left:10px;padding:0 4px;color:var(--b0C);font-size:12px;font-weight:700;
     background:color-mix(in srgb,var(--b00) calc(var(--glass) * 100%),var(--b00))}
-  .tui .it{display:flex;gap:10px;font-size:12px} .tui .it .k{margin-left:auto;color:var(--b03)}
-  .tui .sel{background:color-mix(in srgb,var(--b0C) 22%,transparent);border-radius:4px}
   h2{font-size:13px;color:var(--b04);text-transform:uppercase;letter-spacing:.1em;text-align:center;margin:52px 0 18px;font-weight:600}
   .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
   @media(max-width:760px){.cards{grid-template-columns:1fr 1fr}.title{font-size:48px}}
@@ -101,16 +94,6 @@
       <div class="line"><span class="su">Install [a]ll groups, [c]ore only, or [p]ick</span> <span class="mu">[a]</span>: <span class="y">p</span></div>
       <div class="line"><span class="su">  git (git-delta lazygit gh)? (yes/no)</span> <span class="mu">[yes]</span>:</div>
       <div class="line"><span class="g">✓</span> <span class="su">tools installed at their pins · chezmoi applied · doctor: healthy</span></div>
-      <div class="line"><span class="c b">~</span> <span class="g b">❯</span> dotfiles</div>
-      <div class="tui">
-        <div class="tabs"><span class="on">Status</span><span>Tools</span><span>Files</span><span>Look</span><span>Prompt</span><span>Machine</span></div>
-        <div class="box"><span class="t">Status</span>
-          <div class="line g b">✓  All good</div>
-          <div class="line mu">health and updates checked 2 h ago · r checks again</div>
-          <div class="it sel"><span class="bl">↓</span><span>3 updates waiting</span><span class="k">u update</span></div>
-          <div class="it"><span class="mu">◌</span><span>2 files waiting to apply</span><span class="k">→ Files</span></div>
-        </div>
-      </div>
       <div class="line"><span class="c b">~</span> <span class="g b">❯</span> theme <span class="m">catppuccin-mocha</span> <span class="mu"># nvim, ghostty and friends repaint live</span></div>
     </div>
   </div>
@@ -118,18 +101,16 @@
 
   <h2>what you get</h2>
   <div class="cards">
-    <div class="card"><div class="h"><span class="nm">dotfiles</span><span class="role">one command</span></div>
-      <p>Status, Tools, Files, Look and Machine in one terminal UI. Every action is a plain <code>dotfiles</code> subcommand too.</p></div>
     <div class="card"><div class="h"><span class="nm">pinned</span><span class="role">mise</span></div>
       <p><span data-count="tools">25</span> tools at exact versions with locked checksums, the same on every machine. Renovate keeps them current.</p></div>
     <div class="card"><div class="h"><span class="nm">themed</span><span class="role">base16</span></div>
       <p><span data-count="themes">328</span> palettes across the terminal, Neovim, bat, lazygit, btop and more. <code>theme</code>, <code>glass</code> and <code>wallpaper</code> switch live.</p></div>
     <div class="card"><div class="h"><span class="nm">your pick</span><span class="role">install</span></div>
-      <p>The installer asks: everything, core only, or groups and single tools. Change your mind later in the Tools tab.</p></div>
+      <p>The installer asks: everything, core only, or groups and single tools. Change your mind later in <code>ansible/local.yml</code>.</p></div>
     <div class="card"><div class="h"><span class="nm">healthy</span><span class="role">doctor · update</span></div>
-      <p><code>dotfiles update</code> pulls, provisions and verifies. <code>doctor</code> explains anything off and how to fix it.</p></div>
+      <p>Re-run <code>install.sh</code> to update; it only changes what drifted. <code>doctor</code> explains anything off and how to fix it.</p></div>
     <div class="card"><div class="h"><span class="nm">yours</span><span class="role">no sudo needed</span></div>
-      <p>Installs into your home without root. Signed GitHub commits and age-encrypted secrets are built in.</p></div>
+      <p>Installs into your home without root. Signed GitHub commits are built in.</p></div>
   </div>
 
   <h2>the tools</h2>

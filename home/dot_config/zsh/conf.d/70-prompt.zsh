@@ -3,7 +3,7 @@ if command -v starship >/dev/null 2>&1; then
   eval "$(starship init zsh)"
 fi
 
-# Cursor shape from the prompt options (`dotfiles prompt cursor=… blink=…`):
+# Cursor shape from the prompt options (`prompt_set cursor=… blink=…`):
 # ~/.config/zsh/cursor holds its DECSCUSR code, and only exists when the
 # choice isn't Ghostty's own blinking bar (Ghostty's integration then stays
 # out). Read at every prompt, so a change reaches open shells; vi command

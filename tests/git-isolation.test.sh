@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Tests run from a git hook inherit GIT_DIR etc. pointing at the real repo.
 # With those aimed at a decoy, the decoy and its origin must stay untouched:
-# run.sh drops them centrally, and cli-update.test.sh (which once pushed to
-# the real main) drops them itself when run standalone.
+# run.sh drops them centrally (a test once pushed to the real main).
 set -uo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -57,8 +56,3 @@ exit 0
 PROBE
 env "${leak[@]}" TESTS_DIR="$probe_dir" bash "$TESTS_REPO/tests/run.sh" probe >/dev/null 2>&1
 assert_eq "$before" "$(snapshot)" "run_sh_guard: decoy untouched by an unguarded test"
-
-# cli-update.test.sh standalone: its own guard
-env "${leak[@]}" bash "$TESTS_REPO/tests/cli-update.test.sh" >"$HOME/cli-update.out" 2>&1 ||
-	fail "cli_update_guard: cli-update.test.sh failed under a leaked GIT_DIR: $(cat "$HOME/cli-update.out")"
-assert_eq "$before" "$(snapshot)" "cli_update_guard: decoy untouched"

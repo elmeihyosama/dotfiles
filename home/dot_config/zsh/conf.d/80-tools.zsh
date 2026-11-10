@@ -4,33 +4,9 @@ if command -v zoxide >/dev/null 2>&1; then
 fi
 
 
-# dotfiles is a command in ~/.local/bin (installed by ansible/tasks/mise.yml).
-# doctor: same as `dotfiles doctor`.
-doctor() { dotfiles doctor "$@" }
-
-# Completion: subcommands, then tool/group names for add/remove.
-_dotfiles() {
+# doctor: read-only health check, from the checkout chezmoi applies from.
+doctor() {
   local src
-  local -a subs names
-  if (( CURRENT == 2 )); then
-    subs=('list:tools and their install state' 'add:select tools or groups' 'remove:deselect tools or groups' 'update:pull, apply and verify (--check to preview)' 'doctor:read-only health check' 'tui:full-screen tools, health, update and look' 'look:theme and glass as JSON (--json)' 'theme:switch theme (headless)' 'glass:set the glass level (headless)' 'wallpaper:wallpaper on, off or toggle (headless)' 'install:install the selected tools' 'files:files edited here or waiting to apply' 'machine:this machine'"'"'s install answers' 'help:show usage')
-    _describe 'subcommand' subs
-    return
-  fi
-  case $words[2] in
-    add|remove)
-      src=$(chezmoi source-path 2>/dev/null) || return
-      (( $+commands[yq] )) || return
-      names=(${(f)"$(yq '(.tools | keys | .[]), .tool_groups[]' "$src/.chezmoidata/tools.yaml" 2>/dev/null)"})
-      _describe 'tool or group' names
-      compadd -- --no-apply
-      ;;
-    list) compadd -- --json ;;
-    update) compadd -- --check ;;
-    look) compadd -- --json ;;
-    # 45-theme.zsh's completers
-    theme) (( CURRENT == 3 )) && _theme_slugs ;;
-    glass) (( CURRENT == 3 )) && _glass_levels ;;
-  esac
+  src=$(chezmoi source-path 2>/dev/null) || { echo "doctor: chezmoi not set up" >&2; return 1; }
+  sh "${src:h}/scripts/doctor.sh" "$@"
 }
-compdef _dotfiles dotfiles
