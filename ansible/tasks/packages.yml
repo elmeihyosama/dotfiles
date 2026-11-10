@@ -3,11 +3,11 @@
 # and what mise cannot (native_on / native_only / missing_on). chezmoi is
 # itself a mise tool, so a fresh machine goes:
 #   1. essentials (sudo Linux)
-#   2. CORE pins + the repo lock (only when absent: rewriting chezmoi's full
+#   2. the pins + the repo lock (only when absent: rewriting chezmoi's full
 #      pair would ping-pong with chezmoi)
 #   3. locked install of those pins
 #   4. select-tools, one-time ubi cleanup, native tools
-# then chezmoi deploys the full pins and site.yml installs them.
+# then chezmoi deploys the same pins and site.yml installs any it adds.
 - name: Set package-manager facts
   ansible.builtin.set_fact:
     _pkgmgr: "{{ 'dnf' if ansible_facts.pkg_mgr == 'dnf5' else ansible_facts.pkg_mgr }}"
@@ -46,7 +46,7 @@
     state: present
   when: _native_linux and _missing_essentials.stdout_lines | length > 0
 
-# ---- 2. Core pins + lock (fresh machine only) ----------------------------
+# ---- 2. Pins + lock (fresh machine only) ----------------------------
 # No mode: chezmoi owns this dir after the first apply (user's umask); forcing
 # one would flip it on every run.
 - name: Ensure the dotfiles mise config dir  # noqa risky-file-permissions
@@ -54,16 +54,14 @@
     path: "{{ mise_config_root }}"
     state: directory
 
-- name: Write the core-only bootstrap pins (only when no pins exist yet)
+- name: Write the bootstrap pins (only when no pins exist yet)
   ansible.builtin.template:
     src: "{{ playbook_dir }}/templates/mise-pins.toml.j2"
     dest: "{{ mise_config_root }}/config.toml"
     mode: "0644"
     force: false
   vars:
-    mise_pin_names: >-
-      {{ tool_catalog.tools | dict2items | selectattr('value.group', 'equalto', 'core')
-         | map(attribute='key') | sort }}
+    mise_pin_names: "{{ tool_catalog.tools.keys() | sort }}"
     mise_pin_os: "{{ 'darwin' if ansible_facts.system == 'Darwin' else 'linux' }}"
     mise_pin_plat: "{{ _mise_os }}-{{ _mise_arch }}"
 
@@ -75,11 +73,11 @@
     force: false
 
 # ---- 3. Locked install of whatever is pinned now -------------------------
-- name: Install the pinned core tools
+- name: Install the pinned tools
   ansible.builtin.import_tasks: mise-install.yml
 
-# ---- 4. Selection, legacy cleanup, native tools --------------------------
-- name: Select tools for this machine
+# ---- 4. Sources, legacy cleanup, native tools --------------------------
+- name: Work out how each tool installs here
   ansible.builtin.command:
     argv:
       - "{{ playbook_dir }}/../scripts/select-tools.sh"
@@ -87,8 +85,6 @@
       - "{{ 'darwin' if ansible_facts.system == 'Darwin' else 'linux' }}"
       - --arch
       - "{{ _mise_arch }}"
-      - --local
-      - "{{ playbook_dir }}/local.yml"
   register: _tool_selection
   changed_when: false
   check_mode: false

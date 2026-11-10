@@ -15,8 +15,8 @@
       changed_when: true
 
   pre_tasks:
-    # Loaded under a name, not vars_files, so its generic keys (`tools`,
-    # `tool_groups`) cannot collide with other vars.
+    # Loaded under a name, not vars_files, so its generic `tools` key cannot
+    # collide with other vars.
     - name: Load tool catalog
       ansible.builtin.include_vars:
         file: "{{ playbook_dir }}/../home/.chezmoidata/tools.yaml"

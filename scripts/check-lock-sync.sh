@@ -107,7 +107,7 @@ for plat in macos-arm64 linux-x64 linux-arm64; do
 		elif [ -n "$sum" ] && [ "$nocs" = true ]; then
 			bad "$name ($backend@$version) now has a $plat checksum: remove $plat from its no_checksum_on in tools.yaml"
 		fi
-	done < <("$here/select-tools.sh" --platform "$plat" --local /nonexistent --tools "$tools" |
+	done < <("$here/select-tools.sh" --platform "$plat" --tools "$tools" |
 		jq -r --argjson t "$tools_json" --arg p "$plat" '.[] | select(.source == "mise")
 			| [.name, .backend, .version, ((($t[.name].no_checksum_on // []) | index($p)) != null)] | @tsv')
 done

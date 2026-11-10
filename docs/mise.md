@@ -91,14 +91,6 @@ Supported platforms are the three the lock covers: macos-arm64 (Apple
 Silicon), linux-x64 and linux-arm64. Intel Macs are not supported; the
 playbook stops at its first task there with a message saying so.
 
-### Upgrading an existing machine
-
-If `chezmoi apply` runs before the playbook, there is no `selected_tools`
-in the chezmoi config yet, so the fallback pins (every group) are deployed,
-and the playbook's first locked install installs the tools of deselected
-groups once. That is harmless: they are never uninstalled, and the next
-apply renders only the selection.
-
 ### Known limitation: `shared_home` with mixed arches
 
 On a `shared_home` host with both linux-x64 and linux-arm64 machines,

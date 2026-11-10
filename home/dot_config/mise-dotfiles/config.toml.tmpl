@@ -4,25 +4,15 @@ MISE_SYSTEM_CONFIG_DIR, with mise.lock beside it. Install with
   MISE_GLOBAL_CONFIG_FILE=/nonexistent/mise-user.toml mise -C / install --locked
 Never set `locked = true` here: it makes `mise use -g` fail.
 
-Tools: `selected_tools` (from ansible/tasks/chezmoi.yml), else every tool with
-a backend, minus native_on / missing_on / bootstrap / provided_by; an unknown
-name fails the render. `mise_pins_all` (relock.sh) renders all of them. */ -}}
+Tools: every tool with a backend, minus native_on / missing_on / bootstrap /
+provided_by; `mise_pins_all` (relock.sh) renders all of them. */ -}}
 {{- $os := .chezmoi.os -}}
 {{- $arch := ternary "arm64" "x64" (eq .chezmoi.arch "arm64") -}}
 {{- $plat := printf "%s-%s" (ternary "macos" "linux" (eq $os "darwin")) $arch -}}
 {{- $all := (and (hasKey . "mise_pins_all") .mise_pins_all) -}}
 {{- $names := list -}}
-{{- if and (hasKey . "selected_tools") (not $all) -}}
-{{-   range $name := .selected_tools -}}
-{{-     if not (hasKey $.tools $name) -}}
-{{-       fail (printf "selected_tools: unknown tool %q (not in tools.yaml; stale since a tools.yaml change?). Refresh it: cd ansible && ansible-playbook site.yml --tags chezmoi" $name) -}}
-{{-     end -}}
-{{-     $names = append $names $name -}}
-{{-   end -}}
-{{- else -}}
-{{-   range $name, $t := .tools -}}
-{{-     $names = append $names $name -}}
-{{-   end -}}
+{{- range $name, $t := .tools -}}
+{{-   $names = append $names $name -}}
 {{- end -}}
 [tools]
 {{- range $name := $names -}}

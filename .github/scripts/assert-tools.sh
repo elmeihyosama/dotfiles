@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Assert every tool this machine selects resolves, runs, and passes its smoke test.
+# Assert every catalog tool resolves, runs, and passes its smoke test.
 # Usage: .github/scripts/assert-tools.sh [--local LOCAL_YML] [--tools TOOLS_YAML]
 #
 # Per select-tools source:
@@ -62,7 +62,7 @@ for t in yq jq; do
 done
 
 case "$(uname -s)" in Darwin) os=darwin ;; *) os=linux ;; esac
-sel="$("$repo/scripts/select-tools.sh" --os "$os" --local "$local_yml" --tools "$tools_yaml")"
+sel="$("$repo/scripts/select-tools.sh" --os "$os" --tools "$tools_yaml")"
 
 # shellcheck source=../../scripts/remove-hint.sh
 . "$repo/scripts/remove-hint.sh"

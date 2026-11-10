@@ -16,10 +16,9 @@ bin="$d/bin"
 opt="$d/opt"
 mkdir -p "$bin" "$opt/neovim/bin" "$d/brew"
 
-# This host: Linux x64 without btop (deselected), plus a native tool (no real
-# tool is native on Linux now, so one is added to the selection).
-printf 'tools_remove: [btop]\n' >"$d/local.yml"
-selection="$("$sel" --os linux --arch x64 --local "$d/local.yml")" || fail "select-tools runs"
+# This host: Linux x64, plus a native tool (no real tool is native on Linux
+# now, so one is added to the selection).
+selection="$("$sel" --os linux --arch x64)" || fail "select-tools runs"
 selection="$(jq -c '. + [{name: "natool", bin: "natool", group: "dev", source: "native", backend: null, version: null}]' <<<"$selection")"
 
 exe() { # exe PATH [BODY]: an executable regular file
@@ -37,7 +36,7 @@ ln -s "$d/brew/batcat" "$bin/bat"
 exe "$d/brew/fdfind"
 ln -s "$d/brew/fdfind" "$bin/fd"
 # Kept: user script, pinned mise, shims, uv's install, a foreign symlink, a
-# native (natool) and a deselected tool (btop).
+# native tool (natool).
 exe "$bin/my-tool" "echo mine"
 exe "$bin/mise" "echo mise"
 ln -s "$bin/mise" "$bin/jq"
@@ -46,7 +45,6 @@ exe "$bin/uv" "echo uv"
 exe "$d/brew/gh"
 ln -s "$d/brew/gh" "$bin/gh"
 exe "$bin/natool" "echo user-natool"
-exe "$bin/btop" "echo user-btop"
 
 out="$("$script" "$bin" "$opt" "$tools_yaml" "$selection")" || fail "cleanup exits 0"
 
@@ -56,7 +54,7 @@ for f in ubi rg delta fzf nvim bat fd; do
 done
 [ -e "$opt/neovim" ] && fail "removed: $opt/neovim"
 assert_contains "$out" "$opt/neovim" "reports the neovim tree"
-for f in my-tool mise jq yq uv gh natool btop; do
+for f in my-tool mise jq yq uv gh natool; do
 	[ -e "$bin/$f" ] || fail "kept: $f"
 	assert_not_contains "$out" "$bin/$f"$'\n' "does not report $f"
 done

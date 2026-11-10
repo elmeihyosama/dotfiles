@@ -16,8 +16,7 @@ curl -fsSL https://raw.githubusercontent.com/elmeihyosama/dotfiles/main/install.
 One command — clones to `~/workspace/dotfiles`, prompts for your details, and provisions.
 
 It installs Ansible (a pinned [uv], then the pinned ansible-core, on every
-OS), prompts once for `git_name`, `git_email`, whether to use sudo and which
-tools to install (all, core only, or pick groups and single tools), then
+OS), prompts once for `git_name`, `git_email` and whether to use sudo, then
 runs the playbook (toolchain, JetBrains Mono Nerd Font, shell plugins, login
 shell) and applies the config with `chezmoi apply`. Answers are saved to a git-ignored
 `ansible/local.yml`.
@@ -109,8 +108,8 @@ saying so.
   pinned tools, refreshes the zsh plugins and runs `chezmoi apply`; re-running
   is safe. `--reconfigure` asks the questions again.
 - **Health check:** `doctor` (read-only): missing tools, drift, signing.
-- **Pick tools:** `tool_groups`, `tools_add` and `tools_remove` in
-  `ansible/local.yml`, then re-run `install.sh`.
+- **Tools:** every machine gets the whole catalog
+  (`home/.chezmoidata/tools.yaml`); add or drop one there.
 
 ## Usage
 

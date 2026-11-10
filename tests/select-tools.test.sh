@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/select-tools.sh: group/add/remove selection and per-OS source.
+# scripts/select-tools.sh: every catalog tool, and how it installs per platform.
 source "$(dirname "$0")/lib.sh"
 
 sel="$TESTS_REPO/scripts/select-tools.sh"
@@ -7,105 +7,67 @@ tools_yaml="$TESTS_REPO/home/.chezmoidata/tools.yaml"
 d="$(mktemp -d)"
 _tests_tmpdirs+=("$d")
 
-run() { # run OS LOCAL_CONTENT -> stdout; stderr to $d/err; sets rc
+run() { # run OS [ARGS...] -> stdout; stderr to $d/err; sets rc
 	local os="$1"
-	printf '%s' "$2" >"$d/local.yml"
-	out="$("$sel" --os "$os" --local "$d/local.yml" 2>"$d/err")"
+	shift
+	out="$("$sel" --os "$os" "$@" 2>"$d/err")"
 	rc=$?
 }
 names() { jq -r '.[].name' <<<"$out" | paste -sd, -; }
 field() { jq -r --arg n "$1" --arg f "$2" '.[] | select(.name == $n) | .[$f] // "null"' <<<"$out"; }
 
-# default_all: no selection keys -> every tool in the catalog
-run linux ''
+# every_tool: the whole catalog, sorted by name
 all="$(yq '.tools | keys | .[]' "$tools_yaml" | sort | paste -sd, -)"
-assert_eq 0 "$rc" "default_all: exit 0"
-assert_eq "$all" "$(names)" "default_all: every tool selected"
-assert_eq "$(names)" "$(jq -r '[.[].name] | sort | join(",")' <<<"$out")" "default_all: sorted by name"
+run linux
+assert_eq 0 "$rc" "every_tool: exit 0"
+assert_eq "$all" "$(names)" "every_tool: the whole catalog, sorted"
 
-# groups_subset: core + named groups only
-run linux 'tool_groups: [git]'
-assert_eq 0 "$rc" "groups_subset: exit 0"
-assert_contains "$(names)" "lazygit" "groups_subset: git tool present"
-assert_contains "$(names)" "ripgrep" "groups_subset: core present"
-assert_not_contains "$(names)" "btop" "groups_subset: system absent"
-assert_not_contains "$(names)" "neovim" "groups_subset: dev absent"
-run linux 'tool_groups: []'
-assert_not_contains "$(names)" "lazygit" "groups_subset: empty list is core only"
-assert_contains "$(names)" "jq" "groups_subset: empty list keeps core"
+# native_on: native on that OS, mise elsewhere
+run darwin --arch arm64
+assert_eq native "$(field btop source)" "native_on: btop native on darwin"
+assert_eq null "$(field btop version)" "native_on: no version when native"
+assert_eq null "$(field btop backend)" "native_on: no backend when native"
+run linux --arch arm64
+assert_eq mise "$(field btop source)" "native_on: btop mise on linux"
+assert_eq aqua:aristocratos/btop "$(field btop backend)" "native_on: backend on linux"
 
-# add_remove
-run linux $'tool_groups: [git]\ntools_add: [btop]\ntools_remove: [lazygit]'
-assert_eq 0 "$rc" "add_remove: exit 0"
-assert_contains "$(names)" "btop" "add_remove: added"
-assert_not_contains "$(names)" "lazygit" "add_remove: removed"
+# bin defaults and overrides; bootstrap
+run linux
+assert_eq rg "$(field ripgrep bin)" "bin override"
+assert_eq fzf "$(field fzf bin)" "bin defaults to name"
+assert_eq bootstrap "$(field mise source)" "mise is bootstrap"
 
-# provided_by, on a small catalog (no real tool uses it now): a bundled tool
-# follows its provider and is never installed on its own
-printf '%s\n' 'tool_groups: [core, extra]' 'tools:' \
-	'  prov: {group: extra, backend: aqua:x/prov, version: "1.0.0"}' \
-	'  bund: {group: extra, provided_by: prov}' >"$d/prov.yaml"
-prun() { # prun LOCAL_CONTENT: like run, on the provided_by catalog
-	printf '%s' "$1" >"$d/local.yml"
-	out="$("$sel" --os linux --local "$d/local.yml" --tools "$d/prov.yaml" 2>"$d/err")"
-	rc=$?
+# native_only, missing_on and provided_by, on a small catalog (no real tool
+# uses them now)
+printf '%s\n' 'tools:' \
+	'  nat: {native_only: true}' \
+	'  gap: {backend: aqua:x/gap, version: "1.0.0", missing_on: [linux-arm64]}' \
+	'  prov: {backend: aqua:x/prov, version: "1.0.0"}' \
+	'  bund: {provided_by: prov}' >"$d/fixture.yaml"
+fx() { # fx OS ARCH TOOL FIELD
+	"$sel" --os "$1" --arch "$2" --tools "$d/fixture.yaml" |
+		jq -r --arg n "$3" --arg f "$4" '.[] | select(.name == $n) | .[$f] // "null"'
 }
-prun 'tools_remove: [prov]'
-assert_not_contains "$(names)" "bund" "add_remove: removing provider drops the bundled tool too"
-prun ''
-assert_eq prov "$(field bund provided_by)" "provided_by recorded"
-assert_eq null "$(field bund version)" "provided_by has no version"
-assert_eq null "$(field bund backend)" "provided_by has no backend"
-assert_eq bundled "$(field bund source)" "bund is bundled"
-prun $'tool_groups: []\ntools_add: [bund]'
-assert_eq 2 "$rc" "bundled without provider: exit 2"
-assert_contains "$(cat "$d/err")" "bund comes with prov; add prov instead" "bundled without provider: message"
-prun $'tool_groups: []\ntools_add: [prov, bund]'
-assert_eq 0 "$rc" "bundled with provider: ok"
-
-# core_cannot_be_removed
-run linux 'tools_remove: [fzf]'
-assert_eq 2 "$rc" "core_cannot_be_removed: exit 2"
-assert_contains "$(cat "$d/err")" "fzf" "core_cannot_be_removed: names tool"
-
-# unknown_group_fails / unknown tool
-run linux 'tool_groups: [nope]'
-assert_eq 2 "$rc" "unknown_group_fails: exit 2"
-assert_contains "$(cat "$d/err")" "unknown group: nope (valid: core, git," "unknown_group_fails: message"
-run linux 'tools_add: [nope]'
-assert_eq 2 "$rc" "unknown_tool: exit 2"
-assert_contains "$(cat "$d/err")" "unknown tool: nope" "unknown_tool: message"
-
-# btop_darwin_native
-run darwin ''
-assert_eq native "$(field btop source)" "btop_darwin_native: darwin native"
-assert_eq null "$(field btop version)" "btop_darwin_native: no version"
-assert_eq null "$(field btop backend)" "btop_darwin_native: no backend"
-run linux ''
-assert_eq mise "$(field btop source)" "btop linux: mise"
-assert_eq aqua:aristocratos/btop "$(field btop backend)" "btop linux: backend"
-
-# native_only and missing_on, on a small catalog (no real tool uses them now)
-printf '%s\n' 'tool_groups: [core]' 'tools:' \
-	'  nat: {group: core, native_only: true}' \
-	'  gap: {group: core, backend: aqua:x/gap, version: "1.0.0", missing_on: [linux-arm64]}' >"$d/fixture.yaml"
-fx() { "$sel" --os "$1" --arch "$2" --local /nonexistent --tools "$d/fixture.yaml" | jq -r --arg n "$3" --arg f "$4" '.[] | select(.name == $n) | .[$f] // "null"'; }
 for os in darwin linux; do
 	assert_eq native "$(fx "$os" arm64 nat source)" "native_only: $os"
 	assert_eq null "$(fx "$os" arm64 nat backend)" "native_only: $os no backend"
 done
 assert_eq native "$(fx linux arm64 gap source)" "missing_on: native on linux-arm64"
 assert_eq mise "$(fx linux x64 gap source)" "missing_on: mise on linux-x64"
+assert_eq bundled "$(fx linux x64 bund source)" "provided_by: bundled"
+assert_eq prov "$(fx linux x64 bund provided_by)" "provided_by recorded"
+assert_eq null "$(fx linux x64 bund version)" "provided_by has no version"
+assert_eq null "$(fx linux x64 bund backend)" "provided_by has no backend"
 
-# bin defaults and overrides; bootstrap
-run linux ''
-assert_eq rg "$(field ripgrep bin)" "bin override"
-assert_eq fzf "$(field fzf bin)" "bin defaults to name"
-assert_eq bootstrap "$(field mise source)" "mise is bootstrap"
-
-# missing local file is the default selection
-out="$("$sel" --os linux --local "$d/absent.yml")"
-assert_eq "$all" "$(names)" "missing local.yml: default selection"
+# --platform <os>-<arch> is the same as --os/--arch; bad arguments exit 2
+plat_src() { "$sel" --platform "$1" | jq -r --arg n "$2" '.[] | select(.name == $n) | .source'; }
+assert_eq mise "$(plat_src linux-arm64 btop)" "--platform linux-arm64 maps to linux/arm64"
+assert_eq native "$(plat_src macos-arm64 btop)" "--platform macos-arm64 maps to darwin/arm64"
+for bad in "--os linux --arch riscv" "--platform windows-x64" "--os linux --local x.yml"; do
+	# shellcheck disable=SC2086 # $bad is several arguments
+	"$sel" $bad >/dev/null 2>&1
+	assert_eq 2 "$?" "rejected: $bad"
+done
 
 # yaml_has_every_legacy_tool: the pre-mise group_vars `tools` list
 for t in chezmoi atuin sheldon zellij starship zoxide eza bat fd ripgrep fzf \
@@ -129,7 +91,7 @@ assert_eq "" "$bad" "no latest pins"
 
 # source enum, and mise entries are fully pinned (both OSes)
 for os in darwin linux; do
-	run "$os" ''
+	run "$os"
 	bad="$(jq -r '.[] | select([.source] | inside(["mise", "native", "bootstrap", "bundled"]) | not) | .name' <<<"$out")"
 	assert_eq "" "$bad" "source enum ($os)"
 	bad="$(jq -r '.[] | select(.source == "mise" and (.backend == null or .version == null)) | .name' <<<"$out")"
@@ -148,22 +110,3 @@ while IFS=$'\t' read -r backend name ver; do
 	assert_eq "$pin" "$ver" "tools.yaml pin for $name matches mise.toml"
 done <"$d/cat.tsv"
 [ "$overlap" -ge 4 ] || fail "expected >=4 overlapping tools with mise.toml, found $overlap"
-
-# scalar instead of list -> friendly exit 2
-for k in tool_groups tools_add tools_remove; do
-	run linux "$k: git"
-	assert_eq 2 "$rc" "scalar $k: exit 2"
-	assert_contains "$(cat "$d/err")" "$k must be a list" "scalar $k: message"
-	assert_not_contains "$(cat "$d/err")" "jq: error" "scalar $k: no raw jq error"
-done
-
-# native_on: native on that OS, mise elsewhere
-src_of() { "$sel" --os "$1" --arch "$2" --local /nonexistent | jq -r --arg n "$3" '.[] | select(.name == $n) | .source'; }
-assert_eq native "$(src_of darwin arm64 btop)" "native_on: btop native on darwin"
-assert_eq mise "$(src_of linux arm64 btop)" "native_on: btop mise on linux"
-if "$sel" --os linux --arch riscv --local /nonexistent >/dev/null 2>&1; then fail "bad --arch is rejected"; fi
-# --platform <os>-<arch> is the same as --os/--arch
-plat_src() { "$sel" --platform "$1" --local /nonexistent | jq -r --arg n "$2" '.[] | select(.name == $n) | .source'; }
-assert_eq mise "$(plat_src linux-arm64 btop)" "--platform linux-arm64 maps to linux/arm64"
-assert_eq native "$(plat_src macos-arm64 btop)" "--platform macos-arm64 maps to darwin/arm64"
-if "$sel" --platform windows-x64 --local /nonexistent >/dev/null 2>&1; then fail "bad --platform is rejected"; fi

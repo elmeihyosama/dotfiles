@@ -57,7 +57,7 @@ if [ -n "$tools" ]; then
 	sel_tools="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/select-tools.sh"
 	tools_json="$(yq -o json '.tools' "$tools")" || exit 2
 	for p in macos-arm64 linux-x64 linux-arm64; do
-		sel="$("$sel_tools" --platform "$p" --local /nonexistent --tools "$tools")" || exit 2
+		sel="$("$sel_tools" --platform "$p" --tools "$tools")" || exit 2
 		policy+="$(jq -r --argjson sel "$sel" --arg p "$p" '
 			to_entries[] | select(.value.backend != null) | .key as $n | .value as $t
 			| any($sel[]; .name == $n and .source == "mise") as $mise
