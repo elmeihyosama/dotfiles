@@ -30,7 +30,6 @@ exe "$bin/ubi"
 exe "$bin/rg"
 exe "$bin/delta"
 exe "$bin/fzf"
-exe "$bin/age-keygen"
 exe "$opt/neovim/bin/nvim"
 ln -s "$opt/neovim/bin/nvim" "$bin/nvim"
 exe "$d/brew/batcat"
@@ -51,7 +50,7 @@ exe "$bin/btop" "echo user-btop"
 
 out="$("$script" "$bin" "$opt" "$tools_yaml" "$selection")" || fail "cleanup exits 0"
 
-for f in ubi rg delta fzf age-keygen nvim bat fd; do
+for f in ubi rg delta fzf nvim bat fd; do
 	[ -e "$bin/$f" ] || [ -L "$bin/$f" ] && fail "removed: $f"
 	assert_contains "$out" "$bin/$f" "reports $f"
 done

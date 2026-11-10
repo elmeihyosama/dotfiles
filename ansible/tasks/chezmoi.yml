@@ -74,13 +74,6 @@
     mode: "0600"
     content: |
       sourceDir = "{{ playbook_dir | dirname }}"
-      {% if age_recipient is defined %}
-      # Opt-in age encryption (docs/secrets.md); the identity is per-machine.
-      encryption = "age"
-      [age]
-          identity = "~/.config/chezmoi/key.txt"
-          recipient = "{{ age_recipient }}"
-      {% endif %}
       [data]
       {% for line in _kept_data_lines %}
           {{ line }}

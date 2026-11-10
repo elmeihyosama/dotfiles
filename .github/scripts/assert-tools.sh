@@ -6,7 +6,7 @@
 #   mise       `mise which --version` equals the tools.yaml pin and `command -v`
 #              is inside mise's data dir; copies behind it WARN (shadowed), a
 #              copy ahead of it FAILs.
-#   bundled    as its provider (age-keygen in age).
+#   bundled    as its provider (a provided_by tool).
 #   bootstrap  (mise itself) must resolve and run.
 #   native     required on macOS (brew), best effort (SKIP) on Linux.
 # Output lines: OK: / WARN: / SKIP: / FAIL:. A shadowed Homebrew copy that

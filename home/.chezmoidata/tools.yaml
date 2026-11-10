@@ -143,15 +143,6 @@ tools:
     about: "Friendly disk usage and free space overview"
     backend: aqua:muesli/duf
     version: "0.9.1"
-  age:
-    group: files
-    about: "Simple file encryption (chezmoi secrets)"
-    backend: aqua:FiloSottile/age
-    version: "1.3.1"
-  age-keygen:
-    group: files
-    about: "Creates age keys (ships with age)"
-    provided_by: age
   btop:
     group: system
     about: "Resource monitor: CPU, memory, disks, processes"

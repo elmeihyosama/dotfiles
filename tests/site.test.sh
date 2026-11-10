@@ -16,7 +16,7 @@ page="$TESTS_REPO/site/index.html"
 tools_yaml="$TESTS_REPO/home/.chezmoidata/tools.yaml"
 html="$(cat "$page")"
 
-# provided_by tools (age-keygen) ship inside another tool and get no chip.
+# provided_by tools ship inside another tool and get no chip.
 installable="$(yq '.tools | to_entries[] | select(.value.provided_by == null) | .key' "$tools_yaml")"
 n_tools="$(printf '%s\n' "$installable" | grep -c .)"
 n_themes="$(find "$TESTS_REPO/home/.chezmoidata/themes" -name '*.toml' | wc -l | tr -d ' ')"

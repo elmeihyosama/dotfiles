@@ -39,15 +39,29 @@ run linux $'tool_groups: [git]\ntools_add: [btop]\ntools_remove: [lazygit]'
 assert_eq 0 "$rc" "add_remove: exit 0"
 assert_contains "$(names)" "btop" "add_remove: added"
 assert_not_contains "$(names)" "lazygit" "add_remove: removed"
-run linux $'tool_groups: [files]\ntools_remove: [age]'
-assert_not_contains "$(names)" "age" "add_remove: removing provider drops age-keygen too"
 
-# age-keygen follows age and is never installed on its own
-run linux ''
-assert_eq age "$(field age-keygen provided_by)" "provided_by recorded"
-assert_eq null "$(field age-keygen version)" "provided_by has no version"
-assert_eq null "$(field age-keygen backend)" "provided_by has no backend"
-assert_eq bundled "$(field age-keygen source)" "age-keygen is bundled"
+# provided_by, on a small catalog (no real tool uses it now): a bundled tool
+# follows its provider and is never installed on its own
+printf '%s\n' 'tool_groups: [core, extra]' 'tools:' \
+	'  prov: {group: extra, backend: aqua:x/prov, version: "1.0.0"}' \
+	'  bund: {group: extra, provided_by: prov}' >"$d/prov.yaml"
+prun() { # prun LOCAL_CONTENT: like run, on the provided_by catalog
+	printf '%s' "$1" >"$d/local.yml"
+	out="$("$sel" --os linux --local "$d/local.yml" --tools "$d/prov.yaml" 2>"$d/err")"
+	rc=$?
+}
+prun 'tools_remove: [prov]'
+assert_not_contains "$(names)" "bund" "add_remove: removing provider drops the bundled tool too"
+prun ''
+assert_eq prov "$(field bund provided_by)" "provided_by recorded"
+assert_eq null "$(field bund version)" "provided_by has no version"
+assert_eq null "$(field bund backend)" "provided_by has no backend"
+assert_eq bundled "$(field bund source)" "bund is bundled"
+prun $'tool_groups: []\ntools_add: [bund]'
+assert_eq 2 "$rc" "bundled without provider: exit 2"
+assert_contains "$(cat "$d/err")" "bund comes with prov; add prov instead" "bundled without provider: message"
+prun $'tool_groups: []\ntools_add: [prov, bund]'
+assert_eq 0 "$rc" "bundled with provider: ok"
 
 # core_cannot_be_removed
 run linux 'tools_remove: [fzf]'
@@ -96,7 +110,7 @@ assert_eq "$all" "$(names)" "missing local.yml: default selection"
 # yaml_has_every_legacy_tool: the pre-mise group_vars `tools` list
 for t in chezmoi atuin sheldon zellij starship zoxide eza bat fd ripgrep fzf \
 	git-delta lazygit yazi jq yq gh dust duf btop neovim \
-	fastfetch mise vivid age age-keygen; do
+	fastfetch mise vivid; do
 	if [ "$(yq ".tools | has(\"$t\")" "$tools_yaml")" != true ]; then
 		fail "yaml_has_every_legacy_tool: $t missing from tools.yaml"
 	fi
@@ -142,13 +156,6 @@ for k in tool_groups tools_add tools_remove; do
 	assert_contains "$(cat "$d/err")" "$k must be a list" "scalar $k: message"
 	assert_not_contains "$(cat "$d/err")" "jq: error" "scalar $k: no raw jq error"
 done
-
-# provided_by tool added without its provider
-run linux $'tool_groups: [git]\ntools_add: [age-keygen]'
-assert_eq 2 "$rc" "age-keygen without age: exit 2"
-assert_contains "$(cat "$d/err")" "age-keygen comes with age; add age instead" "age-keygen without age: message"
-run linux $'tool_groups: [git]\ntools_add: [age, age-keygen]'
-assert_eq 0 "$rc" "age-keygen with age: ok"
 
 # native_on: native on that OS, mise elsewhere
 src_of() { "$sel" --os "$1" --arch "$2" --local /nonexistent | jq -r --arg n "$3" '.[] | select(.name == $n) | .source'; }

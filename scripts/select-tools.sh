@@ -9,7 +9,7 @@
 #   mise      from the dotfiles mise pins (backend and version set)
 #   native    brew/apt/dnf/pacman, also a platform in missing_on (backend/version null)
 #   bootstrap installed by Ansible before mise exists (mise itself; version set)
-#   bundled   inside provided_by's install (age-keygen -> age); version/backend null
+#   bundled   inside provided_by's install; version/backend null
 #
 # Selection = core + tool_groups (default: all) + tools_add - tools_remove; a
 # provided_by tool follows its provider. Never uninstalls anything. Bad input
