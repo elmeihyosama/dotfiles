@@ -1,0 +1,6 @@
+{{ if ne .chezmoi.os "darwin" }}
+# macOS only
+Library
+.config/ghostty
+.config/herdr-app
+{{ end }}
