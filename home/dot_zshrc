@@ -36,6 +36,7 @@ plug fzf-tab/fzf-tab.plugin.zsh
 
 # --- tools ---
 has mise  && eval "$(mise activate zsh)"
+has starship && eval "$(starship init zsh)"
 has atuin && eval "$(atuin init zsh)"
 has fzf   && plug fzf-git.sh/fzf-git.sh   # ctrl-g then ctrl-b/f/h/t/r/s: branches, files, commits, tags, remotes, stashes
 

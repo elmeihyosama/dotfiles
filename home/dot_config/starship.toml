@@ -1,0 +1,121 @@
+"$schema" = 'https://starship.rs/config-schema.json'
+add_newline = true
+palette = "catppuccin_mocha"
+
+format = """
+[╭─](rail)$os$hostname$directory$git_branch$git_status$jobs$nodejs$python$rust$golang$docker_context$kubernetes$fill$cmd_duration$time
+[╰─](rail)$character"""
+
+[palettes.catppuccin_mocha]
+# structural
+bg      = "#1e1e2e"
+surface = "#181825"
+raised  = "#313244"
+muted   = "#45475a"
+rail    = "#585b70"
+text    = "#cdd6f4"
+# design roles (chrome)
+accent  = "#a6e3a1"
+accent2 = "#94e2d5"
+link    = "#89b4fa"
+ok      = "#a6e3a1"
+warn    = "#f9e2af"
+err     = "#f38ba8"
+# content spectrum (language segments)
+red     = "#f38ba8"
+orange  = "#fab387"
+yellow  = "#f9e2af"
+green   = "#a6e3a1"
+cyan    = "#94e2d5"
+blue    = "#89b4fa"
+magenta = "#cba6f7"
+
+[os]
+disabled = false
+style = "bold text"
+format = "[$symbol]($style)"
+
+[os.symbols]
+Macos = " "
+Ubuntu = " "
+Debian = " "
+Linux = " "
+Arch = " "
+Fedora = " "
+
+[hostname]
+ssh_only = false
+ssh_symbol = "󰣀 "
+style = "bold orange"
+format = "[$ssh_symbol$hostname]($style) "
+
+[fill]
+symbol = " "
+
+[directory]
+truncation_length = 0
+truncate_to_repo = true
+style = "bold accent2"
+format = "[󰉋 $path]($style)[$read_only]($read_only_style) "
+
+[git_branch]
+symbol = " "
+style = "link"
+format = "[$symbol$branch]($style) "
+
+[git_status]
+style = "err"
+format = '([$all_status$ahead_behind]($style)) '
+
+[jobs]
+symbol = ""
+style = "warn"
+format = "[$symbol $number]($style) "
+
+[nodejs]
+symbol = " "
+style = "green"
+format = "[$symbol($version )]($style)"
+
+[python]
+symbol = " "
+style = "yellow"
+format = '[$symbol(${version} )(\($virtualenv\) )]($style)'
+
+[rust]
+symbol = " "
+style = "orange"
+format = "[$symbol($version )]($style)"
+
+[golang]
+symbol = " "
+style = "cyan"
+format = "[$symbol($version )]($style)"
+
+[docker_context]
+symbol = " "
+only_with_files = true
+style = "muted"
+format = "[$symbol$context]($style) "
+
+[kubernetes]
+symbol = "󱃾 "
+disabled = false
+style = "warn"
+format = '[$symbol$context( \($namespace\))]($style) '
+
+[cmd_duration]
+min_time = 2000
+style = "muted"
+format = "[󱦟 $duration]($style) "
+
+[time]
+disabled = false
+time_format = "%R"
+style = "muted"
+format = "[$time]($style)"
+
+[character]
+success_symbol = '[❯](bold accent)'
+error_symbol = '[❯](bold err)'
+vimcmd_symbol = '[❮](bold warn)'
