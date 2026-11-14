@@ -1,0 +1,14 @@
+# Read by every zsh (also scripts). Keep it to environment only.
+
+# Tools keep their files in ~/.config, ~/.local/share, ~/.cache
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_CACHE_HOME="$HOME/.cache"
+export XDG_STATE_HOME="$HOME/.local/state"
+
+# mise, chezmoi and anything installed without sudo
+typeset -U path
+path=("$HOME/.local/bin" $path)
+
+export EDITOR=nvim
+export VISUAL=nvim

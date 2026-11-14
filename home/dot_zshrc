@@ -1,0 +1,115 @@
+# ~/.zshrc — interactive shell
+
+has()  { command -v "$1" >/dev/null }                       # is a command installed?
+plug() { [[ -r $XDG_DATA_HOME/zsh/$1 ]] && source "$XDG_DATA_HOME/zsh/$1" }  # load a plugin if present
+
+# --- options ---
+setopt autocd               # type a directory to cd into it
+setopt interactive_comments # allow # comments at the prompt
+
+# --- history ---
+HISTFILE=$XDG_STATE_HOME/zsh/history
+HISTSIZE=50000
+SAVEHIST=50000
+[[ -d ${HISTFILE:h} ]] || mkdir -p ${HISTFILE:h}
+setopt share_history        # all tabs see each other's history
+setopt hist_ignore_dups     # no consecutive duplicates
+setopt hist_ignore_space    # " cmd" is not recorded
+
+# --- keys ---
+bindkey -e                  # emacs keys (zsh would pick vi mode because EDITOR=nvim)
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey '^X^E' edit-command-line   # open the command in $EDITOR
+
+# --- completion ---
+fpath=($XDG_DATA_HOME/zsh/zsh-completions/src $fpath)
+autoload -Uz compinit
+[[ -d $XDG_CACHE_HOME/zsh ]] || mkdir -p $XDG_CACHE_HOME/zsh
+compinit -d $XDG_CACHE_HOME/zsh/zcompdump
+# Tab matching: exact, then any case, then partial words (f-b → foo-bar), then substring
+zstyle ':completion:*' matcher-list '' 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=*'
+zstyle ':completion:*' menu no                      # fzf-tab draws the menu
+zstyle ':completion:*:git-checkout:*' sort false    # recent branches first
+has eza && zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza -1 --color=always $realpath'
+plug fzf-tab/fzf-tab.plugin.zsh
+
+# --- tools ---
+has mise  && eval "$(mise activate zsh)"
+has atuin && eval "$(atuin init zsh)"
+has fzf   && plug fzf-git.sh/fzf-git.sh   # ctrl-g then ctrl-b/f/h/t/r/s: branches, files, commits, tags, remotes, stashes
+
+# --- aliases ---
+# navigation
+alias ..='cd ..' ...='cd ../..' ....='cd ../../..'
+alias -- -='cd -'
+mkcd() { mkdir -p -- "$1" && cd -- "$1" }
+
+# listing
+if has eza; then
+  alias ls='eza --icons=always --group-directories-first'
+  alias la='eza -a --icons=always --group-directories-first'
+  alias ll='eza -la --icons=always --group-directories-first'
+  alias lt='eza --tree --level=2 --icons=always'
+  alias tree='eza --tree --icons=always'
+fi
+
+# editor, shell
+alias v='nvim'
+alias reload='exec zsh'
+alias path='print -l $path'
+
+# dotfiles
+alias cz='chezmoi'
+dot() { cd "${$(chezmoi source-path):h}" }   # the repo (chezmoi's source is its home/ folder)
+
+# git
+alias g='git' gs='git status' ga='git add' gc='git commit' gcm='git commit -m' \
+      gca='git commit --amend --no-edit' gp='git push' gpf='git push --force-with-lease' \
+      gpl='git pull' gf='git fetch' gco='git checkout' gsw='git switch' gcb='git switch -c' \
+      gb='git branch' gd='git diff' gds='git diff --staged' gst='git stash' \
+      grs='git restore' gundo='git reset --soft HEAD~1' \
+      gl='git log --oneline --graph --decorate' glg='git log --oneline --graph --decorate --all'
+
+# tools
+has lazygit   && alias lg='lazygit'
+has claude    && alias c='claude'
+has duf       && alias dfh='duf'
+has dust      && alias duh='dust'
+has btop      && alias bt='btop'
+has fastfetch && alias ff='fastfetch'
+has lsof      && alias ports='lsof -nP -iTCP -sTCP:LISTEN'
+
+# yazi: quit and land in the directory you were browsing (from the yazi docs)
+has yazi && y() {
+  local tmp="$(mktemp -t yazi-cwd.XXXXXX)" cwd
+  yazi "$@" --cwd-file="$tmp"
+  IFS= read -r -d '' cwd < "$tmp"
+  [[ -n $cwd && $cwd != $PWD ]] && builtin cd -- "$cwd"
+  rm -f -- "$tmp"
+}
+
+# --- suggestions (grey text, → accepts) ---
+# zsh-autosuggestions tries each strategy in order. `ctx` (below) suggests what you
+# last ran in this directory, then in this git repo; `atuin` falls back to anywhere.
+# --author '$all-user' leaves out commands run by AI agents (atuin's own default).
+_zsh_autosuggest_strategy_ctx() {
+  local mode
+  for mode in directory workspace; do
+    suggestion=$(ATUIN_QUERY=$1 atuin search --cmd-only --author '$all-user' \
+      --limit 1 --search-mode prefix --filter-mode $mode 2>/dev/null)
+    [[ -n $suggestion ]] && return
+  done
+}
+if has atuin; then
+  ZSH_AUTOSUGGEST_STRATEGY=(ctx atuin)
+else
+  ZSH_AUTOSUGGEST_STRATEGY=(history)
+fi
+plug zsh-autosuggestions/zsh-autosuggestions.zsh
+
+# --- syntax highlighting (must be the last plugin) ---
+plug zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+
+# --- this machine only ---
+[[ -r ~/.zshrc.local ]] && source ~/.zshrc.local

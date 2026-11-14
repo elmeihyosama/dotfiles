@@ -1,0 +1,5 @@
+# CLI tools for every machine. `mise install` installs them, no sudo.
+# Your own extras go in ~/.config/mise/config.toml (`mise use -g <tool>`).
+[tools]
+"aqua:junegunn/fzf" = "latest"
+"github:atuinsh/atuin" = { version = "latest", matching_regex = '^atuin-[a-z0-9_]+-(apple-darwin|unknown-linux-musl)[.]tar[.]gz$' }
