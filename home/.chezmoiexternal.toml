@@ -1,0 +1,25 @@
+# zsh plugins: cloned by chezmoi, refreshed weekly, sourced from ~/.zshrc.
+[".local/share/zsh/zsh-autosuggestions"]
+    type = "git-repo"
+    url = "https://github.com/zsh-users/zsh-autosuggestions.git"
+    refreshPeriod = "168h"
+
+[".local/share/zsh/zsh-syntax-highlighting"]
+    type = "git-repo"
+    url = "https://github.com/zsh-users/zsh-syntax-highlighting.git"
+    refreshPeriod = "168h"
+
+[".local/share/zsh/fzf-tab"]
+    type = "git-repo"
+    url = "https://github.com/Aloxaf/fzf-tab.git"
+    refreshPeriod = "168h"
+
+[".local/share/zsh/zsh-completions"]
+    type = "git-repo"
+    url = "https://github.com/zsh-users/zsh-completions.git"
+    refreshPeriod = "168h"
+
+[".local/share/zsh/fzf-git.sh"]
+    type = "git-repo"
+    url = "https://github.com/junegunn/fzf-git.sh.git"
+    refreshPeriod = "168h"
