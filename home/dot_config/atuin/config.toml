@@ -1,0 +1,14 @@
+# local only: no account, no sync
+update_check = false
+auto_sync = false
+
+style = "full"
+inline_height = 15
+show_preview = true
+enter_accept = true       # Tab puts it on the prompt to edit instead
+
+filter_mode = "global"    # ctrl-r again cycles host / session / directory
+search_mode = "fuzzy"
+
+[theme]
+name = "catppuccin-mocha-mauve"

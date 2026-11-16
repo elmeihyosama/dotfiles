@@ -1,0 +1,88 @@
+#!/bin/bash
+# Claude Code status line. Claude pipes the session as JSON on stdin; this prints one line.
+# Colours: official Catppuccin Mocha (github.com/catppuccin/catppuccin), same names as starship.toml.
+
+# --- palette ---
+teal=94e2d5 blue=89b4fa sapphire=74c7ec sky=89dceb mauve=cba6f7 pink=f5c2e7
+peach=fab387 yellow=f9e2af green=a6e3a1 red=f38ba8
+surface1=45475a text=cdd6f4
+
+rgb() { printf '%d;%d;%d' "0x${1:0:2}" "0x${1:2:2}" "0x${1:4:2}"; }
+fg() { printf '\033[38;2;%sm' "$(rgb "$1")"; }
+reset=$'\033[0m'
+
+# --- read everything in one jq call (\037 keeps empty fields in place) ---
+IFS=$'\037' read -r dir model effort ctx h5 h5_reset d7 d7_reset cost added removed \
+  ostyle pr pr_url < <(jq -r '[
+    (.workspace.current_dir // .cwd), .model.display_name, .effort.level,
+    .context_window.used_percentage,
+    .rate_limits.five_hour.used_percentage, .rate_limits.five_hour.resets_at,
+    .rate_limits.seven_day.used_percentage, .rate_limits.seven_day.resets_at,
+    .cost.total_cost_usd, .cost.total_lines_added, .cost.total_lines_removed,
+    .output_style.name, .pr.number, .pr.url
+  ] | map(. // "" | tostring) | join("\u001f")')
+
+# --- helpers ---
+# seconds until a unix time, as 2h46m or 3d11h
+until_reset() {
+  local left=$(( $1 - $(date +%s) ))
+  [ "$left" -gt 0 ] || return
+  if [ "$left" -ge 86400 ]; then printf '%dd%dh' $((left / 86400)) $((left % 86400 / 3600))
+  else printf '%dh%dm' $((left / 3600)) $((left % 3600 / 60)); fi
+}
+
+segs=()   # each entry: colour<TAB>text
+seg() { segs+=("$1"$'\t'"$2"); }
+
+# --- fields ---
+cd "$dir" 2>/dev/null
+if top=$(git rev-parse --show-toplevel 2>/dev/null); then
+  seg "$teal" "󰉋 ${top##*/}${dir#"$top"}"
+  branch=$(git branch --show-current 2>/dev/null)
+  [ -n "$(git --no-optional-locks status --porcelain 2>/dev/null | head -1)" ] && branch="$branch*"
+  [ -n "$branch" ] && seg "$blue" " $branch"
+else
+  case "$dir" in "$HOME"*) dir="~${dir#"$HOME"}" ;; esac
+  seg "$teal" "󰉋 $dir"
+fi
+
+[ -n "$model" ] && seg "$peach" "󰚩 $model"
+[ -n "$effort" ] && seg "$mauve" "󰓅 $effort"
+
+# context: green under 40%, yellow under 60%, orange under 80%, red after
+if [ -n "$ctx" ]; then
+  pct=${ctx%.*}
+  if [ "$pct" -lt 40 ]; then c=$green; elif [ "$pct" -lt 60 ]; then c=$yellow
+  elif [ "$pct" -lt 80 ]; then c=$peach; else c=$red; fi
+  bar=""   # 10 cells, 10% each
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    if [ $(( i * 10 )) -le $(( pct + 5 )) ]; then bar="${bar}▰"; else bar="${bar}▱"; fi
+  done
+  seg "$c" "$bar $pct%"
+fi
+
+if [ -n "$h5" ]; then
+  r5=$(until_reset "$h5_reset"); r7=$(until_reset "$d7_reset")
+  limits="5h ${h5%.*}%${r5:+ ↻$r5}"
+  [ -n "$d7" ] && limits="$limits · 7d ${d7%.*}%${r7:+ ↻$r7}"
+  seg "$sky" "󰔟 $limits"
+elif [ -n "$cost" ]; then
+  # session cost: $ in green, the amount coloured by size (under $25 / $50 / $75, then more)
+  usd=$(printf '%.2f' "$cost"); whole=${usd%.*}
+  if [ "$whole" -lt 25 ]; then c=$text; elif [ "$whole" -lt 50 ]; then c=$yellow
+  elif [ "$whole" -lt 75 ]; then c=$peach; else c=$red; fi
+  seg "$green" "\$$(fg "$c")$usd"
+fi
+
+[ -n "$ostyle" ] && [ "$ostyle" != "default" ] && seg "$pink" "󰏘 $ostyle"
+[ "${added:-0}${removed:-0}" != "00" ] && seg "$green" "+$added$(fg "$red") −$removed"
+[ -n "$pr" ] && seg "$sapphire" " "$'\033]8;;'"$pr_url"$'\a'"#$pr"$'\033]8;;\a'
+
+# --- draw ---
+out=""
+for s in "${segs[@]}"; do
+  c=${s%%$'\t'*} t=${s#*$'\t'}
+  [ -n "$out" ] && out="$out$(fg "$surface1") │ "
+  out="$out$(fg "$c")$t"
+done
+printf '%s%s\n' "$out" "$reset"

@@ -1,0 +1,61 @@
+# name, email and signing: ~/.config/git/local, per machine, included last
+
+[init]
+    defaultBranch = main
+[pull]
+    rebase = true
+[push]
+    autoSetupRemote = true
+[fetch]
+    prune = true
+[rebase]
+    autoStash = true
+[merge]
+    conflictStyle = zdiff3    # conflicts also show the original text
+    autoStash = true
+[diff]
+    algorithm = histogram
+    colorMoved = default
+[branch]
+    sort = -committerdate
+[tag]
+    sort = version:refname
+[column]
+    ui = auto
+
+# --- delta ---
+[core]
+    pager = delta
+[interactive]
+    diffFilter = delta --color-only
+[delta]
+    navigate = true           # n / N jump between files
+    line-numbers = true
+    side-by-side = true
+    features = catppuccin-mocha
+
+# github.com/catppuccin/delta
+[delta "catppuccin-mocha"]
+    blame-palette = "#1e1e2e #181825 #11111b #313244 #45475a"
+    commit-decoration-style = "#6c7086" bold box ul
+    dark = true
+    file-decoration-style = "#6c7086"
+    file-style = "#cdd6f4"
+    hunk-header-decoration-style = "#6c7086" box ul
+    hunk-header-file-style = bold
+    hunk-header-line-number-style = bold "#a6adc8"
+    hunk-header-style = file line-number syntax
+    line-numbers-left-style = "#6c7086"
+    line-numbers-minus-style = bold "#f38ba8"
+    line-numbers-plus-style = bold "#a6e3a1"
+    line-numbers-right-style = "#6c7086"
+    line-numbers-zero-style = "#6c7086"
+    minus-emph-style = bold syntax "#694559"
+    minus-style = syntax "#493447"
+    plus-emph-style = bold syntax "#4e6356"
+    plus-style = syntax "#394545"
+    map-styles = bold purple => syntax "#5b4e74", bold blue => syntax "#445375", bold cyan => syntax "#446170", bold yellow => syntax "#6b635b"
+    syntax-theme = Catppuccin Mocha
+
+[include]
+    path = ~/.config/git/local

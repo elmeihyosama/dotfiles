@@ -1,0 +1,17 @@
+# font: the built-in JetBrains Mono, Nerd Font icons included
+theme = catppuccin-mocha.conf
+font-size = 14
+
+copy-on-select = clipboard
+clipboard-write = allow
+window-save-state = always
+macos-titlebar-style = hidden
+
+cursor-style = bar
+cursor-style-blink = true
+
+confirm-close-surface = always
+
+# servers you ssh into understand Ghostty's terminal type
+shell-integration-features = ssh-terminfo,ssh-env
+

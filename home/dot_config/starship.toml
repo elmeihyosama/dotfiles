@@ -1,0 +1,126 @@
+"$schema" = 'https://starship.rs/config-schema.json'
+add_newline = true
+palette = "catppuccin_mocha"
+
+format = """
+[╭─](surface2)$os$hostname$directory$git_branch$git_status$jobs$nodejs$python$rust$golang$docker_context$kubernetes$fill$cmd_duration$time
+[╰─](surface2)$character"""
+
+# official palette, from github.com/catppuccin/starship (themes/mocha.toml)
+[palettes.catppuccin_mocha]
+rosewater = "#f5e0dc"
+flamingo = "#f2cdcd"
+pink = "#f5c2e7"
+mauve = "#cba6f7"
+red = "#f38ba8"
+maroon = "#eba0ac"
+peach = "#fab387"
+yellow = "#f9e2af"
+green = "#a6e3a1"
+teal = "#94e2d5"
+sky = "#89dceb"
+sapphire = "#74c7ec"
+blue = "#89b4fa"
+lavender = "#b4befe"
+text = "#cdd6f4"
+subtext1 = "#bac2de"
+subtext0 = "#a6adc8"
+overlay2 = "#9399b2"
+overlay1 = "#7f849c"
+overlay0 = "#6c7086"
+surface2 = "#585b70"
+surface1 = "#45475a"
+surface0 = "#313244"
+base = "#1e1e2e"
+mantle = "#181825"
+crust = "#11111b"
+
+[os]
+disabled = false
+style = "bold text"
+format = "[$symbol]($style)"
+
+[os.symbols]
+Macos = " "
+Ubuntu = " "
+Debian = " "
+Linux = " "
+Arch = " "
+Fedora = " "
+
+[hostname]
+ssh_only = false
+ssh_symbol = "󰣀 "
+style = "bold peach"
+format = "[$ssh_symbol$hostname]($style) "
+
+[fill]
+symbol = " "
+
+[directory]
+truncation_length = 0
+truncate_to_repo = true
+style = "bold teal"
+format = "[󰉋 $path]($style)[$read_only]($read_only_style) "
+
+[git_branch]
+symbol = " "
+style = "blue"
+format = "[$symbol$branch]($style) "
+
+[git_status]
+style = "red"
+format = '([$all_status$ahead_behind]($style)) '
+
+[jobs]
+symbol = ""
+style = "yellow"
+format = "[$symbol $number]($style) "
+
+[nodejs]
+symbol = " "
+style = "green"
+format = "[$symbol($version )]($style)"
+
+[python]
+symbol = " "
+style = "yellow"
+format = '[$symbol(${version} )(\($virtualenv\) )]($style)'
+
+[rust]
+symbol = " "
+style = "peach"
+format = "[$symbol($version )]($style)"
+
+[golang]
+symbol = " "
+style = "teal"
+format = "[$symbol($version )]($style)"
+
+[docker_context]
+symbol = " "
+only_with_files = true
+style = "surface1"
+format = "[$symbol$context]($style) "
+
+[kubernetes]
+symbol = "󱃾 "
+disabled = false
+style = "yellow"
+format = '[$symbol$context( \($namespace\))]($style) '
+
+[cmd_duration]
+min_time = 2000
+style = "surface1"
+format = "[󱦟 $duration]($style) "
+
+[time]
+disabled = false
+time_format = "%R"
+style = "surface1"
+format = "[$time]($style)"
+
+[character]
+success_symbol = '[❯](bold green)'
+error_symbol = '[❯](bold red)'
+vimcmd_symbol = '[❮](bold yellow)'

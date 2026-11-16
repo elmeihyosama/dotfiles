@@ -1,0 +1,12 @@
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_CACHE_HOME="$HOME/.cache"
+export XDG_STATE_HOME="$HOME/.local/state"
+export EZA_CONFIG_DIR="$XDG_CONFIG_HOME/eza"   # eza ignores XDG on macOS
+export RIPGREP_CONFIG_PATH="$XDG_CONFIG_HOME/ripgrep/config"   # rg only reads a config it is pointed at
+
+typeset -U path
+path=("$HOME/.local/bin" $path)
+
+export EDITOR=nvim
+export VISUAL=nvim

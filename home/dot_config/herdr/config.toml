@@ -1,0 +1,20 @@
+# default keys: prefix ctrl-b, ctrl-b ? lists them. All options: `herdr --default-config`
+onboarding = false
+
+[theme]
+name = "catppuccin"   # Mocha
+
+[theme.custom]
+sidebar_bg = "#181825"      # mantle
+active_row_bg = "#313244"   # surface0
+selection_bg = "#5b4e74"    # mauve blend, from catppuccin/delta
+
+[ui]
+accent = "#cba6f7"              # mauve
+status_indicators = "symbols"
+tab_bar_right = [
+  { type = "zoom" },
+  { type = "hostname" },
+  { type = "datetime", format = "%H:%M" },
+]
+tab_bar_right_separator = " · "
